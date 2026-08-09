@@ -1,10 +1,18 @@
 # JoeKnock MVP — API Endpoint Specification
 
-## Overview
+## 1. Overview
 
-The JoeKnock MVP API provides the backend services required for authentication, organization management, user and team management, property management, field interactions, configurable statuses, map data, geocoding, and basic activity reporting.
+The JoeKnock MVP API provides the backend services required for:
 
-The API is built around the following core relationship:
+- Authentication
+- Organization management
+- User and team management
+- Configurable statuses
+- Property resolution and map data
+- Field interactions
+- Basic activity reporting
+
+The API is designed around a simple organization-scoped model:
 
 ```text
 Organization
@@ -13,20 +21,31 @@ Organization
     │      │
     │      └── Teams
     │
+    ├── Organization Settings
+    │
     ├── Statuses
     │
     └── Properties
            │
-           └── Interactions
+           └── Interaction Groups
                   │
                   └── Immutable Snapshots
 ```
 
-The API enforces organization isolation, authentication, authorization, and representative visibility rules.
+The API enforces:
+
+- Authentication
+- Authorization
+- Organization isolation
+- Representative visibility rules
+- Immutable interaction history
+- Server-controlled ownership and organization relationships
+
+The MVP intentionally avoids unnecessary CRUD and infrastructure endpoints.
 
 ---
 
-# API Conventions
+# 2. API Conventions
 
 ## Base URL
 
@@ -36,30 +55,30 @@ The API enforces organization isolation, authentication, authorization, and repr
 
 ## Authentication
 
-Protected endpoints require a valid JWT.
+Protected endpoints require a valid JWT:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-The authenticated user's identity and organization are determined from the JWT rather than being supplied by the client.
+The authenticated user's identity and organization are determined from the JWT.
+
+Clients do not supply `user_id` or `organization_id` for protected operations.
 
 ## HTTP Methods
 
-| Method   | Purpose                                          |
-| -------- | ------------------------------------------------ |
-| `GET`    | Retrieve data                                    |
-| `POST`   | Create a resource or perform an action           |
-| `PATCH`  | Modify an existing mutable resource              |
-| `DELETE` | Remove a relationship/resource where appropriate |
+| Method   | Purpose                                            |
+| -------- | -------------------------------------------------- |
+| `GET`    | Retrieve data                                      |
+| `POST`   | Create a resource or perform an operation          |
+| `PATCH`  | Modify a mutable resource                          |
+| `DELETE` | Remove a relationship where specifically permitted |
 
 ## Response Format
 
 Successful requests return JSON.
 
-Errors use appropriate HTTP status codes and a consistent error structure.
-
-Example:
+Errors use an appropriate HTTP status code and consistent structure:
 
 ```json
 {
@@ -72,9 +91,7 @@ Example:
 
 ---
 
-# 1. Authentication
-
-Authentication endpoints handle account registration, login, and logout.
+# 3. Authentication
 
 ## POST `/api/auth/register`
 
@@ -84,7 +101,7 @@ Create the initial organization and administrator account during onboarding.
 
 ### Authentication
 
-Public
+Public.
 
 ### Request
 
@@ -110,7 +127,7 @@ The newly created user becomes the initial organization administrator.
 
 ### Response
 
-Returns the newly created user and authentication information.
+Returns authentication information and the newly created user.
 
 ---
 
@@ -122,7 +139,7 @@ Authenticate an existing user.
 
 ### Authentication
 
-Public
+Public.
 
 ### Request
 
@@ -135,7 +152,7 @@ Public
 
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `users`
 - `organizations`
@@ -157,17 +174,17 @@ Returns a JWT and authenticated user information.
 
 ### Purpose
 
-End the current authenticated session.
+Log the current user out of the application.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
 ### Database Interaction
 
-If server-side session tracking is implemented, the session is invalidated.
+None required for the MVP.
 
-If JWT authentication remains fully stateless, logout is primarily handled by removing the token from the client.
+Because JWT authentication is stateless, the client removes the JWT after logout.
 
 ### Response
 
@@ -179,7 +196,7 @@ If JWT authentication remains fully stateless, logout is primarily handled by re
 
 ---
 
-# 2. Current User
+# 4. Current User
 
 ## GET `/api/me`
 
@@ -189,16 +206,16 @@ Return information about the currently authenticated user.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `users`
 - `organizations`
-- `team_users`
 - `teams`
+- `team_users`
 
 ### Response
 
@@ -216,27 +233,25 @@ Reads from:
 
 ---
 
-# 3. Organizations
-
-Organization creation occurs during registration.
-
-Administrative endpoints manage the current organization.
+# 5. Organizations
 
 ## GET `/api/organization`
 
 ### Purpose
 
-Retrieve the current organization's information.
+Retrieve the authenticated user's organization.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `organizations`
+
+The organization is determined from the authenticated user.
 
 ---
 
@@ -244,19 +259,13 @@ Reads from:
 
 ### Purpose
 
-Update organization information.
+Update mutable organization information.
 
 ### Authentication
 
-Admin
+Admin.
 
-### Database Interaction
-
-Updates:
-
-- `organizations`
-
-### Example Request
+### Request
 
 ```json
 {
@@ -264,25 +273,31 @@ Updates:
 }
 ```
 
-The organization ID is determined from the authenticated user's JWT and is not supplied by the client.
+### Database Interaction
+
+Updates:
+
+- `organizations`
+
+The client does not provide `organization_id`.
 
 ---
 
-# 4. Organization Settings
+# 6. Organization Settings
 
 ## GET `/api/organization/settings`
 
 ### Purpose
 
-Retrieve organization-specific application settings.
+Retrieve organization-level application settings.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `organization_settings`
 
@@ -292,21 +307,17 @@ Reads from:
 
 ### Purpose
 
-Update organization settings.
+Update organization-level application settings.
 
 ### Authentication
 
-Admin
-
-### Database Interaction
-
-Updates:
-
-- `organization_settings`
+Admin.
 
 ### MVP Setting
 
-#### `rep_visibility`
+```text
+rep_visibility
+```
 
 Allowed values:
 
@@ -316,41 +327,35 @@ team
 organization
 ```
 
-Meaning:
+### Meaning
 
-| Value          | Visibility                                         |
-| -------------- | -------------------------------------------------- |
-| `own`          | Representative sees only their own interactions    |
-| `team`         | Representative sees interactions from their teams  |
-| `organization` | Representative sees organization-wide interactions |
+| Value          | Representative visibility                           |
+| -------------- | --------------------------------------------------- |
+| `own`          | Own interactions only                               |
+| `team`         | Own interactions plus interactions from their teams |
+| `organization` | Organization-wide interactions                      |
 
 Managers and administrators retain access according to their role permissions.
 
 ---
 
-# 5. Users
+# 7. Users
 
-Users are organization members.
+Users belong to exactly one organization.
 
-Users are deactivated rather than permanently deleted so historical interaction records retain their original user relationship.
+Users are never deleted in the MVP.
+
+Deactivation prevents account access while preserving existing historical records.
 
 ## GET `/api/users`
 
 ### Purpose
 
-Retrieve users belonging to the current organization.
+Retrieve users belonging to the authenticated user's organization.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Reads from:
-
-- `users`
-- `team_users`
-- `teams`
+Manager/Admin.
 
 ### Supported Filters
 
@@ -360,25 +365,25 @@ Reads from:
 ?teamId=<uuid>
 ```
 
+### Database Interaction
+
+Reads:
+
+- `users`
+- `teams`
+- `team_users`
+
 ---
 
 ## GET `/api/users/:id`
 
 ### Purpose
 
-Retrieve a specific user.
+Retrieve a specific organization user.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Reads from:
-
-- `users`
-- `team_users`
-- `teams`
+Manager/Admin.
 
 The API verifies that the requested user belongs to the authenticated user's organization.
 
@@ -388,11 +393,11 @@ The API verifies that the requested user belongs to the authenticated user's org
 
 ### Purpose
 
-Create or invite a new user into the organization.
+Create a new organization user.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Request
 
@@ -406,13 +411,13 @@ Manager/Admin
 }
 ```
 
+The organization is derived from the authenticated user.
+
 ### Database Interaction
 
 Creates:
 
 - `users`
-
-The `organization_id` is determined from the authenticated administrator rather than the request body.
 
 ---
 
@@ -424,13 +429,7 @@ Update mutable user information.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Updates:
-
-- `users`
+Manager/Admin.
 
 ### Possible Fields
 
@@ -442,7 +441,13 @@ Updates:
 }
 ```
 
-Email and password changes may be handled through dedicated authentication flows if required.
+This endpoint does not handle:
+
+- Team membership
+- Activation/deactivation
+- Organization changes
+- Password changes
+- Email changes
 
 ---
 
@@ -454,7 +459,7 @@ Activate or deactivate a user.
 
 ### Authentication
 
-Admin
+Admin.
 
 ### Request
 
@@ -464,42 +469,39 @@ Admin
 }
 ```
 
-### Database Interaction
+### Behavior
 
-Updates:
+When a user is deactivated:
 
-- `users.is_active`
-- `users.deactivated_at`
+- They cannot authenticate.
+- They cannot create new interactions.
+- They cannot edit existing interactions.
+- Existing interaction groups remain unchanged.
+- Existing snapshots remain unchanged.
+- Historical `user_id` relationships remain intact.
+- No interactions are reassigned.
 
-The user is not physically deleted.
-
-This preserves the user's relationship to historical interaction records.
+There is no user deletion endpoint.
 
 ---
 
-# 6. Teams
+# 8. Teams
 
 Teams organize users within an organization.
 
 Users and teams have a many-to-many relationship through `team_users`.
 
+A user may belong to zero, one, or multiple teams.
+
 ## GET `/api/teams`
 
 ### Purpose
 
-Retrieve teams belonging to the current organization.
+Retrieve organization teams.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Reads from:
-
-- `teams`
-- `team_users`
-- `users`
+Manager/Admin.
 
 ---
 
@@ -507,19 +509,11 @@ Reads from:
 
 ### Purpose
 
-Retrieve a specific team and its members.
+Retrieve a team and its members.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Reads from:
-
-- `teams`
-- `team_users`
-- `users`
+Manager/Admin.
 
 ---
 
@@ -527,11 +521,11 @@ Reads from:
 
 ### Purpose
 
-Create a new team.
+Create a team.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Request
 
@@ -541,13 +535,7 @@ Manager/Admin
 }
 ```
 
-### Database Interaction
-
-Creates:
-
-- `teams`
-
-The `organization_id` is determined from the authenticated user.
+The organization is derived from the authenticated user.
 
 ---
 
@@ -555,17 +543,19 @@ The `organization_id` is determined from the authenticated user.
 
 ### Purpose
 
-Update a team's information.
+Update team information.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
-### Database Interaction
+### Possible Fields
 
-Updates:
-
-- `teams`
+```json
+{
+  "name": "North Knoxville Team"
+}
+```
 
 ---
 
@@ -573,11 +563,11 @@ Updates:
 
 ### Purpose
 
-Add a user to a team.
+Add an organization user to a team.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Request
 
@@ -587,13 +577,10 @@ Manager/Admin
 }
 ```
 
-### Database Interaction
+The API verifies that:
 
-Creates:
-
-- `team_users`
-
-The API verifies that both the team and user belong to the same organization.
+- The team belongs to the authenticated user's organization.
+- The user belongs to the same organization.
 
 ---
 
@@ -605,39 +592,38 @@ Remove a user from a team.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
-### Database Interaction
+This removes only the `team_users` relationship.
 
-Deletes the appropriate relationship from:
+It does not:
 
-- `team_users`
+- Delete the user.
+- Deactivate the user.
+- Modify existing interactions.
+- Reassign interactions.
 
-This does not delete or deactivate the user.
+A user with no team membership remains a valid organization user.
+
+Teams themselves cannot be deleted in the MVP.
 
 ---
 
-# 7. Statuses
+# 9. Statuses
 
 Statuses define the organization's field-interaction workflow.
 
-Statuses are configurable rather than hard-coded into the application.
+Statuses are organization-defined rather than hard-coded.
 
 ## GET `/api/statuses`
 
 ### Purpose
 
-Retrieve active statuses available to the current organization.
+Retrieve active statuses available to the authenticated organization.
 
 ### Authentication
 
-Authenticated
-
-### Database Interaction
-
-Reads from:
-
-- `statuses`
+Authenticated.
 
 ---
 
@@ -649,13 +635,7 @@ Retrieve a specific status.
 
 ### Authentication
 
-Authenticated
-
-### Database Interaction
-
-Reads from:
-
-- `statuses`
+Authenticated.
 
 ---
 
@@ -663,11 +643,11 @@ Reads from:
 
 ### Purpose
 
-Create a new organization status.
+Create an organization status.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Request
 
@@ -679,13 +659,7 @@ Manager/Admin
 }
 ```
 
-### Database Interaction
-
-Creates:
-
-- `statuses`
-
-The `organization_id` is determined from the authenticated user.
+The organization is derived from the authenticated user.
 
 ---
 
@@ -693,17 +667,11 @@ The `organization_id` is determined from the authenticated user.
 
 ### Purpose
 
-Update a status.
+Modify a status.
 
 ### Authentication
 
-Manager/Admin
-
-### Database Interaction
-
-Updates:
-
-- `statuses`
+Manager/Admin.
 
 ### Possible Fields
 
@@ -711,7 +679,7 @@ Updates:
 - `description`
 - `display_order`
 
-Historical interaction snapshots are not changed when a status is edited.
+Existing interaction snapshots are not modified when a status changes.
 
 ---
 
@@ -723,7 +691,7 @@ Activate or deactivate a status.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Request
 
@@ -733,57 +701,39 @@ Manager/Admin
 }
 ```
 
-### Database Interaction
+A deactivated status:
 
-Updates:
+- Cannot be selected for new/current interaction snapshots.
+- Remains associated with historical snapshots.
+- Does not cause historical records to change.
 
-- `statuses.is_active`
-
-Existing historical interactions remain unchanged.
+There is no status deletion endpoint.
 
 ---
 
-# 8. Properties
+# 10. Properties
 
-Properties represent physical locations being canvassed.
+Properties represent physical addresses being canvassed.
 
-A property can have multiple separate interaction histories.
+Properties belong permanently to an organization in the MVP.
+
+Properties cannot be manually edited or deleted.
 
 ## GET `/api/properties`
 
 ### Purpose
 
-Retrieve properties visible to the current user.
-
-This is one of the primary endpoints used by the map interface.
+Retrieve properties visible to the authenticated user.
 
 ### Authentication
 
-Authenticated
-
-### Database Interaction
-
-Reads from:
-
-- `properties`
-- `interactions`
-- `users`
-- `teams`
-- `statuses`
+Authenticated.
 
 ### Supported Filters
-
-The endpoint supports filtering by:
 
 - Status
 - Date range
 - Geographic/map bounds
-
-Example:
-
-```text
-GET /api/properties?status=Interested
-```
 
 ### Authorization
 
@@ -791,10 +741,8 @@ The API applies:
 
 - Organization isolation
 - User role
-- Representative visibility settings
+- Representative visibility
 - Team membership
-
-A user cannot retrieve another organization's properties.
 
 ---
 
@@ -806,94 +754,81 @@ Retrieve a specific property.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
-### Database Interaction
-
-Reads from:
-
-- `properties`
-
-The API verifies that the property belongs to the user's organization.
+The API verifies that the property belongs to the authenticated user's organization.
 
 ---
 
-## POST `/api/properties`
+## POST `/api/properties/resolve`
 
 ### Purpose
 
-Create a new property.
+Resolve a map-selected location into a JoeKnock property.
 
-This normally occurs when a representative selects a property/address that does not already exist in JoeKnock.
+This is the primary property-creation workflow in the MVP.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
 ### Request
 
 ```json
 {
-  "addressLine1": "123 Main Street",
-  "addressLine2": null,
-  "city": "Knoxville",
-  "state": "TN",
-  "postalCode": "37923",
-  "country": "USA",
-  "latitude": 35.1234567,
-  "longitude": -84.1234567
+  "latitude": 35.9,
+  "longitude": -84.0
 }
 ```
 
-### Database Interaction
+### Processing
 
-Creates:
+The backend:
 
-- `properties`
+1. Sends the coordinates to the configured geocoding provider.
+2. Retrieves the address.
+3. Requires a valid address.
+4. Normalizes the address.
+5. Searches for the property within the authenticated organization.
+6. Returns the existing property if one exists.
+7. Creates a new property if none exists.
+8. Returns the property.
 
-The `organization_id` is determined from the authenticated user.
+### Important MVP Rules
 
-### Duplicate Handling
-
-The API should attempt to match an existing property using the normalized address before creating a duplicate property.
-
----
-
-## PATCH `/api/properties/:id`
-
-### Purpose
-
-Update mutable property information.
-
-### Authentication
-
-Authenticated
-
-### Database Interaction
-
-Updates:
-
-- `properties`
-
-Property updates do not modify historical interaction snapshots.
+- A property cannot exist without a valid address.
+- The geocoder's returned address is used as the property's address.
+- Users do not manually edit latitude/longitude.
+- Users do not manually correct the address in the MVP.
+- Duplicate properties are prevented within an organization using the normalized address.
+- Properties are not deleted.
+- Properties are not updated through a general `PATCH` endpoint.
 
 ---
 
-# 9. Property Interaction History
+# 11. Property Interactions (Current State)
 
 ## GET `/api/properties/:propertyId/interactions`
 
 ### Purpose
 
-Retrieve interaction history associated with a property.
+Retrieve the current interaction state associated with a property that the authenticated user is authorized to view.
 
 ### Authentication
 
-Authenticated
+Authenticated.
+
+### Default Behavior
+
+The endpoint returns current snapshots only.
+
+The MVP does not provide a normal user-facing historical snapshot view.
+
+Interaction history remains preserved in the database for reporting and authorized administrative/support use.
 
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `interactions`
 - `users`
@@ -907,47 +842,81 @@ Reads from:
   "interactions": [
     {
       "interactionGroupId": "uuid",
-      "currentSnapshot": {
-        "id": "uuid",
-        "statusName": "Interested",
-        "interactionAt": "2026-08-08T15:30:00Z",
-        "changedAt": "2026-08-08T15:35:00Z"
-      }
+      "userId": "uuid",
+      "statusId": "uuid",
+      "statusName": "Interested",
+      "initialInteractionAt": "2026-08-08T15:30:00Z",
+      "changedAt": "2026-08-08T15:35:00Z",
+      "contactName": "John Smith",
+      "contactPhone": "555-555-5555",
+      "contactEmail": "john@example.com",
+      "notes": "Wants follow-up Friday."
     }
   ]
 }
 ```
 
-The endpoint can return current snapshots by default and historical snapshots when requested by the UI.
+Historical snapshots remain in the database but are not exposed through a normal history endpoint in the MVP.
 
 ---
 
-# 10. Interactions
+# 12. Interactions
 
-Interactions represent field interactions with a property.
+Interactions represent a representative's field interaction with a property.
 
-Interactions use immutable snapshots.
+The MVP uses immutable interaction snapshots.
 
-A property may have multiple separate interaction histories.
+## Interaction Identification
+
+Three identifiers serve different purposes:
+
+```text
+property_id
+    ↓
+Which property?
+
+interaction_group_id
+    ↓
+Which organization/property/representative interaction history?
+
+id
+    ↓
+Which immutable snapshot?
+```
+
+### MVP Interaction Rule
+
+An interaction group represents one interaction history for a specific:
+
+- Organization
+- Property
+- Representative
+
+During the MVP, there is one interaction group per organization + property + representative combination.
+
+The first interaction by that representative creates the interaction group.
+
+Subsequent saves to that interaction create new snapshots within the same group.
+
+A future expiration/re-knock feature may allow additional interaction groups, but that is outside the MVP.
+
+---
 
 ## POST `/api/properties/:propertyId/interactions`
 
 ### Purpose
 
-Create a completely new interaction at a property.
-
-This is used when a representative has a new field interaction with the property.
+Create the authenticated representative's first interaction with a property in their organization.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
 ### Request
 
 ```json
 {
   "statusId": "uuid",
-  "interactionAt": "2026-08-09T15:30:00Z",
   "contactName": "John Smith",
   "contactPhone": "555-555-5555",
   "contactEmail": "john@example.com",
@@ -955,66 +924,81 @@ Authenticated
 }
 ```
 
-### Database Interaction
+### Server-Controlled Fields
 
-Creates a new row in:
-
-- `interactions`
-
-The API generates:
-
-- `id`
-- `interaction_group_id`
-
-The API determines:
+The client does not supply:
 
 - `organization_id`
 - `user_id`
+- `interaction_group_id`
 - `initial_interaction_at`
 - `changed_at`
 - `is_current`
 
-For a brand-new interaction:
+The API determines these values.
+
+For a first interaction:
 
 ```text
-initial_interaction_at = interaction_at
+initial_interaction_at = current interaction time
+changed_at = current time
 is_current = true
 ```
 
+### Duplicate Interaction Handling
+
+Before creating a new interaction group, the API checks whether the authenticated user already has an interaction group for the property.
+
+If one exists, the API does not create a second group.
+
+The representative must update the existing interaction through `POST /api/interactions/:id`.
+
 ---
+
+# 13. Get Individual Interaction
 
 ## GET `/api/interactions/:id`
 
 ### Purpose
 
-Retrieve a specific immutable interaction snapshot.
+Retrieve the current interaction snapshot represented by the requested interaction ID.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
-### Database Interaction
+### Authorization
 
-Reads from:
+The API verifies:
 
-- `interactions`
-- `properties`
-- `users`
-- `statuses`
+- Interaction belongs to the authenticated user's organization.
+- User has permission to view the interaction.
+
+The response contains the current interaction data required by the UI.
 
 ---
 
-## POST `/api/interactions/:id/revisions`
+# 14. Save Changes to an Interaction
+
+## POST `/api/interactions/:id`
 
 ### Purpose
 
-Create a new snapshot/revision of an existing interaction.
+Save changes to an existing interaction.
 
-This endpoint is used when an existing interaction needs to be changed.
+This operation creates a new immutable interaction snapshot.
+
+The API does not modify the existing snapshot's field values.
 
 ### Authentication
 
-Authenticated
+Authenticated.
+
+### Authorization
+
+Only the representative who owns the interaction group can modify it.
+
+Managers and administrators are view-only when accessing another representative's interaction.
 
 ### Request
 
@@ -1028,83 +1012,96 @@ Authenticated
 }
 ```
 
-### Database Interaction
+### Processing
 
 The API:
 
-1. Retrieves the existing snapshot.
-2. Gets its `interaction_group_id`.
-3. Verifies the user has permission to modify the interaction.
-4. Marks the current snapshot as `is_current = false`.
-5. Creates a new interaction snapshot.
-6. Reuses the same `interaction_group_id`.
-7. Sets the new snapshot's `is_current = true`.
-8. Preserves `initial_interaction_at`.
-9. Sets a new `changed_at`.
+1. Retrieves the current snapshot.
+2. Verifies edit permission.
+3. Creates a new snapshot.
+4. Copies the previous snapshot's values.
+5. Applies submitted changes.
+6. Preserves `initial_interaction_at`.
+7. Sets a new `changed_at`.
+8. Sets the previous snapshot's `is_current` to `false`.
+9. Sets the new snapshot's `is_current` to `true`.
+10. Preserves the same `interaction_group_id`.
+11. Preserves the same `user_id`.
+12. Stores the current `status_name` alongside the `status_id`.
+
+### Notes
+
+Existing notes are carried forward when an interaction is edited.
+
+For example:
+
+```text
+Snapshot 1
+Notes: "Homeowner wants a call Friday."
+```
+
+If the representative changes only the status, the new snapshot remains:
+
+```text
+Snapshot 2
+Notes: "Homeowner wants a call Friday."
+```
+
+If the representative edits the note, the new snapshot contains the edited note.
+
+---
+
+# 15. Immutable Interaction Rules
+
+The following endpoints do not exist:
+
+```text
+PATCH /api/interactions/:id
+DELETE /api/interactions/:id
+```
+
+Interaction snapshots are immutable.
+
+Changes are represented by creating a new snapshot through:
+
+```text
+POST /api/interactions/:id
+```
 
 The previous snapshot remains in the database.
 
-### Example
-
-```text
-Interaction Group A
-│
-├── Snapshot 1
-│   Status: No Answer
-│
-├── Snapshot 2
-│   Status: Interested
-│
-└── Snapshot 3
-    Status: Follow Up
-    is_current = true
-```
+There is no user-facing interaction-history endpoint in the MVP.
 
 ---
 
-## GET `/api/interactions/:interactionGroupId/history`
-
-### Purpose
-
-Retrieve every snapshot belonging to a specific interaction history.
-
-### Authentication
-
-Authenticated
-
-### Database Interaction
-
-Reads from:
-
-- `interactions`
-
-All returned snapshots have the same:
-
-```text
-interaction_group_id
-```
-
-This endpoint allows authorized users and support/admin functionality to inspect how an interaction evolved.
-
----
-
-# 11. Map Data
-
-The map is a core part of the JoeKnock MVP.
-
-The map endpoint provides the property and interaction information needed to render map markers efficiently.
+# 16. Map Data
 
 ## GET `/api/map/properties`
 
 ### Purpose
 
-Retrieve map-ready property data within a geographic area.
+Retrieve map-ready property data within the requested geographic area.
 
 ### Authentication
 
-Authenticated
+Authenticated.
 
 ### Query Parameters
+
+```text
+north
+south
+east
+west
+```
+
+Optional:
+
+```text
+status
+dateFrom
+dateTo
+```
 
 Example:
 
@@ -1116,20 +1113,12 @@ GET /api/map/properties
     &west=-84.10
 ```
 
-Optional filters:
-
-```text
-status
-dateFrom
-dateTo
-```
-
 ### Database Interaction
 
-Reads from:
+Reads:
 
 - `properties`
-- current `interactions`
+- Current `interactions`
 - `statuses`
 - `users`
 - `teams`
@@ -1147,191 +1136,65 @@ Example:
     "latitude": 35.9,
     "longitude": -84.0,
     "status": "Interested",
-    "interactionCount": 2
+    "interactionCount": 1
   }
 ]
 ```
 
 ### Authorization
 
-The endpoint must enforce:
+The map uses the same visibility rules as the rest of the application.
 
-- Organization isolation
-- User role
-- Representative visibility
-- Team membership
+The map cannot bypass organization or representative visibility restrictions.
 
 ---
 
-# 12. Geocoding
+# 17. Geocoding
 
-Geocoding supports the map-first workflow.
+Geocoding is an internal backend service in the MVP.
 
-JoeKnock should keep the geocoding provider behind the backend API rather than having the React application communicate directly with the provider.
+The React application does not communicate directly with the external geocoding provider.
 
-This allows the provider to be changed later without requiring changes to the frontend.
+There are no public geocoding endpoints.
 
-The general flow is:
+Geocoding remains an internal backend implementation detail used by property resolution.
+
+The workflow is:
 
 ```text
 React Application
        │
        ↓
-JoeKnock API
+POST /api/properties/resolve
+       │
+       ↓
+JoeKnock Backend
        │
        ↓
 Geocoding Provider
        │
        ↓
-Address / Coordinates
+Address + Coordinates
+       │
+       ↓
+Property Resolution
 ```
 
-## GET `/api/geocoding/reverse`
-
-### Purpose
-
-Convert geographic coordinates into an address.
-
-This is used when a representative taps a location/house on the map and JoeKnock needs to determine the corresponding street address.
-
-### Authentication
-
-Authenticated
-
-### Query Parameters
-
-```text
-lat
-lng
-```
-
-Example:
-
-```text
-GET /api/geocoding/reverse?lat=35.900000&lng=-84.000000
-```
-
-### External Service Interaction
-
-The JoeKnock backend sends the latitude and longitude to the configured geocoding provider.
-
-The frontend does not communicate directly with the provider.
-
-### Example Response
-
-```json
-{
-  "address": {
-    "addressLine1": "123 Main Street",
-    "addressLine2": null,
-    "city": "Knoxville",
-    "state": "TN",
-    "postalCode": "37923",
-    "country": "USA"
-  },
-  "coordinates": {
-    "latitude": 35.9,
-    "longitude": -84.0
-  }
-}
-```
-
-### Intended MVP Workflow
-
-```text
-Rep taps house on map
-        ↓
-GET /api/geocoding/reverse
-        ↓
-Address returned
-        ↓
-Check whether property exists
-        ↓
-Existing property?
-    ↙          ↘
-  YES           NO
-   ↓             ↓
-Load property   Create property
-   ↓             ↓
-Start/record interaction
-```
+This keeps the provider hidden behind the JoeKnock API and allows the provider to be replaced later without changing the frontend.
 
 ---
 
-## GET `/api/geocoding/search`
-
-### Purpose
-
-Convert a street address or address search into geographic coordinates.
-
-This provides the reverse operation of `/api/geocoding/reverse`.
-
-### Authentication
-
-Authenticated
-
-### Query Parameters
-
-```text
-address
-```
-
-Example:
-
-```text
-GET /api/geocoding/search?address=123 Main Street Knoxville TN
-```
-
-### External Service Interaction
-
-The JoeKnock backend sends the address to the configured geocoding provider.
-
-### Example Response
-
-```json
-{
-  "results": [
-    {
-      "address": {
-        "addressLine1": "123 Main Street",
-        "city": "Knoxville",
-        "state": "TN",
-        "postalCode": "37923",
-        "country": "USA"
-      },
-      "coordinates": {
-        "latitude": 35.9,
-        "longitude": -84.0
-      }
-    }
-  ]
-}
-```
-
-### Intended Uses
-
-- Address search
-- Locating a property on the map
-- Creating a property from an address
-- Future navigation/search functionality
-
----
-
-# 13. Reporting / Activity Data
-
-The MVP does not require a separate reporting database or reporting tables.
-
-Reports are generated from existing property and interaction data.
+# 18. Reporting
 
 ## GET `/api/reports/activity`
 
 ### Purpose
 
-Retrieve field-activity data for the reporting interface.
+Provide activity data for the MVP reporting interface.
 
 ### Authentication
 
-Manager/Admin
+Manager/Admin.
 
 ### Query Parameters
 
@@ -1343,7 +1206,7 @@ teamId
 statusId
 ```
 
-### Example
+Example:
 
 ```text
 GET /api/reports/activity?dateFrom=2026-08-01&dateTo=2026-08-09
@@ -1359,183 +1222,222 @@ Reads from:
 - `teams`
 - `statuses`
 
-### Possible Results
-
-The endpoint can provide:
-
-- Total interactions
-- Interactions by representative
-- Interactions by team
-- Interactions by status
-- Properties contacted
-- Activity by date
-
-Historical snapshots must be handled carefully so revisions are not accidentally counted as separate field visits.
-
-Only appropriate interaction records should be counted as actual field interactions.
+No reporting-specific database tables are required.
 
 ---
 
-# 14. Authorization Rules
+## Knock Counting
 
-All protected endpoints must enforce organization boundaries.
+The MVP distinguishes between the initial interaction and later snapshot changes.
 
-A user must never be able to access another organization's data simply by changing an ID in the URL.
+The initial knock is determined using:
+
+```text
+initial_interaction_at
+```
+
+A knock is counted only when the representative first creates an interaction group for that organization + property + representative combination.
+
+Changing an interaction does not create another knock.
+
+### Example
+
+```text
+Aug 1 — Rep A knocks Property 123
+Aug 2 — Rep A edits status
+Aug 4 — Rep A edits notes
+```
+
+This represents:
+
+```text
+1 knock
+```
+
+not three.
+
+A future expiration/re-knock system may introduce new interaction groups, but this is outside the MVP.
+
+---
+
+## Status Reporting
+
+Snapshots can be used to determine the current state and changes occurring within a reporting period.
+
+Historical snapshots must not be counted as additional physical knocks.
+
+The MVP does not maintain a separate activity-log table.
+
+---
+
+# 19. Authorization Rules
+
+Every protected endpoint enforces organization boundaries.
+
+A user cannot access another organization's resources by changing a UUID in the request.
+
+Authorization applies to:
+
+- Users
+- Teams
+- Statuses
+- Properties
+- Interactions
+- Reports
+- Organization settings
+
+### Organization Isolation
+
+Every organization-owned resource is resolved within the authenticated user's organization.
 
 For example:
 
 ```text
-GET /api/properties/another-org-property-id
+GET /api/properties/{id}
 ```
 
-must not expose the property.
+must not expose a property belonging to another organization.
 
-Every resource lookup must verify that the resource belongs to the authenticated user's organization.
+---
 
-This applies to:
+# 20. Representative Visibility
 
-- Properties
-- Interactions
+The MVP supports three organization-level visibility settings.
+
+## `own`
+
+A representative sees:
+
+- Their own interactions.
+
+## `team`
+
+A representative sees:
+
+- Their own interactions.
+- Interactions belonging to users on any team they belong to.
+
+A representative belonging to no teams sees only their own interactions.
+
+## `organization`
+
+A representative sees:
+
+- Organization-wide interactions.
+
+### Important
+
+Visibility does not grant editing permission.
+
+A representative may be able to **see** another representative's interaction without being able to modify it.
+
+---
+
+# 21. Interaction Editing Permissions
+
+The MVP intentionally keeps interaction ownership simple.
+
+### Representative
+
+Can:
+
+- View permitted interactions.
+- Create their own interactions.
+- Edit their own interactions.
+
+Cannot edit another representative's interaction.
+
+### Manager
+
+Can:
+
+- View permitted interactions.
+- Create their own interactions.
+- Edit their own interactions.
+
+Managers are view-only when viewing another representative's interaction.
+
+### Administrator
+
+Can:
+
+- View permitted interactions.
+- Create their own interactions.
+- Edit their own interactions.
+
+Administrators are view-only when viewing another representative's interaction.
+
+The MVP does not include:
+
+- Lead ownership transfer
+- Lead reassignment
+- Credit reassignment
+- Manager override editing
+- Lead claiming
+
+---
+
+# 22. User Deactivation
+
+Deactivation changes account access only.
+
+```text
+Rep A
+  ↓
+Deactivated
+```
+
+Existing data remains:
+
+```text
+Rep A
+  │
+  ├── Interaction Group 1
+  │      ├── Snapshot 1
+  │      └── Snapshot 2
+  │
+  └── Interaction Group 2
+         └── Snapshot 1
+```
+
+Nothing is reassigned or deleted.
+
+The deactivated user:
+
+- Cannot log in.
+- Cannot create interactions.
+- Cannot edit interactions.
+- Remains associated with historical records.
+
+---
+
+# 23. Data Deletion
+
+The MVP intentionally provides **no deletion functionality for organization data**.
+
+There are no hard-delete or soft-delete workflows for:
+
+- Organizations
 - Users
 - Teams
 - Statuses
-- Organization settings
-- Reports
+- Properties
+- Interactions
+- Interaction snapshots
 
-Geocoding requests must also require authentication so the JoeKnock API cannot be abused as an unrestricted public proxy for the external geocoding provider.
-
----
-
-# 15. Role Permissions
-
-## Representative
-
-Can:
-
-- View permitted properties
-- Create interactions
-- View permitted interactions
-- Create revisions for interactions they are authorized to modify
-- View their own profile
-- View applicable statuses
-- Use map functionality
-- Use geocoding functionality
-
-Cannot:
-
-- Manage organization users
-- Manage teams
-- Manage organization settings
-- Manage statuses
-
----
-
-## Manager
-
-Can:
-
-- Perform all representative functions
-- View team activity
-- View users
-- Manage teams
-- Manage statuses
-- View activity reports
-
----
-
-## Administrator
-
-Can:
-
-- Perform all manager functions
-- Manage organization settings
-- Manage organization information
-- Create users
-- Deactivate users
-- Manage organization-level configuration
-
----
-
-# 16. Immutable Interaction Rules
-
-The following endpoints are intentionally NOT provided:
+The only relationship deletion endpoint is:
 
 ```text
-PATCH  /api/interactions/:id
-DELETE /api/interactions/:id
+DELETE /api/teams/:id/users/:userId
 ```
 
-Interaction snapshots are immutable.
+which removes a team membership relationship.
 
-Changes create new snapshots through:
-
-```text
-POST /api/interactions/:id/revisions
-```
-
-This preserves the historical interaction record.
-
-The interaction's `interaction_group_id` remains the same across all revisions.
+This does not delete either resource.
 
 ---
 
-# 17. Interaction Data Model Relationship
-
-The interaction model uses three levels of identification:
-
-```text
-property_id
-    ↓
-Which property?
-
-interaction_group_id
-    ↓
-Which field interaction/history at that property?
-
-id
-    ↓
-Which immutable snapshot/version of that interaction?
-```
-
-Example:
-
-```text
-123 Main Street
-│
-├── Interaction Group A
-│   ├── Snapshot 1 — No Answer
-│   ├── Snapshot 2 — Interested
-│   └── Snapshot 3 — Follow Up
-│
-└── Interaction Group B
-    ├── Snapshot 1 — No Answer
-    └── Snapshot 2 — Not Interested
-```
-
-This allows the same property to have multiple field interactions while preserving the history of changes made to each interaction.
-
----
-
-# 18. API-to-Database Summary
-
-| API Area              | Primary Tables                                             |
-| --------------------- | ---------------------------------------------------------- |
-| Authentication        | `users`, `organizations`, `organization_settings`          |
-| Current User          | `users`, `teams`, `team_users`                             |
-| Organizations         | `organizations`                                            |
-| Organization Settings | `organization_settings`                                    |
-| Users                 | `users`, `team_users`                                      |
-| Teams                 | `teams`, `team_users`, `users`                             |
-| Statuses              | `statuses`                                                 |
-| Properties            | `properties`                                               |
-| Property Interactions | `interactions`, `properties`, `users`, `statuses`          |
-| Map                   | `properties`, `interactions`, `statuses`, `users`, `teams` |
-| Geocoding             | External geocoding provider; no JoeKnock table required    |
-| Reporting             | `interactions`, `properties`, `users`, `teams`, `statuses` |
-
----
-
-# 19. Complete Endpoint List
+# 24. Final Endpoint List
 
 ## Authentication
 
@@ -1597,8 +1499,7 @@ PATCH  /api/statuses/:id/active
 ```text
 GET    /api/properties
 GET    /api/properties/:id
-POST   /api/properties
-PATCH  /api/properties/:id
+POST   /api/properties/resolve
 ```
 
 ## Interactions
@@ -1608,21 +1509,13 @@ GET    /api/properties/:propertyId/interactions
 POST   /api/properties/:propertyId/interactions
 
 GET    /api/interactions/:id
-POST   /api/interactions/:id/revisions
-GET    /api/interactions/:interactionGroupId/history
+POST   /api/interactions/:id
 ```
 
 ## Map
 
 ```text
 GET    /api/map/properties
-```
-
-## Geocoding
-
-```text
-GET    /api/geocoding/reverse
-GET    /api/geocoding/search
 ```
 
 ## Reporting
@@ -1633,7 +1526,7 @@ GET    /api/reports/activity
 
 ---
 
-# 20. Total MVP Endpoint Count
+# 25. Total MVP Endpoint Count
 
 | Area           | Endpoints |
 | -------------- | --------: |
@@ -1643,71 +1536,97 @@ GET    /api/reports/activity
 | Users          |         5 |
 | Teams          |         6 |
 | Statuses       |         5 |
-| Properties     |         4 |
-| Interactions   |         5 |
+| Properties     |         3 |
+| Interactions   |         4 |
 | Map            |         1 |
-| Geocoding      |         2 |
 | Reporting      |         1 |
-| **Total**      |    **37** |
+| **Total**      |    **33** |
 
 ---
 
-# 21. Core API Architecture
+# 26. API-to-Database Summary
 
-The JoeKnock MVP API follows this relationship:
+| API Area              | Primary Tables                                             |
+| --------------------- | ---------------------------------------------------------- |
+| Authentication        | `users`, `organizations`, `organization_settings`          |
+| Current User          | `users`, `teams`, `team_users`                             |
+| Organization          | `organizations`                                            |
+| Organization Settings | `organization_settings`                                    |
+| Users                 | `users`, `team_users`                                      |
+| Teams                 | `teams`, `team_users`, `users`                             |
+| Statuses              | `statuses`                                                 |
+| Properties            | `properties`                                               |
+| Property Interactions | `interactions`, `properties`, `users`, `statuses`          |
+| Map                   | `properties`, `interactions`, `statuses`, `users`, `teams` |
+| Geocoding             | External provider; no JoeKnock table                       |
+| Reporting             | `interactions`, `properties`, `users`, `teams`, `statuses` |
+
+---
+
+# 27. Core API Architecture
 
 ```text
-Organization
-     │
-     ├── Users
-     │     │
-     │     └── Teams
-     │
-     ├── Organization Settings
-     │
-     ├── Statuses
-     │
-     └── Properties
-             │
-             └── Interactions
-                    │
-                    ├── Interaction Group
-                    │       │
-                    │       ├── Snapshot 1
-                    │       ├── Snapshot 2
-                    │       └── Snapshot 3
-                    │
-                    ├── User
-                    └── Status
-
-
-Map
- │
- ├── Properties
- │
- └── Geocoding
-       │
-       ├── Coordinates → Address
-       └── Address → Coordinates
+                         ORGANIZATION
+                              │
+             ┌────────────────┼────────────────┐
+             │                │                │
+           USERS            TEAMS           STATUSES
+             │                │
+             └───────┬────────┘
+                     │
+                 VISIBILITY
+                     │
+                     ▼
+                 PROPERTIES
+                     │
+                     ▼
+              INTERACTION GROUP
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+      SNAPSHOT    SNAPSHOT    SNAPSHOT
+          │          │          │
+          └──────────┼──────────┘
+                     │
+              CURRENT SNAPSHOT
+                     │
+             ┌───────┴───────┐
+             ▼               ▼
+            MAP           REPORTING
 ```
 
 The core architectural rules are:
 
-1. Every user belongs to an organization.
-2. Every property belongs to an organization.
+1. Every user belongs to one organization.
+2. Every property belongs to one organization.
 3. Every interaction belongs to a property and organization.
 4. `property_id` identifies the property.
-5. `interaction_group_id` identifies the interaction history.
-6. `id` identifies the individual immutable snapshot.
+5. `interaction_group_id` identifies the organization/property/representative interaction history.
+6. `id` identifies an individual immutable interaction snapshot.
 7. Interaction snapshots are never deleted.
 8. Changes create new interaction snapshots.
-9. Users are deactivated rather than physically deleted.
-10. Statuses are organization-defined rather than hard-coded.
-11. API authorization enforces organization boundaries.
-12. Representative visibility determines which interactions a representative can see.
-13. Map data is filtered through the same authorization rules as normal property data.
-14. Geocoding is handled through the JoeKnock backend rather than directly from the frontend.
-15. Reverse geocoding converts map coordinates into an address.
-16. Forward geocoding converts an address into coordinates.
-17. Geocoding does not require a dedicated JoeKnock database table.
-18. Reporting is generated from existing property and interaction data rather than a separate activity-log table.
+9. `initial_interaction_at` represents the first knock for that organization/property/representative interaction history.
+10. `changed_at` represents when the current snapshot was saved.
+11. An organization/property/representative combination has one interaction group during the MVP.
+12. A future expiration/re-knock system is outside the MVP.
+13. Users are deactivated rather than deleted.
+14. Teams are not deleted.
+15. Statuses are organization-defined rather than hard-coded.
+16. Deactivated statuses remain available to historical snapshots.
+17. Organization data is never deleted in the MVP.
+18. Team membership can be removed without affecting historical interaction records.
+19. Visibility and editing permissions are separate concepts.
+20. Only the owner of an interaction group can edit it.
+21. Managers and administrators are view-only when viewing another representative's interaction.
+22. There is no lead ownership or credit reassignment system.
+23. Map data follows the same authorization rules as normal property data.
+24. Geocoding is handled internally by the JoeKnock backend.
+25. A property requires a valid address.
+26. The geocoder's returned address is used as the property's address in the MVP.
+27. Latitude and longitude are not user-editable.
+28. Properties cannot be manually edited or deleted in the MVP.
+29. Reporting is generated from existing property and interaction data.
+30. No separate activity-log table is required.
+31. Historical interaction snapshots remain available in the database even though the MVP primarily displays current state.
+32. The API never trusts client-supplied organization or user ownership identifiers.
+33. All organization-owned resources are protected by organization-level authorization.
