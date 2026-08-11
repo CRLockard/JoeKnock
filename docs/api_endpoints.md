@@ -322,18 +322,18 @@ rep_visibility
 Allowed values:
 
 ```text
-own
+self
 team
 organization
 ```
 
 ### Meaning
 
-| Value          | Representative visibility                           |
-| -------------- | --------------------------------------------------- |
-| `own`          | Own interactions only                               |
-| `team`         | Own interactions plus interactions from their teams |
-| `organization` | Organization-wide interactions                      |
+| Value          | Representative visibility                            |
+| -------------- | ---------------------------------------------------- |
+| `self`         | self interactions only                               |
+| `team`         | self interactions plus interactions from their teams |
+| `organization` | Organization-wide interactions                       |
 
 Managers and administrators retain access according to their role permissions.
 
@@ -1304,7 +1304,7 @@ must not expose a property belonging to another organization.
 
 The MVP supports three organization-level visibility settings.
 
-## `own`
+## `self`
 
 A representative sees:
 

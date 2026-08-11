@@ -868,12 +868,12 @@ so that field information is shared according to our organization's workflow.
 Organization can configure:
 
 ```text
-own
+self
 team
 organization
 ```
 
-For `own`:
+For `self`:
 
 - Representative sees their own interactions.
 
