@@ -596,6 +596,8 @@ so that I can record an interaction without manually entering the property addre
 
 **Priority:** P2
 
+**Status:** Deferred / POST-MVP
+
 **Labels:**
 `user-story` `priority:p2` `area:geocoding` `area:map` `frontend` `backend`
 
@@ -607,18 +609,17 @@ so that I can quickly locate a property on the map.
 
 ### Acceptance Criteria
 
-- User can enter an address.
-- Backend sends the request to the geocoding service.
-- Matching results are returned.
-- User can select a result.
-- Selected result is displayed on the map.
-- Invalid or unavailable addresses produce an appropriate message.
+- Story remains documented for post-MVP planning.
+- MVP scope excludes a user-facing address-search endpoint.
+- MVP implementation continues using `POST /api/properties/resolve` for property resolution.
 
 ---
 
 ## US-025 — Cache Geocoding Results
 
 **Priority:** P2
+
+**Status:** Deferred / POST-MVP
 
 **Labels:**
 `user-story` `priority:p2` `area:geocoding` `backend` `database`
@@ -631,14 +632,13 @@ so that JoeKnock respects the geocoding provider's usage limits.
 
 ### Acceptance Criteria
 
-- Application avoids unnecessary duplicate geocoding requests.
-- Previously resolved property information can be reused where appropriate.
-- Caching does not cause stale property information to overwrite confirmed user data.
-- Geocoding requests remain within provider usage requirements.
+- Story remains documented for post-MVP planning.
+- MVP scope excludes dedicated geocoding cache infrastructure.
+- MVP continues to rely on property reuse and normalized-address matching during resolution.
 
 ### Note
 
-Caching may be implemented after the core MVP workflow is functional.
+Property resolution in MVP already avoids unnecessary requests by reusing existing property records.
 
 ---
 
@@ -691,7 +691,7 @@ so that I can review its current information before recording an interaction.
 
 ---
 
-## US-028 — View Property Interaction History
+## US-028 — View Property Interactions (Current State)
 
 **Priority:** P0
 
@@ -701,16 +701,16 @@ so that I can review its current information before recording an interaction.
 ### User Story
 
 As a sales representative,
-I want to see the interaction history for a property,
-so that I know what has happened there previously.
+I want to see the current interaction state for a property,
+so that I know the latest authorized information before recording updates.
 
 ### Acceptance Criteria
 
-- Property displays associated interaction histories.
-- Multiple interaction histories can exist for one property.
+- Property interaction endpoint returns current snapshots by default.
+- Multiple interaction groups can exist for one property.
 - Current interaction snapshots are identifiable.
-- Historical snapshots can be retrieved when authorized.
-- Interaction history remains associated with the correct property.
+- Results respect organization isolation and visibility permissions.
+- Normal user-facing historical interaction timeline is not exposed in MVP.
 
 ---
 
@@ -828,6 +828,8 @@ so that I can understand what information was recorded.
 
 **Priority:** P1
 
+**Status:** Deferred / POST-MVP
+
 **Labels:**
 `user-story` `priority:p1` `area:interactions` `frontend` `backend` `database`
 
@@ -839,12 +841,10 @@ so that I can understand how the record changed over time.
 
 ### Acceptance Criteria
 
-- All snapshots in an interaction group can be retrieved.
-- Snapshots are ordered chronologically.
-- Each snapshot identifies when it was created/changed.
-- Each snapshot identifies the user responsible for the change.
-- Previous snapshots remain unchanged.
-- Current snapshot can be identified.
+- Story remains documented for post-MVP planning.
+- MVP scope excludes a normal user-facing interaction-history timeline.
+- MVP UI continues to use current-state interaction behavior.
+- Historical snapshots remain preserved internally for support/reporting use.
 
 ---
 
@@ -1216,7 +1216,7 @@ US-023  Identify Property from Map Location
 
 US-026  Create Property
 US-027  View Property
-US-028  View Property Interaction History
+US-028  View Property Interactions (Current State)
 
 US-029  Record New Interaction
 US-030  Save Interaction Draft
@@ -1253,7 +1253,7 @@ US-020  Follow Current Location
 US-022  Filter Map Properties
 
 US-032  View Interaction Snapshot
-US-033  View Interaction History
+US-033  View Interaction History (Deferred/Post-MVP)
 
 US-037  View Activity Report
 
@@ -1269,8 +1269,8 @@ These are useful but can be completed after the core workflow is operational.
 ```text
 US-013  Remove User from Team
 
-US-024  Search for Address
-US-025  Cache Geocoding Results
+US-024  Search for Address (Deferred/Post-MVP)
+US-025  Cache Geocoding Results (Deferred/Post-MVP)
 
 US-038  View Activity by Status
 US-039  View Activity by Representative
@@ -1314,7 +1314,7 @@ View Property
    │
    ▼
 US-028
-View Interaction History
+View Current Interaction State
    │
    ▼
 US-041

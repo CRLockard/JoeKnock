@@ -603,7 +603,11 @@ npm test
 
 This command should eventually execute the appropriate automated test suite for the project.
 
-The exact testing framework and configuration will be selected during the project foundation phase based on the actual React/backend stack.
+The testing stack is finalized as:
+
+- Vitest for unit/integration test running
+- Supertest for API/integration HTTP behavior
+- Playwright for end-to-end browser workflows
 
 The final command should:
 

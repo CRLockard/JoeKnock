@@ -176,11 +176,9 @@ Authenticated user clicks logout
 
 ## New Tests
 
-- TEST-092 (proposed) Valid Logout Returns Success
-- TEST-093 (proposed) Logout Requires Authentication
-- TEST-094 (proposed) Protected Routes Blocked After Logout
-
-Planning-only identifiers. Do not edit test-matrix.md in this task.
+- TEST-092 Valid Logout Returns Success
+- TEST-093 Logout Requires Authentication
+- TEST-094 Protected Routes Blocked After Logout
 
 ## Unit Tests
 
@@ -279,21 +277,22 @@ Repository currently has no application code scaffold in ddd.
 
 ## Expected New Files
 
-- ddd/backend/src/auth/logout.route.[ext]
-- ddd/backend/tests/integration/auth/logout.[ext]
-- ddd/frontend/src/auth/logout-action.[ext]
-- ddd/frontend/tests/auth/logout.[ext]
+- ddd/backend/src/auth/authRoutes.js
+- ddd/backend/src/auth/authController.js
+- ddd/backend/tests/integration/auth/logout.test.js
+- ddd/frontend/src/auth/AuthProvider.jsx
+- ddd/frontend/tests/auth/logout.test.js
 
 ## Expected Modified Files
 
-- ddd/backend/src/app.[ext] (auth route registration)
-- ddd/frontend/src/auth/context.[ext] (clear auth state)
-- ddd/frontend/src/routes/protected.[ext] (redirect behavior)
-- ddd/frontend/src/layout/user-menu.[ext] (logout trigger)
+- ddd/backend/src/app.js (auth route registration)
+- ddd/frontend/src/auth/authStorage.js (clear token from localStorage)
+- ddd/frontend/src/auth/ProtectedRoute.jsx (redirect behavior)
+- ddd/frontend/src/layout/UserMenu.jsx (logout trigger)
 
 ## Potential Files
 
-- ddd/frontend/src/navigation/router.[ext]
+- ddd/frontend/src/app/router.jsx
 
 # 16. Dependencies
 
@@ -347,7 +346,7 @@ Security
 Testing
 
 - [ ] TEST-011/012 behavior covered for logout endpoint protection.
-- [ ] Proposed TEST-092/093/094 implemented or explicitly tracked.
+- [ ] TEST-092/093/094 implemented.
 - [ ] npm test passes.
 
 Documentation
@@ -398,7 +397,7 @@ Mitigation:
 1. Foundation gap: repository currently has no backend/frontend scaffold in ddd.
    Impact:
 
-- Exact file paths and test framework details cannot be finalized.
+- Implementation cannot begin until the planned foundation scaffold is created.
   Blocking status:
 - Implementation-blocking until foundation scaffold exists.
 

@@ -1,5 +1,18 @@
 # JoeKnock - Product & Architecture Design Snapshot
 
+> This document is a supporting design snapshot.
+>
+> It is not the authoritative implementation contract.
+>
+> For current implementation decisions, use:
+>
+> 1. `docs/api_endpoints.md` and `docs/table_Schema_decisions.md`
+> 2. `docs/implementation/foundation/project-foundation-spec.md`
+> 3. `docs/Architecture_Decision_Record.md`
+> 4. `docs/implementation/tickets/`
+>
+> Some wording in this snapshot may describe historical or conceptual alternatives and should not override the finalized MVP contracts.
+
 ## Overview
 
 JoeKnock is a lightweight field interaction platform designed for organizations that rely on teams working directly with people in the field.

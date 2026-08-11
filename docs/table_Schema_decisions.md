@@ -96,18 +96,18 @@ Managers and administrators have additional visibility based on their role.
 
 Stores authenticated users.
 
-| Column            | Type         | Constraints      | Description                   |
-| ----------------- | ------------ | ---------------- | ----------------------------- |
-| `id`              | UUID         | PK               | Unique user identifier        |
-| `organization_id` | UUID         | FK, NOT NULL     | User's organization           |
-| `email`           | VARCHAR(255) | UNIQUE, NOT NULL | Login email                   |
-| `password_hash`   | TEXT         | NOT NULL         | Hashed password               |
-| `first_name`      | VARCHAR(100) | NOT NULL         | User first name               |
-| `last_name`       | VARCHAR(100) | NOT NULL         | User last name                |
-| `role`            | VARCHAR(50)  | NOT NULL         | User's application role       |
-| `is_active`       | BOOLEAN      | NOT NULL         | Whether the account is active |
-| `created_at`      | TIMESTAMP    | NOT NULL         | Account creation timestamp    |
-| `updated_at`      | TIMESTAMP    | NOT NULL         | Last account update           |
+| Column            | Type         | Constraints  | Description                   |
+| ----------------- | ------------ | ------------ | ----------------------------- |
+| `id`              | UUID         | PK           | Unique user identifier        |
+| `organization_id` | UUID         | FK, NOT NULL | User's organization           |
+| `email`           | VARCHAR(255) | NOT NULL     | Login email                   |
+| `password_hash`   | TEXT         | NOT NULL     | Hashed password               |
+| `first_name`      | VARCHAR(100) | NOT NULL     | User first name               |
+| `last_name`       | VARCHAR(100) | NOT NULL     | User last name                |
+| `role`            | VARCHAR(50)  | NOT NULL     | User's application role       |
+| `is_active`       | BOOLEAN      | NOT NULL     | Whether the account is active |
+| `created_at`      | TIMESTAMP    | NOT NULL     | Account creation timestamp    |
+| `updated_at`      | TIMESTAMP    | NOT NULL     | Last account update           |
 
 ### Roles
 
@@ -124,6 +124,18 @@ The user's role is stored on the `users` table.
 Team membership does **not** determine role.
 
 This provides one authoritative source for permissions.
+
+### Email uniqueness
+
+Email uniqueness is organization-scoped.
+
+Canonical rule:
+
+```text
+UNIQUE (organization_id, lower(email))
+```
+
+The same email may exist in different organizations.
 
 ### Relationships
 
@@ -158,11 +170,12 @@ A user may belong to multiple teams.
 
 Junction table connecting users to teams.
 
-| Column       | Type      | Constraints | Description                   |
-| ------------ | --------- | ----------- | ----------------------------- |
-| `team_id`    | UUID      | PK, FK      | Team identifier               |
-| `user_id`    | UUID      | PK, FK      | User identifier               |
-| `created_at` | TIMESTAMP | NOT NULL    | Membership creation timestamp |
+| Column            | Type      | Constraints  | Description                       |
+| ----------------- | --------- | ------------ | --------------------------------- |
+| `organization_id` | UUID      | FK, NOT NULL | Organization scope for membership |
+| `team_id`         | UUID      | PK, FK       | Team identifier                   |
+| `user_id`         | UUID      | PK, FK       | User identifier                   |
+| `created_at`      | TIMESTAMP | NOT NULL     | Membership creation timestamp     |
 
 ### Constraints
 
@@ -173,6 +186,10 @@ team_id + user_id
 ```
 
 must be unique.
+
+Team membership must be organization-consistent.
+
+The database should enforce that `team_users.organization_id` matches both the referenced team and the referenced user.
 
 ### Relationships
 
@@ -241,6 +258,7 @@ Stores organization-defined interaction statuses.
 | `id`              | UUID         | PK           | Unique status identifier                                |
 | `organization_id` | UUID         | FK, NOT NULL | Owning organization                                     |
 | `name`            | VARCHAR(100) | NOT NULL     | Status name                                             |
+| `description`     | TEXT         | NULL         | Optional status description                             |
 | `display_order`   | INTEGER      | NOT NULL     | Order displayed to representatives                      |
 | `is_active`       | BOOLEAN      | NOT NULL     | Whether representatives can currently select the status |
 | `created_at`      | TIMESTAMP    | NOT NULL     | Status creation timestamp                               |
@@ -308,6 +326,7 @@ The previous snapshot remains unchanged except that `is_current` may be changed 
 | `contact_phone`          | VARCHAR(50)  | NULL         | Contact phone number                                                     |
 | `contact_email`          | VARCHAR(255) | NULL         | Contact email                                                            |
 | `notes`                  | TEXT         | NULL         | Representative notes                                                     |
+| `client_request_id`      | UUID         | NULL         | Optional retry/idempotency key for create requests                       |
 | `created_at`             | TIMESTAMP    | NOT NULL     | Database record creation timestamp                                       |
 
 ---
@@ -756,13 +775,19 @@ The MVP does not expose a customer-facing historical interaction timeline.
 
 # Duplicate-Safe Interaction Creation
 
-Interaction creation should support a client-generated UUID.
+Interaction creation should support a client-generated request UUID.
 
 This allows the API to safely identify a retry of the same client operation.
 
 This is particularly important when a representative submits an interaction while experiencing an unreliable network connection.
 
 The client can retry the request without unintentionally creating duplicate interaction records.
+
+`client_request_id` is an idempotency key only.
+
+It does not replace interaction snapshot identity.
+
+`id` remains the unique identity of each immutable snapshot.
 
 ---
 
@@ -800,6 +825,79 @@ The database/application must enforce the following logical rules:
 13. Historical status text is preserved in `status_name`.
 14. A different representative creates a different interaction group for the same property.
 15. No separate interaction activity-log table is required for the MVP.
+
+---
+
+# Database Enforcement (MVP)
+
+The database should enforce organization-scoped relationships where practical, preferring composite foreign keys over triggers when they can enforce the rule cleanly.
+
+## Organization-scoped relationship enforcement
+
+Recommended enforcement approach:
+
+1. Keep organization ownership columns on organization-owned records.
+2. Use composite foreign keys for cross-table references that must remain in the same organization.
+3. Use lightweight triggers only where cross-row invariants cannot be expressed by constraints/indexes alone.
+
+Examples:
+
+- `team_users.organization_id` must match both `teams.organization_id` and `users.organization_id`.
+- `interactions.organization_id` must match related `properties`, `users`, and `statuses` records.
+
+## Interaction group invariants
+
+`interaction_group_id` is the explicit identity of one representative + one property relationship.
+
+The database/application must enforce:
+
+- Exactly one current snapshot per `interaction_group_id`.
+- All snapshots in a group share the same `organization_id`.
+- All snapshots in a group share the same `property_id`.
+- All snapshots in a group share the same `user_id`.
+- All snapshots in a group share the same `initial_interaction_at`.
+
+There is no separate `interaction_groups` table in the MVP.
+
+## Required/Recommended indexes and constraints
+
+1. Partial unique index for current-snapshot invariant:
+
+```text
+UNIQUE (interaction_group_id) WHERE is_current = true
+```
+
+2. Partial unique index for idempotency key:
+
+```text
+UNIQUE (organization_id, client_request_id)
+WHERE client_request_id IS NOT NULL
+```
+
+3. Do not treat this optional index as group identity:
+
+```text
+UNIQUE (organization_id, property_id, user_id)
+WHERE is_current = true
+```
+
+It can be a defensive optimization in strict MVP semantics, but it is not the definition of `interaction_group_id` and can be redundant when group invariants are correctly enforced.
+
+## Immutability and atomicity guidance
+
+Desired behavior:
+
+- Inserts create new snapshots.
+- Historical business fields are never rewritten.
+- `is_current` may transition under controlled logic.
+- Restoring an older snapshot changes current designation without rewriting historical business data.
+- Promotion of a new current snapshot and demotion of the previous current snapshot occurs atomically.
+
+Implementation guidance:
+
+- Use a transaction in the service layer for create/revision/restore flows.
+- Use the partial unique `is_current` index as a database backstop.
+- Add lightweight immutability checks only where constraint/index support is insufficient.
 
 ---
 

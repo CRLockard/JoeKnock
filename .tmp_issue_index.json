@@ -1,0 +1,272 @@
+[
+  {
+    "number": 1,
+    "state": "OPEN",
+    "title": "US-001 — Register Organization",
+    "labels": "user-story,priority:p0,area:auth,backend,database"
+  },
+  {
+    "number": 2,
+    "state": "OPEN",
+    "title": "US-002 — Log In",
+    "labels": "user-story,priority:p0,area:auth,frontend,backend,security"
+  },
+  {
+    "number": 3,
+    "state": "OPEN",
+    "title": "US-003 — Log Out",
+    "labels": "user-story,priority:p0,area:auth,frontend,backend"
+  },
+  {
+    "number": 4,
+    "state": "OPEN",
+    "title": "US-004 — View Current User",
+    "labels": "user-story,priority:p1,area:auth,area:users,frontend,backend"
+  },
+  {
+    "number": 5,
+    "state": "OPEN",
+    "title": "US-005 — Manage Organization Information",
+    "labels": "user-story,priority:p1,area:settings,frontend,backend"
+  },
+  {
+    "number": 6,
+    "state": "OPEN",
+    "title": "US-006 — Create User",
+    "labels": "user-story,priority:p0,area:users,frontend,backend,database"
+  },
+  {
+    "number": 7,
+    "state": "OPEN",
+    "title": "US-007 — View Organization Users",
+    "labels": "user-story,priority:p1,area:users,frontend,backend"
+  },
+  {
+    "number": 8,
+    "state": "OPEN",
+    "title": "US-008 — Update User",
+    "labels": "user-story,priority:p1,area:users,frontend,backend"
+  },
+  {
+    "number": 9,
+    "state": "OPEN",
+    "title": "US-009 — Deactivate User",
+    "labels": "user-story,priority:p1,area:users,backend,database,security"
+  },
+  {
+    "number": 10,
+    "state": "OPEN",
+    "title": "US-010 — Create Team",
+    "labels": "user-story,priority:p1,area:teams,frontend,backend,database"
+  },
+  {
+    "number": 11,
+    "state": "OPEN",
+    "title": "US-011 — View Teams",
+    "labels": "user-story,priority:p1,area:teams,frontend,backend"
+  },
+  {
+    "number": 12,
+    "state": "OPEN",
+    "title": "US-012 — Add User to Team",
+    "labels": "user-story,priority:p1,area:users,area:teams,backend,database"
+  },
+  {
+    "number": 13,
+    "state": "OPEN",
+    "title": "US-013 — Remove User from Team",
+    "labels": "user-story,priority:p2,area:teams,backend,database"
+  },
+  {
+    "number": 14,
+    "state": "OPEN",
+    "title": "US-014 — View Statuses",
+    "labels": "user-story,priority:p0,area:statuses,frontend,backend"
+  },
+  {
+    "number": 15,
+    "state": "OPEN",
+    "title": "US-015 — Create Status",
+    "labels": "user-story,priority:p1,area:statuses,frontend,backend,database"
+  },
+  {
+    "number": 16,
+    "state": "OPEN",
+    "title": "US-016 — Update Status",
+    "labels": "user-story,priority:p1,area:statuses,frontend,backend"
+  },
+  {
+    "number": 17,
+    "state": "OPEN",
+    "title": "US-017 — Deactivate Status",
+    "labels": "user-story,priority:p1,area:statuses,frontend,backend"
+  },
+  {
+    "number": 18,
+    "state": "OPEN",
+    "title": "US-018 — View Map",
+    "labels": "user-story,priority:p0,area:map,frontend"
+  },
+  {
+    "number": 19,
+    "state": "OPEN",
+    "title": "US-019 — View Current Location",
+    "labels": "user-story,priority:p0,area:map,frontend"
+  },
+  {
+    "number": 20,
+    "state": "OPEN",
+    "title": "US-020 — Follow Current Location",
+    "labels": "user-story,priority:p1,area:map,frontend"
+  },
+  {
+    "number": 21,
+    "state": "OPEN",
+    "title": "US-021 — View Property Markers",
+    "labels": "user-story,priority:p0,area:properties,area:map,frontend,backend"
+  },
+  {
+    "number": 22,
+    "state": "OPEN",
+    "title": "US-022 — Filter Map Properties",
+    "labels": "user-story,priority:p1,area:properties,area:map,frontend,backend"
+  },
+  {
+    "number": 23,
+    "state": "OPEN",
+    "title": "US-023 — Identify Property from Map Location",
+    "labels": "user-story,priority:p0,area:properties,area:map,area:geocoding,frontend,backend"
+  },
+  {
+    "number": 24,
+    "state": "OPEN",
+    "title": "US-024 ΓÇö Search for Address [POST-MVP]",
+    "labels": "user-story,area:map,area:geocoding,frontend,backend,deferred,post-mvp"
+  },
+  {
+    "number": 25,
+    "state": "OPEN",
+    "title": "US-025 ΓÇö Cache Geocoding Results [POST-MVP]",
+    "labels": "user-story,area:geocoding,backend,database,deferred,post-mvp"
+  },
+  {
+    "number": 26,
+    "state": "OPEN",
+    "title": "US-026 — Create Property",
+    "labels": "user-story,priority:p0,area:properties,backend,database"
+  },
+  {
+    "number": 27,
+    "state": "OPEN",
+    "title": "US-027 — View Property",
+    "labels": "user-story,priority:p0,area:properties,frontend,backend"
+  },
+  {
+    "number": 28,
+    "state": "OPEN",
+    "title": "US-028 — View Property Interactions (Current State)",
+    "labels": "user-story,priority:p0,area:properties,area:interactions,frontend,backend"
+  },
+  {
+    "number": 29,
+    "state": "OPEN",
+    "title": "US-029 — Record New Interaction",
+    "labels": "user-story,priority:p0,area:interactions,frontend,backend,database"
+  },
+  {
+    "number": 30,
+    "state": "OPEN",
+    "title": "US-030 — Save Interaction Draft",
+    "labels": "user-story,priority:p0,area:interactions,frontend"
+  },
+  {
+    "number": 31,
+    "state": "OPEN",
+    "title": "US-031 — Update Interaction",
+    "labels": "user-story,priority:p0,area:interactions,frontend,backend,database"
+  },
+  {
+    "number": 32,
+    "state": "OPEN",
+    "title": "US-032 — View Interaction Snapshot",
+    "labels": "user-story,priority:p1,area:interactions,frontend,backend"
+  },
+  {
+    "number": 33,
+    "state": "OPEN",
+    "title": "US-033 ΓÇö View Interaction History [POST-MVP]",
+    "labels": "user-story,area:interactions,frontend,backend,database,deferred,post-mvp"
+  },
+  {
+    "number": 34,
+    "state": "OPEN",
+    "title": "US-034 — Restrict Representative Visibility",
+    "labels": "user-story,priority:p0,area:interactions,area:settings,backend,security"
+  },
+  {
+    "number": 35,
+    "state": "OPEN",
+    "title": "US-035 — Enforce Organization Isolation",
+    "labels": "user-story,priority:p0,area:auth,backend,database,security,testing"
+  },
+  {
+    "number": 36,
+    "state": "OPEN",
+    "title": "US-036 — Enforce Role Permissions",
+    "labels": "user-story,priority:p0,area:auth,backend,security,testing"
+  },
+  {
+    "number": 37,
+    "state": "OPEN",
+    "title": "US-037 — View Activity Report",
+    "labels": "user-story,priority:p1,area:reports,frontend,backend"
+  },
+  {
+    "number": 38,
+    "state": "OPEN",
+    "title": "US-038 — View Activity by Status",
+    "labels": "user-story,priority:p2,area:reports,frontend,backend"
+  },
+  {
+    "number": 39,
+    "state": "OPEN",
+    "title": "US-039 — View Activity by Representative",
+    "labels": "user-story,priority:p2,area:reports,frontend,backend"
+  },
+  {
+    "number": 40,
+    "state": "OPEN",
+    "title": "US-040 — Select Property from Map",
+    "labels": "user-story,priority:p0,area:properties,area:map,frontend"
+  },
+  {
+    "number": 41,
+    "state": "OPEN",
+    "title": "US-041 — Record Interaction Without Leaving Map",
+    "labels": "user-story,priority:p0,area:interactions,area:map,frontend"
+  },
+  {
+    "number": 42,
+    "state": "OPEN",
+    "title": "US-042 — Display Interaction Status and Count",
+    "labels": "user-story,priority:p1,area:interactions,area:map,frontend"
+  },
+  {
+    "number": 43,
+    "state": "OPEN",
+    "title": "US-043 — Handle API Validation Errors",
+    "labels": "user-story,priority:p1,area:interactions,frontend,backend,testing"
+  },
+  {
+    "number": 44,
+    "state": "OPEN",
+    "title": "US-044 — Handle Network Failure During Interaction",
+    "labels": "user-story,priority:p1,area:interactions,frontend,testing"
+  },
+  {
+    "number": 45,
+    "state": "OPEN",
+    "title": "US-045 — Protect Geocoding Service",
+    "labels": "user-story,priority:p1,area:geocoding,backend,security"
+  }
+]

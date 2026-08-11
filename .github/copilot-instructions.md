@@ -21,9 +21,10 @@ Before making implementation changes, consult the relevant project documentation
 The primary sources of truth are:
 
 ```text
-docs/Architecture_Decision_Record.md
 docs/api_endpoints.md
 docs/table_Schema_decisions.md
+docs/implementation/foundation/project-foundation-spec.md
+docs/Architecture_Decision_Record.md
 docs/testing/testing-strategy.md
 docs/testing/test-matrix.md
 docs/implementation/
@@ -62,14 +63,13 @@ Define the approved implementation approach for individual GitHub issues.
 When information conflicts, use this order:
 
 1. Explicitly approved user/product decisions documented in the repository
-2. Architecture Decision Record
-3. Database schema decisions
-4. API endpoint documentation
-5. Testing strategy and test matrix
-6. Approved implementation specification for the current ticket
+2. API endpoint documentation and database schema decisions
+3. Foundation specification
+4. Architecture Decision Record
+5. Approved implementation specification for the current ticket
+6. Existing GitHub issue text
 7. Existing application code
-8. Existing GitHub issue text
-9. Your own assumptions
+8. Your own assumptions
 
 If an implementation specification conflicts with an architecture, schema, or API document, do not silently resolve the conflict.
 
@@ -231,6 +231,10 @@ The MVP does not expose latitude/longitude as user-editable fields.
 # 12. Interaction Model
 
 Interactions follow the finalized immutable snapshot architecture.
+
+Historical interaction business data is immutable.
+
+System-maintained current-state metadata may change when snapshots transition (for example, `is_current`).
 
 The MVP interaction identity is based on:
 

@@ -213,7 +213,7 @@ User enters credentials
 
 ## New Tests
 
-- TEST-091 (proposed) Login Auth Context Includes Organization
+- TEST-091 Login Auth Context Includes Organization
   - Planning-only identifier. Do not edit test-matrix.md in this task.
 
 ## Unit Tests
@@ -308,7 +308,7 @@ Then:
 4. Implement password hash compare path.
 5. Implement JWT issuance and response shaping.
 6. Wire frontend login state handling.
-7. Add/execute TEST-007/008/009/010 and proposed TEST-091.
+7. Add/execute TEST-007/008/009/010 and TEST-091.
 8. Run broader auth-related tests and npm test.
 
 # 15. Expected Files
@@ -317,24 +317,27 @@ Repository currently has no application code scaffold in ddd.
 
 ## Expected New Files
 
-- ddd/backend/src/auth/login.route.[ext]
-- ddd/backend/src/auth/login.service.[ext]
-- ddd/backend/src/auth/login.validation.[ext]
-- ddd/backend/src/security/jwt.[ext]
-- ddd/backend/tests/integration/auth/login.[ext]
-- ddd/frontend/src/auth/login.[ext]
-- ddd/frontend/tests/auth/login.[ext]
+- ddd/backend/src/auth/authRoutes.js
+- ddd/backend/src/auth/authController.js
+- ddd/backend/src/auth/authService.js
+- ddd/backend/src/auth/jwt.js
+- ddd/backend/src/validation/schemas/login.js
+- ddd/backend/tests/integration/auth/login.test.js
+- ddd/frontend/src/api/authApi.js
+- ddd/frontend/src/pages/LoginPage.jsx
+- ddd/frontend/tests/auth/login.test.js
 
 ## Expected Modified Files
 
-- ddd/backend/src/app.[ext] (auth route registration)
-- ddd/frontend/src/auth/context.[ext] (auth storage/session state)
-- ddd/frontend/src/routes/protected.[ext] (auth gate)
+- ddd/backend/src/app.js (auth route registration)
+- ddd/frontend/src/auth/AuthProvider.jsx (auth storage/session state)
+- ddd/frontend/src/auth/authStorage.js (localStorage token handling)
+- ddd/frontend/src/auth/ProtectedRoute.jsx (auth gate)
 
 ## Potential Files
 
-- ddd/backend/src/common/errors.[ext]
-- ddd/backend/src/common/response.[ext]
+- ddd/backend/src/common/errors.js
+- ddd/backend/src/common/response.js
 
 # 16. Dependencies
 
@@ -390,7 +393,7 @@ Testing
 
 - [ ] TEST-007/008/009/010 implemented and passing.
 - [ ] TEST-011/012 coverage validated for protected-route behavior.
-- [ ] Proposed TEST-091 implemented or explicitly tracked.
+- [ ] TEST-091 implemented.
 - [ ] npm test passes.
 
 Documentation
@@ -440,7 +443,7 @@ Mitigation:
 1. Foundation gap: repository currently has no backend/frontend scaffold in ddd.
    Impact:
 
-- Exact implementation file paths and test framework details cannot be fixed yet.
+- Implementation cannot begin until the planned foundation scaffold is created.
   Blocking status:
 - Implementation-blocking until foundation exists.
 

@@ -1060,7 +1060,9 @@ PATCH /api/interactions/:id
 DELETE /api/interactions/:id
 ```
 
-Interaction snapshots are immutable.
+Historical interaction business data in each snapshot is immutable.
+
+System-maintained current-state metadata (for example `is_current`) may change as snapshots transition.
 
 Changes are represented by creating a new snapshot through:
 

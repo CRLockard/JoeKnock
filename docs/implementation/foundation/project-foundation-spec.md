@@ -1,8 +1,8 @@
 # JoeKnock Project Foundation Specification
 
-Status: Planned
-Purpose: Define the implementation foundation required before US-001, US-002, US-003, and all subsequent application tickets.
-Scope: Planning and documentation only. No application code, dependency installation, or environment provisioning is performed by this document.
+**Status:** Planned
+**Purpose:** Define the implementation foundation required before US-001, US-002, US-003, and all subsequent application tickets.
+**Scope:** Planning and documentation only. No application code, dependency installation, or environment provisioning is performed by this document.
 
 ---
 
@@ -13,593 +13,684 @@ Scope: Planning and documentation only. No application code, dependency installa
 The project foundation must establish:
 
 1. A concrete and minimal full-stack technology baseline for JoeKnock MVP.
-2. A production-grade repository structure under ddd with explicit file paths and responsibilities.
+2. A production-respectful repository structure under `ddd` with explicit file paths and responsibilities.
 3. A repeatable backend/frontend development workflow.
-4. Shared conventions for API behavior, validation, auth context, authorization, and organization isolation.
-5. A serious automated test architecture with npm test as the primary suite command.
+4. Shared conventions for API behavior, validation, authentication context, authorization, and organization isolation.
+5. A practical automated test architecture using Vitest, Supertest, and Playwright.
 6. Database migration and test-database patterns required for safe iterative development.
-7. Clear implementation guardrails for Copilot and human contributors.
+7. Basic application security appropriate for an MVP.
+8. Clear implementation guardrails for GitHub Copilot and human contributors.
 
 ## 1.2 What the Foundation Explicitly Does Not Implement
 
 This foundation specification does not implement:
 
 1. Any MVP business feature endpoint or UI behavior from user-story tickets.
-2. Any schema redesign beyond docs/table_Schema_decisions.md.
-3. Any contract redesign beyond docs/api_endpoints.md.
-4. Any post-MVP infrastructure (token blacklisting, distributed session systems, queue workers, etc.).
-5. Any package installation or code scaffolding in the repository.
+2. Any schema redesign beyond `docs/table_Schema_decisions.md`.
+3. Any contract redesign beyond `docs/api_endpoints.md`.
+4. Any post-MVP infrastructure such as token blacklisting, refresh-token rotation, distributed sessions, Redis, queues, or external observability platforms.
+5. CSRF protection for the MVP JWT bearer-token architecture.
+6. Any package installation or application code scaffolding in the repository.
 
 ---
 
 # 2. Technology Stack Decisions
 
-This section turns current architecture intent into actionable implementation decisions. Where decisions are already fixed in source-of-truth docs, they are marked Established. Where not fixed by source docs, this foundation selects a final MVP implementation choice.
+This section defines the finalized MVP implementation baseline.
 
 ## 2.1 Summary
 
-1. Frontend framework: React (Established by ADR/design docs)
-2. Frontend language: TypeScript (Final foundation choice)
-3. Frontend build tool: Vite (Final foundation choice)
-4. Backend runtime: Node.js LTS (Final foundation choice)
-5. Backend language: TypeScript (Final foundation choice)
-6. Backend framework: Express (Established by design snapshot)
-7. Database: PostgreSQL (Established by ADR-004)
-8. DB access: Prisma ORM with explicit transactional usage (Final foundation choice)
-9. Authentication: JWT bearer auth with stateless logout (Established by API docs)
-10. API architecture: REST JSON over /api (Established by API docs)
-11. Validation library: Zod (Final foundation choice)
-12. Unit/API test framework: Vitest (Final foundation choice)
-13. API/integration test transport: Supertest (Final foundation choice)
-14. End-to-end test framework: Playwright (Final foundation choice)
-15. Linting: ESLint (Final foundation choice)
-16. Formatting: Prettier (Final foundation choice)
-17. Environment/configuration: dotenv + typed config module (Final foundation choice)
+1. Frontend framework: **React**
+2. Frontend language: **JavaScript**
+3. Frontend build tool: **Vite**
+4. Backend runtime: **Node.js LTS**
+5. Backend language: **JavaScript**
+6. Backend framework: **Express**
+7. Database: **PostgreSQL**
+8. Database access: **`pg` / node-postgres**
+9. Database migrations: **node-pg-migrate**
+10. Authentication: **JWT bearer authentication**
+11. MVP client token storage: **localStorage**
+12. API architecture: **REST JSON under `/api`**
+13. API validation: **express-validator**
+14. Frontend HTTP client: **native `fetch`**
+15. Frontend authentication state: **React Context**
+16. Unit/component testing: **Vitest**
+17. API/integration testing: **Supertest**
+18. End-to-end testing: **Playwright**
+19. Linting: **ESLint**
+20. Formatting: **Prettier**
+21. Environment/configuration: **dotenv + typed configuration module**
+22. Password hashing: **Argon2id**
+23. Security middleware: **Helmet, CORS configuration, express-rate-limit**
+24. Logging: **lightweight application logger**
+25. Request tracing: **request IDs**
+26. Maps: **Leaflet**
+27. Geocoding: **OpenStreetMap/Nominatim through the JoeKnock backend**
 
-## 2.1.1 Foundation Decision Rationale for Finalized Choices
+## 2.1.1 Finalized Foundation Rationale
 
-TypeScript:
+### JavaScript
 
-1. Improves correctness for auth context, organization scoping, and API contract mapping.
-2. Reduces runtime class of errors for solo development.
-3. Adds moderate setup complexity but improves long-term maintainability.
+JavaScript is used for both frontend and backend.
 
-Prisma:
+Reasons:
 
-1. Best productivity/safety tradeoff for a solo MVP using PostgreSQL.
-2. Strong migration workflow and typed DB access.
-3. Acceptable lock-in risk for capstone scope.
+1. It matches the user's existing course/project experience.
+2. It reduces language-switching overhead for a solo capstone.
+3. It keeps the implementation approachable and easy to defend during project review.
+4. The project does not require TypeScript-specific complexity to achieve the MVP's goals.
 
-Testing stack (Vitest + Supertest + Playwright):
+TypeScript is explicitly **not** part of the MVP foundation.
 
-1. Covers unit, API integration, and end-to-end needs with minimal tool fragmentation.
-2. Supports required npm test behavior and strong local feedback loops.
+### PostgreSQL + `pg`
 
-JWT client storage:
+PostgreSQL remains the authoritative database.
 
-1. localStorage is selected for MVP simplicity and session persistence.
-2. Security guardrails are required: strict input validation, no dangerous HTML injection patterns, minimal token payload, and immediate clear on logout.
-3. In-memory-only tokens are more secure for XSS but create weaker practical UX for MVP session continuity.
+Database access uses `pg` rather than an ORM.
 
-## 2.2 Recommendation Details
+Reasons:
 
-### Frontend Framework: React (Established)
+1. JoeKnock has a strongly relational data model.
+2. Explicit SQL keeps database behavior visible and understandable.
+3. The user already has SQL experience.
+4. Parameterized SQL provides strong protection against SQL injection.
+5. It avoids unnecessary ORM abstraction and lock-in.
+6. It makes the database layer straightforward to explain and test.
 
-What it is:
+### node-pg-migrate
 
-- Component-based frontend library.
+Database schema changes are managed through source-controlled migrations using `node-pg-migrate`.
 
-Why it fits JoeKnock:
+### JWT + localStorage
 
-- Already aligned with product and architecture documentation.
-- Strong ecosystem for map UI integration and route-guard patterns.
+JWT bearer authentication is retained for MVP.
 
-Why appropriate for MVP:
+Tokens are stored in `localStorage` for MVP session persistence.
 
-- Fast iteration and strong educational value for a capstone.
+Security guardrails include:
 
-Alternatives considered:
+1. Minimal JWT payload.
+2. Short, intentional token lifetime.
+3. No sensitive information in the token.
+4. Immediate client-side token removal on logout.
+5. Strict backend authentication and authorization.
+6. Input validation.
+7. Security headers.
+8. Rate limiting.
+9. Safe error handling.
+10. No dangerous HTML injection patterns.
 
-- Vue, Svelte.
+CSRF protection is deferred because the MVP sends JWTs explicitly through the `Authorization` header rather than relying on authentication cookies.
 
-Why preferred:
+If authentication changes to cookie-based credentials in the future, CSRF protection must be reconsidered.
 
-- Existing project documentation repeatedly references React.
+### Validation
 
-Migration risk:
+`express-validator` is the finalized API validation library.
 
-- Low immediate risk; medium long-term switching cost if changed later.
+Frontend validation remains UX-focused and is never considered a security boundary.
 
-### Frontend Build Tool: Vite (Recommended)
+### Testing
 
-What it is:
+The finalized testing stack is:
 
-- Lightweight dev server and build tool for modern frontend apps.
+- Vitest
+- Supertest
+- Playwright
 
-Why it fits JoeKnock:
-
-- Fast startup and rebuild speed supports solo-developer productivity.
-
-Why appropriate for MVP:
-
-- Minimal config burden and straightforward testing integration.
-
-Alternatives considered:
-
-- CRA, Next.js, Parcel.
-
-Why preferred:
-
-- Simpler than Next.js for this API-separated architecture.
-- Faster and more current than CRA for new projects.
-
-Migration risk:
-
-- Low. Vite is ecosystem-standard and easy to migrate from if needed.
-
-### Backend Runtime: Node.js LTS (Recommended)
-
-What it is:
-
-- JavaScript runtime for server applications.
-
-Why it fits JoeKnock:
-
-- Single-language stack with React reduces cognitive overhead.
-
-Why appropriate for MVP:
-
-- Broad tooling support, low friction for a solo capstone.
-
-Alternatives considered:
-
-- Python/FastAPI, .NET, Go.
-
-Why preferred:
-
-- Best fit with existing React/Express documentation direction.
-
-Migration risk:
-
-- Low for MVP; language migration later is possible but non-trivial.
-
-### Backend Framework: Express (Established)
-
-What it is:
-
-- Minimal web framework for Node.js APIs.
-
-Why it fits JoeKnock:
-
-- Direct mapping to current REST routes and middleware pipeline needs.
-
-Why appropriate for MVP:
-
-- Minimal abstraction and high learning value for backend fundamentals.
-
-Alternatives considered:
-
-- Fastify, NestJS.
-
-Why preferred:
-
-- Explicitly referenced in design snapshot and consistent with MVP simplicity.
-
-Migration risk:
-
-- Low-medium. Migration to Fastify/Nest later is feasible if scale requires.
-
-### Database: PostgreSQL (Established)
-
-What it is:
-
-- Relational ACID database.
-
-Why it fits JoeKnock:
-
-- Strongly relational domain with strict ownership and historical constraints.
-
-Why appropriate for MVP:
-
-- Reliable transactions and SQL power for reporting and isolation tests.
-
-Alternatives considered:
-
-- MongoDB/document DB.
-
-Why preferred:
-
-- ADR-004 explicitly selects PostgreSQL for this domain.
-
-Migration risk:
-
-- Low; this is already foundationally established.
-
-### Database Access Layer: Prisma ORM (Final Foundation Choice)
-
-What it is:
-
-- Type-safe ORM and migration tooling for Node + PostgreSQL.
-
-Why it fits JoeKnock:
-
-- Reduces boilerplate while keeping transactional operations explicit.
-- Good fit for complex relationship traversal and typed query usage.
-
-Why appropriate for MVP:
-
-- Speeds safe development for one developer while preserving correctness.
-
-Alternatives considered:
-
-- Drizzle ORM, Knex + SQL, Sequelize, TypeORM.
-
-Why preferred:
-
-- Best balance of productivity, ecosystem maturity, and migration tooling.
-
-Migration risk:
-
-- Medium. ORM lock-in exists, but schema and SQL remain portable.
-
-### Authentication: JWT Bearer, Stateless Logout (Established)
-
-What it is:
-
-- Signed token used on Authorization: Bearer headers.
-
-Why it fits JoeKnock:
-
-- Matches existing API contracts for login and logout.
-
-Why appropriate for MVP:
-
-- Keeps operational complexity low.
-
-Alternatives considered:
-
-- Server sessions, refresh-token rotation system, OAuth provider integration.
-
-Why preferred:
-
-- Existing contracts already define stateless logout and no required server mutation.
-
-Migration risk:
-
-- Medium if advanced auth requirements later emerge.
-
-### API Architecture: REST JSON under /api (Established)
-
-What it is:
-
-- Resource/operation endpoints with JSON payloads and HTTP statuses.
-
-Why it fits JoeKnock:
-
-- Already fully documented with endpoint matrix.
-
-Why appropriate for MVP:
-
-- Transparent, easy to test, and understandable for capstone review.
-
-Alternatives considered:
-
-- GraphQL, gRPC.
-
-Why preferred:
-
-- Existing source-of-truth is REST.
-
-Migration risk:
-
-- Low-medium depending on future API consumption patterns.
-
-### Validation Library: Zod (Final Foundation Choice)
-
-What it is:
-
-- Runtime schema validation with TypeScript inference.
-
-Why it fits JoeKnock:
-
-- Single-source validation models for request boundaries.
-
-Why appropriate for MVP:
-
-- Keeps validation explicit without heavy framework coupling.
-
-Alternatives considered:
-
-- Joi, Yup, express-validator, class-validator.
-
-Why preferred:
-
-- Strong type ergonomics and clean integration with both backend and frontend forms.
-
-Migration risk:
-
-- Low.
-
-### Testing Framework: Vitest (Final Foundation Choice)
-
-What it is:
-
-- Fast test runner compatible with modern TS/JS stacks.
-
-Why it fits JoeKnock:
-
-- Works well for frontend unit tests and backend unit/integration tests in one ecosystem.
-
-Why appropriate for MVP:
-
-- Reduces tool fragmentation.
-
-Alternatives considered:
-
-- Jest + ts-jest.
-
-Why preferred:
-
-- Faster local feedback and strong Vite alignment.
-
-Migration risk:
-
-- Low.
-
-### API/Integration Testing: Supertest (Final Foundation Choice)
-
-What it is:
-
-- HTTP assertions for Node server handlers.
-
-Why it fits JoeKnock:
-
-- Direct route-level testing for auth, isolation, and error contracts.
-
-Why appropriate for MVP:
-
-- Minimal setup, battle-tested.
-
-Alternatives considered:
-
-- Pactum, Frisby.
-
-Why preferred:
-
-- Simplicity and standard Express testing pattern.
-
-Migration risk:
-
-- Low.
-
-### End-to-End Testing: Playwright (Final Foundation Choice)
-
-What it is:
-
-- Browser automation and end-to-end testing framework.
-
-Why it fits JoeKnock:
-
-- Supports critical map and auth workflow checks.
-
-Why appropriate for MVP:
-
-- Reliable cross-browser capability with strong debugging.
-
-Alternatives considered:
-
-- Cypress.
-
-Why preferred:
-
-- Better multi-browser parity and robust modern tooling.
-
-Migration risk:
-
-- Low-medium.
-
-### Linting: ESLint (Final Foundation Choice)
-
-What it is:
-
-- Static analysis for code quality issues.
-
-Why it fits JoeKnock:
-
-- Enforces consistency and catches common defects early.
-
-Why appropriate for MVP:
-
-- Low-cost quality guardrail.
-
-Alternatives considered:
-
-- Biome-only linting.
-
-Why preferred:
-
-- Broad rule ecosystem and familiarity.
-
-Migration risk:
-
-- Low.
-
-### Formatting: Prettier (Final Foundation Choice)
-
-What it is:
-
-- Automated code formatting.
-
-Why it fits JoeKnock:
-
-- Prevents style churn and review noise.
-
-Why appropriate for MVP:
-
-- Very low overhead, high consistency.
-
-Alternatives considered:
-
-- ESLint format-only, Biome formatter.
-
-Why preferred:
-
-- Established default and editor support.
-
-Migration risk:
-
-- Low.
-
-### Environment/Config Management: dotenv + typed config module (Final Foundation Choice)
-
-What it is:
-
-- Environment variable loading and runtime config validation.
-
-Why it fits JoeKnock:
-
-- Clean separation of dev/test/prod behavior and secrets.
-
-Why appropriate for MVP:
-
-- Simple, familiar, and enough for single-developer operations.
-
-Alternatives considered:
-
-- dotenv-flow, external secret managers only.
-
-Why preferred:
-
-- Lowest complexity while still production-respectful.
-
-Migration risk:
-
-- Low.
+Each tool has a distinct responsibility rather than trying to use one tool for everything.
 
 ---
 
-# 3. Repository Structure (Production Proposal)
+# 2.2 Recommendation Details
 
-Current state: ddd is empty. This section defines the intended structure with explicit file extensions and responsibilities.
+## Frontend Framework: React
+
+**Status:** Established
+
+React provides the component-based frontend architecture for JoeKnock.
+
+Why it fits:
+
+- Already established through the project and coursework.
+- Strong ecosystem for map interfaces.
+- Familiar development model.
+- Appropriate for the capstone's scope.
+
+Alternatives considered:
+
+- Vue
+- Svelte
+
+Decision:
+
+- React remains the frontend framework.
+
+---
+
+## Frontend Language: JavaScript
+
+**Status:** Finalized
+
+JoeKnock uses JavaScript rather than TypeScript.
+
+File extensions include:
+
+```text
+.js
+.jsx
+```
+
+Reasons:
+
+1. Matches existing coursework and project experience.
+2. Reduces setup and configuration overhead.
+3. Keeps the stack consistent with the user's current skill set.
+4. Makes the implementation easier to explain and defend.
+
+TypeScript is deferred rather than prohibited from future versions.
+
+---
+
+## Frontend Build Tool: Vite
+
+**Status:** Finalized
+
+Vite provides the frontend development server and production build tooling.
+
+Why it fits:
+
+- Fast startup.
+- Fast rebuilds.
+- Minimal configuration.
+- Good React integration.
+- Straightforward testing integration.
+
+Alternatives considered:
+
+- Create React App
+- Next.js
+- Parcel
+
+Decision:
+
+- Vite.
+
+---
+
+## Backend Runtime: Node.js LTS
+
+**Status:** Finalized
+
+Node.js LTS provides the backend runtime.
+
+Why it fits:
+
+- Consistent language across the application.
+- Strong Express ecosystem.
+- Familiar JavaScript environment.
+- Appropriate for the scale of the MVP.
+
+---
+
+## Backend Framework: Express
+
+**Status:** Established
+
+Express provides the REST API and middleware pipeline.
+
+Why it fits:
+
+- Explicit routing and middleware.
+- Easy to understand.
+- Strong ecosystem.
+- Appropriate abstraction level for the capstone.
+
+Alternatives considered:
+
+- Fastify
+- NestJS
+
+Decision:
+
+- Express.
+
+---
+
+## Database: PostgreSQL
+
+**Status:** Established
+
+PostgreSQL is the authoritative JoeKnock database.
+
+Why it fits:
+
+- Strong relational model.
+- ACID transactions.
+- Foreign-key support.
+- Constraints and indexes.
+- Appropriate for historical interaction records.
+- Good support for organization isolation.
+
+---
+
+## Database Access: `pg`
+
+**Status:** Finalized
+
+JoeKnock uses the `pg` Node.js PostgreSQL client.
+
+The architecture is:
+
+```text
+Service
+  ↓
+Repository
+  ↓
+pg
+  ↓
+PostgreSQL
+```
+
+Queries use parameterized values:
+
+```js
+pool.query(
+  `
+    SELECT *
+    FROM properties
+    WHERE id = $1
+  `,
+  [propertyId],
+);
+```
+
+String interpolation of user-controlled values into SQL is prohibited.
+
+There is no ORM in the MVP.
+
+---
+
+## Database Migrations: node-pg-migrate
+
+**Status:** Finalized
+
+Database schema changes are represented by source-controlled migration files.
+
+Migration history is part of the repository and is used to reproduce database structure in development and test environments.
+
+---
+
+## Authentication: JWT Bearer Authentication
+
+**Status:** Established
+
+JoeKnock uses signed JWT bearer tokens.
+
+Protected requests use:
+
+```text
+Authorization: Bearer <token>
+```
+
+JWT verification occurs in backend authentication middleware.
+
+---
+
+## Password Hashing: Argon2id
+
+**Status:** Finalized
+
+Passwords are hashed using Argon2id.
+
+Passwords are never stored in plaintext.
+
+Password hashes are never returned through API responses.
+
+---
+
+## API Architecture: REST JSON under `/api`
+
+**Status:** Established
+
+JoeKnock exposes a REST-style JSON API under:
+
+```text
+/api/...
+```
+
+The endpoint contract is authoritative in:
+
+```text
+docs/api_endpoints.md
+```
+
+The Foundation Specification must not create a competing endpoint contract.
+
+Alternatives considered:
+
+- GraphQL
+- gRPC
+
+Decision:
+
+- REST JSON.
+
+---
+
+## API Validation: express-validator
+
+**Status:** Finalized
+
+`express-validator` validates incoming request data at the API boundary.
+
+Validation applies to:
+
+- request bodies
+- route parameters
+- query parameters
+
+Business rules remain in the service layer.
+
+Database constraints remain the final integrity boundary.
+
+---
+
+## Frontend HTTP Client: Native `fetch`
+
+**Status:** Finalized
+
+The frontend uses the browser's native `fetch` API.
+
+JoeKnock may provide a lightweight API client wrapper around `fetch` for shared concerns such as:
+
+- API base URL
+- authorization headers
+- JSON parsing
+- common error handling
+
+No Axios dependency is required.
+
+---
+
+## Frontend Authentication State: React Context
+
+**Status:** Finalized
+
+Authentication state is managed with React Context.
+
+The authentication provider is responsible for:
+
+- current authenticated user
+- token lifecycle
+- login state
+- logout state
+- persistence/recovery from localStorage
+
+Redux or another global-state framework is not required for MVP.
+
+---
+
+## Testing Framework: Vitest
+
+**Status:** Finalized
+
+Vitest is used for unit and component tests.
+
+Appropriate targets include:
+
+- utility functions
+- validation helpers
+- business-rule logic
+- permission calculations
+- React components
+- React hooks
+- authentication state behavior
+
+---
+
+## API/Integration Testing: Supertest
+
+**Status:** Finalized
+
+Supertest is used to exercise the Express API through HTTP-style requests.
+
+It should cover:
+
+- status codes
+- request validation
+- authentication
+- authorization
+- organization isolation
+- response contracts
+- important database-backed API behavior
+
+Supertest is particularly valuable because it tests the actual Express middleware and route pipeline rather than only isolated functions.
+
+---
+
+## End-to-End Testing: Playwright
+
+**Status:** Finalized
+
+Playwright provides browser-level end-to-end testing.
+
+MVP E2E coverage should focus on critical workflows rather than attempting to test every UI detail.
+
+Examples include:
+
+- registration
+- login
+- logout
+- authenticated map access
+- property resolution
+- recording an interaction
+- viewing current interaction state
+
+---
+
+## Linting: ESLint
+
+**Status:** Finalized
+
+ESLint provides static code-quality checks.
+
+---
+
+## Formatting: Prettier
+
+**Status:** Finalized
+
+Prettier provides consistent formatting.
+
+ESLint and Prettier have separate responsibilities:
+
+```text
+ESLint   → code quality
+Prettier → formatting
+```
+
+---
+
+## Environment/Configuration: dotenv + Config Module
+
+**Status:** Finalized
+
+Environment variables are loaded through `dotenv` and accessed through a typed configuration module.
+
+Environment values are validated when the application starts.
+
+Secrets are never committed to source control.
+
+---
+
+# 3. Repository Structure
+
+Current state: `ddd` is empty.
+
+This section defines the intended structure.
 
 ## 3.1 Top-Level
 
-1. ddd/frontend
-2. ddd/backend
-3. docs
-4. .github
+```text
+ddd/
+frontend/
+backend/
+docs/
+.github/
+```
+
+The actual application code lives under `ddd`.
+
+---
 
 ## 3.2 Proposed Structure
 
 ```text
 ddd/
-	frontend/
-		package.json
-		tsconfig.json
-		vite.config.ts
-		index.html
-		src/
-			main.tsx
-			app/
-				App.tsx
-				router.tsx
-			auth/
-				AuthProvider.tsx
-				authStorage.ts
-				useAuth.ts
-				ProtectedRoute.tsx
-			api/
-				client.ts
-				authApi.ts
-			pages/
-				LoginPage.tsx
-				MapPage.tsx
-				ProfilePage.tsx
-			components/
-			features/
-			styles/
-		tests/
-			unit/
-			integration/
-		e2e/
-			specs/
-			fixtures/
-
-	backend/
-		package.json
-		tsconfig.json
-		src/
-			server.ts
-			app.ts
-			config/
-				env.ts
-			common/
-				errors.ts
-				response.ts
-				logger.ts
-			middleware/
-				authMiddleware.ts
-				roleMiddleware.ts
-				errorMiddleware.ts
-				requestIdMiddleware.ts
-			auth/
-				authRoutes.ts
-				authController.ts
-				authService.ts
-				jwt.ts
-				password.ts
-				authTypes.ts
-			organization/
-			users/
-			teams/
-			statuses/
-			properties/
-			interactions/
-			map/
-			reports/
-			validation/
-				schemas/
-			db/
-				client.ts
-				transaction.ts
-		prisma/
-			schema.prisma
-			migrations/
-			seeds/
-		tests/
-			unit/
-			integration/
-			helpers/
-
-	package.json
-	.editorconfig
-	.gitignore
-	.env.example
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx
+│       ├── app/
+│       │   ├── App.jsx
+│       │   └── router.jsx
+│       ├── auth/
+│       │   ├── AuthProvider.jsx
+│       │   ├── authStorage.js
+│       │   ├── useAuth.js
+│       │   └── ProtectedRoute.jsx
+│       ├── api/
+│       │   ├── client.js
+│       │   └── authApi.js
+│       ├── pages/
+│       │   ├── LoginPage.jsx
+│       │   ├── MapPage.jsx
+│       │   └── ProfilePage.jsx
+│       ├── components/
+│       ├── features/
+│       └── styles/
+│
+├── backend/
+│   ├── package.json
+│   ├── src/
+│   │   ├── server.js
+│   │   ├── app.js
+│   │   ├── config/
+│   │   │   └── env.js
+│   │   ├── common/
+│   │   │   ├── errors.js
+│   │   │   ├── response.js
+│   │   │   └── logger.js
+│   │   ├── middleware/
+│   │   │   ├── authMiddleware.js
+│   │   │   ├── roleMiddleware.js
+│   │   │   ├── errorMiddleware.js
+│   │   │   ├── requestIdMiddleware.js
+│   │   │   └── rateLimitMiddleware.js
+│   │   ├── auth/
+│   │   │   ├── authRoutes.js
+│   │   │   ├── authController.js
+│   │   │   ├── authService.js
+│   │   │   ├── jwt.js
+│   │   │   ├── password.js
+│   │   │   └── authTypes.js
+│   │   ├── organization/
+│   │   ├── users/
+│   │   ├── teams/
+│   │   ├── statuses/
+│   │   ├── properties/
+│   │   ├── interactions/
+│   │   ├── map/
+│   │   ├── reports/
+│   │   ├── geocoding/
+│   │   ├── validation/
+│   │   │   └── schemas/
+│   │   └── db/
+│   │       ├── client.js
+│   │       └── transaction.js
+│   ├── migrations/
+│   └── tests/
+│       ├── unit/
+│       ├── integration/
+│       └── helpers/
+│
+├── package.json
+├── .editorconfig
+├── .gitignore
+└── .env.example
 ```
 
 ## 3.3 Directory Responsibilities
 
-1. frontend/src/auth
-   - Client auth state lifecycle, token persistence, route guards.
-2. frontend/src/api
-   - HTTP client wrappers and endpoint modules.
-3. backend/src/middleware
-   - Authentication, authorization, request IDs, centralized errors.
-4. backend/src/auth
-   - Password hashing, JWT issue/verify, auth endpoints.
-5. backend/src/validation
-   - API boundary schemas and parse helpers.
-6. backend/src/db
-   - DB client ownership and transaction helpers.
-7. backend/prisma
-   - Source-controlled schema and migrations.
-8. backend/tests
-   - Unit and integration test suites.
+### `frontend/src/auth`
+
+Client-side authentication state and route protection.
+
+### `frontend/src/api`
+
+HTTP client and endpoint-specific API modules using native `fetch`.
+
+### `backend/src/middleware`
+
+Cross-cutting HTTP concerns including:
+
+- authentication
+- authorization
+- request IDs
+- rate limiting
+- centralized error handling
+
+### `backend/src/auth`
+
+Authentication-specific implementation including:
+
+- password hashing
+- JWT creation/verification
+- authentication routes
+- authentication services
+
+### `backend/src/validation`
+
+API boundary validation using `express-validator`.
+
+### `backend/src/db`
+
+Database client ownership and transaction helpers.
+
+### `backend/migrations`
+
+Source-controlled PostgreSQL migrations managed by `node-pg-migrate`.
+
+### `backend/tests`
+
+Backend unit and integration tests.
+
+### Domain directories
+
+Domain-specific code should follow:
+
+```text
+routes
+  ↓
+controllers
+  ↓
+services
+  ↓
+repositories
+```
+
+where the repository layer owns database access.
 
 Design constraint:
 
-- Avoid introducing extra layers that add indirection without domain value.
-- Route -> controller -> service -> db access is sufficient.
+- Do not introduce unnecessary architectural layers.
+- Keep controllers thin.
+- Keep business logic in services.
+- Keep SQL/database access in repositories.
 
 ---
 
@@ -607,160 +698,275 @@ Design constraint:
 
 ## 4.1 Package Manifests
 
-Recommendation:
+Use:
 
-1. Keep a lightweight workspace root package.json for orchestration scripts.
-2. Maintain separate package manifests at ddd/frontend and ddd/backend.
+1. One lightweight root `package.json` for orchestration.
+2. One package manifest under `ddd/frontend`.
+3. One package manifest under `ddd/backend`.
 
-Why:
+Reasons:
 
 1. Clear runtime boundaries.
-2. Isolated production dependencies per deployment target.
-3. Easier dependency hygiene and faster installs for focused work.
+2. Separate frontend/backend dependencies.
+3. Straightforward development commands.
+4. Easier dependency management.
 
-Alternative:
-
-- Single combined package.json.
-
-Why not preferred:
-
-- Blurs runtime boundaries and inflates install scope.
+---
 
 ## 4.2 Dependency Boundaries
 
-1. Frontend production deps: React, router, map UI libs, HTTP client.
-2. Backend production deps: Express, JWT library, password hashing library, DB client/ORM, validation.
-3. Shared dev tooling may live at root if it only orchestrates scripts.
+### Frontend production dependencies
+
+Examples:
+
+- React
+- React Router
+- Leaflet/map libraries
+
+The frontend uses native `fetch` rather than Axios.
+
+### Backend production dependencies
+
+Examples:
+
+- Express
+- `pg`
+- `node-pg-migrate`
+- JWT library
+- Argon2 library
+- express-validator
+- Helmet
+- CORS middleware
+- express-rate-limit
+- dotenv
+
+### Development dependencies
+
+Examples:
+
+- Vitest
+- Supertest
+- Playwright
+- ESLint
+- Prettier
+
+Dependencies should only be added when they provide clear value.
+
+---
 
 ## 4.3 Script Organization
 
-1. Root scripts delegate to frontend/backend scripts.
-2. Each package owns its own build/test/lint scripts.
+Root scripts delegate to frontend/backend scripts where appropriate.
+
+Expected commands include:
+
+```text
+npm run dev
+npm run build
+npm test
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run test:watch
+npm run test:coverage
+npm run lint
+npm run format
+```
+
+Exact implementation may evolve as the workspace is built.
 
 ---
 
 # 5. Database Foundation
 
-Database design is authoritative in docs/table_Schema_decisions.md and must not be redefined here.
+Database design is authoritative in:
+
+```text
+docs/table_Schema_decisions.md
+```
+
+This Foundation Specification does not redefine the schema.
 
 ## 5.1 Connection Strategy
 
-1. One backend DB client initialized from environment config.
-2. Per-request DB usage via service calls, not global mutable transaction state.
-3. Separate DATABASE_URL values for dev and test.
+1. One application-level `pg.Pool`.
+2. Database configuration comes from environment variables.
+3. Normal queries use the shared pool.
+4. Transactions check out a dedicated client from the pool.
+5. Transaction clients are always released.
+
+---
 
 ## 5.2 Migration Strategy
 
-1. Migrations are source-controlled under backend/prisma/migrations.
-2. Schema changes are made only by migration files.
-3. No direct manual table edits in shared environments.
+1. Migrations are source-controlled under `backend/migrations`.
+2. Migrations are managed with `node-pg-migrate`.
+3. Shared database schemas are changed through migrations rather than manual edits.
+4. Migration files are committed with the application changes that require them.
+
+---
 
 ## 5.3 Development Database Setup
 
-1. Local PostgreSQL instance/database for development.
-2. Migration command applied before app startup in new environments.
+1. Local PostgreSQL database for development.
+2. Development database URL is separate from test and production environments.
+3. Migrations must be applied before the application depends on newly introduced schema.
+
+---
 
 ## 5.4 Test Database Strategy
 
-1. Dedicated test database isolated from dev/prod.
-2. Test run starts from migrated schema.
-3. Test data generated per test/suite.
+1. Dedicated test database.
+2. Test database is never the development or production database.
+3. Test schema is created through migrations.
+4. Test data is created through deterministic test factories/helpers.
+5. Tests must not depend on persistent shared seed data.
+
+---
 
 ## 5.5 Transaction Handling
 
-1. Multi-write operations such as registration must run in a single DB transaction.
-2. Failures must rollback fully.
+Multi-write operations that must succeed or fail together use PostgreSQL transactions.
+
+Example:
+
+```text
+BEGIN
+  ↓
+operation 1
+  ↓
+operation 2
+  ↓
+COMMIT
+```
+
+On failure:
+
+```text
+ROLLBACK
+```
+
+Transaction clients must always be released.
+
+---
 
 ## 5.6 Seed Data Strategy
 
-1. Minimal seed data for local manual testing only.
-2. Automated tests should not depend on shared seed assumptions.
+1. Minimal seed data may be provided for local manual development.
+2. Automated tests must not depend on shared seed assumptions.
+3. Tests should create the data they require.
+
+---
 
 ## 5.7 Schema Change Process
 
-1. Update schema definition.
-2. Generate migration.
-3. Run migration on dev DB.
-4. Add/adjust tests.
-5. Commit migration and related code together.
+1. Modify the approved schema design.
+2. Create a migration.
+3. Run migration against development database.
+4. Update affected application code.
+5. Add/adjust tests.
+6. Commit migration, code, and tests together.
 
-## 5.8 Test Isolation and Corruption Prevention
+---
 
-Recommended pattern:
+## 5.8 Immutable Interaction Snapshots
 
-1. Wrap each integration test in DB transaction with rollback when feasible.
-2. Where multi-connection behavior prevents per-test rollback, truncate/reset all tables between tests in dependency-safe order.
-3. Never reuse mutable cross-test fixtures.
+Interactions are immutable historical snapshots.
 
-Alternatives:
+When an interaction changes:
 
-1. Fresh database per test file.
-2. Docker snapshot restore per suite.
+```text
+Existing snapshot
+       ↓
+never modified
 
-Preferred for MVP:
+New snapshot
+       ↓
+created
+```
 
-- Transaction rollback + deterministic cleanup hybrid, due to simplicity and speed.
+Historical interaction records remain intact.
 
-Migration risk:
-
-- Low. Can evolve to container-per-suite if parallelism needs grow.
+A separate interaction activity-log table is **not required for MVP** because immutable interaction snapshots already provide the historical interaction record.
 
 ---
 
 # 6. Authentication Foundation
 
-Must support US-001, US-002, US-003 exactly as documented.
+Authentication must support US-001, US-002, and US-003 according to the authoritative API contracts.
 
 ## 6.1 Password Hashing
 
-Recommendation:
+Use **Argon2id**.
 
-1. Use bcrypt with cost factor set via config.
+Requirements:
 
-Rationale:
+1. Passwords are never stored in plaintext.
+2. Password hashes are never returned to clients.
+3. Hash configuration is centralized.
+4. Password verification uses the Argon2id library rather than custom cryptographic code.
 
-1. Mature and widely understood for MVP auth.
+---
 
 ## 6.2 JWT Creation and Validation
 
-1. JWT issued on successful register/login.
-2. JWT verification middleware required on protected routes.
-3. Token contains user id, organization id, role, and standard claims.
-4. Do not include sensitive fields.
+1. JWT is issued after successful registration/login.
+2. JWT verification middleware protects authenticated routes.
+3. JWT contains only the minimum required identity/authorization claims.
+4. JWT does not contain passwords, password hashes, or other sensitive data.
+5. JWT expiration is configured through environment configuration.
+
+---
 
 ## 6.3 Authentication Middleware
 
-1. Parse bearer token.
-2. Verify signature and expiry.
-3. Attach authenticated context to request object.
-4. Reject missing/invalid token with 401 structured error.
+Authentication middleware must:
+
+1. Read the `Authorization` header.
+2. Require the `Bearer` scheme.
+3. Verify JWT signature.
+4. Verify expiration and required claims.
+5. Attach authenticated user context to the request.
+6. Return a structured `401` response for missing/invalid authentication.
+
+---
 
 ## 6.4 Authenticated Request Context
 
-Standard request context:
+Authenticated request context includes:
 
-1. userId
-2. organizationId
-3. role
-4. team membership may be loaded lazily by service when needed
+1. `userId`
+2. `organizationId`
+3. `role`
+
+Additional information may be loaded by services when required.
+
+---
 
 ## 6.5 Organization and Role Context
 
-1. Organization context is server-owned from JWT/user record.
-2. Client never supplies authoritative organization ownership for protected operations.
+1. Organization identity is server-owned.
+2. The authenticated context determines organization ownership.
+3. Clients cannot override authoritative organization ownership by submitting a different organization ID.
+
+---
 
 ## 6.6 Client-Side Auth State
 
-1. Auth provider stores token and basic user context.
-2. Token storage mechanism for MVP is localStorage.
-3. Protected route component enforces auth before page render.
-4. Logout clears persisted and in-memory auth state.
+1. React Context manages authentication state.
+2. JWT is stored in `localStorage` for MVP.
+3. Protected routes require authenticated state.
+4. Logout clears both persisted and in-memory authentication state.
+5. The frontend never treats user-supplied organization information as authoritative.
+
+---
 
 ## 6.7 Logout Behavior
 
-1. API endpoint is authenticated and returns success message.
-2. No server-side token blacklist/session invalidation for MVP.
-3. Client removal of token is authoritative logout behavior for MVP.
+1. Logout endpoint follows the established API contract.
+2. MVP does not maintain a server-side token blacklist.
+3. MVP does not implement refresh-token rotation.
+4. Client token removal is the effective logout mechanism for the stateless JWT model.
 
 ---
 
@@ -770,209 +976,335 @@ Organization isolation is a critical security boundary.
 
 ## 7.1 Identity Source
 
-1. organizationId comes from authenticated user context.
-2. It is never trusted from incoming body/query/path as ownership authority.
+`organizationId` comes from authenticated server-side context.
+
+It is never trusted from:
+
+- request body
+- query parameters
+- client-supplied ownership fields
+
+as the authoritative organization identity.
+
+---
 
 ## 7.2 Backend Query Scope Pattern
 
-Required reusable pattern:
+Organization-owned queries must include organization scope.
 
-1. Every organization-owned query includes organization_id filter.
-2. Any lookup by id must include both id and organization_id.
+For example:
 
-## 7.3 Interaction With Authorization
+```sql
+SELECT *
+FROM properties
+WHERE id = $1
+  AND organization_id = $2;
+```
 
-1. Isolation applies first as hard boundary.
-2. Role/visibility checks apply within organization scope.
+A lookup by resource ID alone is insufficient when the resource is organization-owned.
+
+---
+
+## 7.3 Authorization Interaction
+
+Authorization follows this order conceptually:
+
+```text
+Authenticate
+    ↓
+Determine organization
+    ↓
+Apply organization isolation
+    ↓
+Apply role/visibility rules
+    ↓
+Perform operation
+```
+
+---
 
 ## 7.4 Cross-Organization Prevention
 
-This pattern prevents:
+The backend must prevent:
 
-1. UUID guessing access.
-2. Cross-org joins exposing unauthorized resources.
-3. Foreign key association across organizations.
+1. Access through guessed resource IDs.
+2. Cross-organization resource retrieval.
+3. Cross-organization modification.
+4. Cross-organization associations.
+
+---
 
 ## 7.5 Testing
 
-Minimum repeated pattern in integration tests:
+Integration tests should repeatedly verify:
 
-1. Create Organization A and B.
-2. Authenticate user from A.
-3. Attempt access to B resources.
-4. Expect denial/not-found per endpoint policy.
+1. Organization A exists.
+2. Organization B exists.
+3. User from A authenticates.
+4. User from A attempts to access B-owned resources.
+5. The API denies access according to the endpoint's established policy.
 
 ---
 
 # 8. Authorization Foundation
 
-Authorization must follow finalized MVP role and interaction-editing rules.
+Authorization follows finalized MVP role and visibility rules.
 
 ## 8.1 Roles
 
-1. rep
-2. manager
-3. admin
+MVP roles:
 
-Roles are stored on users and used by policy guards.
+1. `rep`
+2. `manager`
+3. `admin`
+
+---
 
 ## 8.2 Policy Structure
 
-Recommendation:
+Use:
 
-1. Route-level role requirements for broad access.
-2. Service-level resource ownership checks for nuanced rules.
+1. Middleware for broad route-level authorization where appropriate.
+2. Service-level authorization for resource-specific rules.
 
-## 8.3 Interaction Edit Rule
+---
 
-Critical rule:
+## 8.3 Interaction Editing
 
-1. Managers/admins do not automatically gain edit authority over another representative interaction.
-2. They remain view-only for other representatives unless an explicit future rule changes this.
+Interaction history is immutable.
+
+Therefore:
+
+1. Existing interaction snapshots are never edited in place.
+2. A meaningful change creates a new interaction snapshot.
+3. Managers/admins do not automatically gain permission to modify another representative's historical interaction.
+4. Viewing and editing are separate authorization decisions.
+
+---
 
 ## 8.4 Visibility Integration
 
-1. Representative visibility self/team/organization controls readable interaction set.
-2. Visibility and edit authority are separate decisions.
+The finalized visibility model includes:
+
+1. My interactions.
+2. My team's interactions.
+3. Organization-wide interactions.
+
+Visibility controls what a user can read.
+
+Visibility does not automatically grant permission to modify another user's historical interaction.
 
 ---
 
 # 9. API Foundation
 
-Endpoint contracts remain authoritative in docs/api_endpoints.md.
+Endpoint contracts remain authoritative in:
+
+```text
+docs/api_endpoints.md
+```
+
+This document must not create a competing endpoint inventory.
 
 ## 9.1 Routing Structure
 
-Suggested backend route modules:
+The backend may organize routes by domain, including:
 
-1. /auth
-2. /me
-3. /organization
-4. /users
-5. /teams
-6. /statuses
-7. /properties
-8. /interactions
-9. /map
-10. /reports
+1. `/auth`
+2. `/me`
+3. `/organization`
+4. `/users`
+5. `/teams`
+6. `/statuses`
+7. `/properties`
+8. `/interactions`
+9. `/map`
+10. `/reports`
+11. `/geocoding` where explicitly defined by the authoritative API contract
+
+The exact endpoint paths and methods remain controlled by `docs/api_endpoints.md`.
+
+---
 
 ## 9.2 Request/Response Conventions
 
-1. JSON request/response.
-2. Success uses endpoint-specific payload shape.
-3. Errors follow consistent structure:
+1. JSON request/response format.
+2. Endpoint-specific success payloads.
+3. Consistent error envelope.
+
+Example:
 
 ```json
 {
   "error": {
-    "code": "SOME_CODE",
-    "message": "Human readable message"
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request data."
   }
 }
 ```
 
+---
+
 ## 9.3 HTTP Status Conventions
 
-1. 200 for successful reads/operations.
-2. 201 for created resources when appropriate.
-3. 400 for validation errors.
-4. 401 for missing/invalid auth.
-5. 403 for authenticated but disallowed actions when applicable.
-6. 404 where resource should be hidden or absent per policy.
-7. 409 for duplicate/conflict.
-8. 500 for unexpected server errors.
+1. `200` — successful read/update/operation.
+2. `201` — resource successfully created.
+3. `204` — successful operation with no response body.
+4. `400` — invalid request.
+5. `401` — missing/invalid authentication.
+6. `403` — authenticated but not authorized.
+7. `404` — resource not found or intentionally hidden according to endpoint policy.
+8. `409` — resource/state conflict.
+9. `429` — rate limit exceeded.
+10. `500` — unexpected server error.
+
+---
 
 ## 9.4 Error Handling Boundaries
 
-1. Validation layer maps known parse errors to 400.
-2. Auth middleware maps token issues to 401.
-3. Authorization checks map to 403/404 per endpoint policy.
-4. DB known conflicts map to 409 where contractually expected.
-5. Unhandled exceptions map to 500 with safe generic messages.
+1. `express-validator` handles request validation.
+2. Authentication middleware handles authentication failures.
+3. Authorization logic handles permission failures.
+4. Repository/database errors are translated into safe application errors.
+5. Known conflicts return `409` where appropriate.
+6. Unexpected exceptions are handled by centralized error middleware.
+7. Internal error details are logged server-side but not returned to clients.
+
+---
 
 ## 9.5 Logging Boundaries
 
-1. Log request method/path/status/timing.
-2. Log correlation/request id.
-3. Do not log passwords, tokens, or sensitive PII fields in full.
+Logs may include:
+
+- request ID
+- HTTP method
+- route/path
+- response status
+- duration
+- safe application context
+- server-side error information
+
+Logs must not include:
+
+- passwords
+- password hashes
+- JWTs
+- authorization headers
+- database credentials
+- secrets
+- unnecessary sensitive personal information
 
 ---
 
 # 10. Validation Foundation
 
-Validation responsibilities should be layered without contradiction.
+Validation is intentionally layered.
 
 ## 10.1 Frontend
 
-1. UX-focused validation for fast feedback.
-2. Never treated as security boundary.
+Frontend validation exists for:
+
+1. Immediate user feedback.
+2. Better form UX.
+3. Preventing obviously invalid submissions.
+
+Frontend validation is never treated as a security boundary.
+
+---
 
 ## 10.2 API Boundary
 
-1. Full schema validation of input payloads and params.
-2. Required canonical guardrail before service logic.
+The backend performs authoritative input validation using `express-validator`.
+
+Validation applies to:
+
+- body fields
+- route parameters
+- query parameters
+
+Invalid requests are rejected before business logic executes.
+
+---
 
 ## 10.3 Business Layer
 
-1. Domain rules requiring data/context checks (ownership, state transitions).
-2. Not duplicated as simple field-level type checks.
+Services enforce rules requiring application state or context, including:
+
+- ownership
+- organization scope
+- authorization
+- state transitions
+- domain-specific requirements
+
+---
 
 ## 10.4 Database Layer
 
-1. Final integrity enforcement through constraints and transaction boundaries.
+PostgreSQL provides final data-integrity enforcement through:
+
+- primary keys
+- foreign keys
+- unique constraints
+- not-null constraints
+- check constraints where appropriate
+- transactions
 
 ---
 
 # 11. Testing Architecture
 
-Testing must match docs/testing/testing-strategy.md and docs/testing/test-matrix.md.
+The testing strategy uses three primary layers.
 
-## 11.1 Unit Tests
+## 11.1 Unit and Component Tests — Vitest
 
-Belongs here:
+Appropriate targets:
 
 1. Pure business-rule utilities.
 2. Validation helpers.
-3. Permission and visibility computation logic.
-4. JWT/password utility wrappers.
+3. Permission calculations.
+4. Visibility calculations.
+5. Authentication utilities.
+6. React components.
+7. React hooks.
+8. Client-side state behavior.
 
-Does not belong here:
+Unit tests should focus on meaningful behavior rather than arbitrary coverage targets.
 
-1. Database behavior validation.
-2. Full route and middleware integration.
+---
 
-## 11.2 Integration/API Tests
+## 11.2 API/Integration Tests — Supertest
 
-Must cover:
+Integration/API tests should cover:
 
-1. Route behavior and status codes.
-2. Authentication and authorization failures.
-3. Organization isolation boundaries.
-4. Transaction behavior for multi-write operations.
-5. API error contract shape.
+1. Route behavior.
+2. Middleware behavior.
+3. Status codes.
+4. Authentication.
+5. Authorization.
+6. Organization isolation.
+7. Database-backed behavior.
+8. Transaction behavior.
+9. API error contracts.
+10. Immutable interaction behavior.
 
-## 11.3 Frontend Tests
+---
 
-Must cover:
+## 11.3 End-to-End Tests — Playwright
 
-1. Critical components and hooks.
-2. Auth state lifecycle.
-3. Protected route gating.
-4. Important user interactions in auth and map workflow surfaces.
+Playwright covers critical browser workflows.
 
-## 11.4 End-to-End Tests
+MVP focus includes:
 
-Critical workflow coverage target:
-
-1. Register organization.
+1. Registration.
 2. Login.
 3. Logout.
 4. Authenticated map access.
-5. Property resolution flow.
-6. Record interaction.
-7. Edit interaction snapshot.
-8. Organization isolation checks.
-9. Reporting access and filtering safety.
+5. Property resolution.
+6. Recording an interaction.
+7. Viewing current interaction state.
+8. Critical authorization/visibility workflows.
+
+E2E tests should remain intentionally limited to important user journeys.
 
 ---
 
@@ -980,61 +1312,71 @@ Critical workflow coverage target:
 
 ## 12.1 Goals
 
-1. Deterministic repeatability.
+1. Deterministic tests.
 2. No test-order dependency.
-3. Isolation across suites.
-4. Safe parallel runs when enabled.
+3. Isolation from development and production databases.
+4. Repeatable local execution.
+5. Support for future parallel execution.
+
+---
 
 ## 12.2 Recommended Approach
 
-1. Dedicated test database URL.
-2. Migrations applied before test suite.
-3. Factory-based test data creation per test.
-4. Per-test transaction rollback where practical.
-5. Table cleanup fallback where transaction boundaries do not fit.
+Use a hybrid cleanup strategy:
+
+1. Dedicated test database.
+2. Migrations applied before testing.
+3. Factory-based test data.
+4. Transaction rollback where practical.
+5. Deterministic table cleanup when transaction boundaries are unsuitable.
+
+The exact cleanup implementation should be selected during test-harness implementation rather than introducing unnecessary infrastructure now.
+
+---
 
 ## 12.3 Isolation Testing Patterns
 
-1. Always create at least two organizations in isolation suites.
-2. Verify same endpoint with same resource type across org boundary.
+Isolation tests should:
 
-## 12.4 Immutable Snapshot Testing Support
+1. Create at least two organizations.
+2. Create users/resources belonging to each.
+3. Authenticate as one organization.
+4. Attempt to access the other organization's resources.
+5. Verify the expected denial behavior.
 
-1. Seed one interaction group with multiple snapshots.
-2. Assert is_current transition and unchanged historical snapshot payloads.
+---
 
-## 12.5 Alternatives Considered
+## 12.4 Immutable Snapshot Testing
 
-1. Full DB recreate per test file.
-2. Container-per-test-suite orchestration.
+Tests should verify that:
 
-Why recommended option is preferable for MVP:
-
-1. Lower operational burden and faster local iteration.
-
-Migration risk:
-
-1. Low; strategy can evolve with project scale.
+1. An original interaction snapshot remains unchanged.
+2. A subsequent change creates a new snapshot.
+3. Historical data remains available.
+4. Current-state markers transition correctly according to the authoritative schema design.
 
 ---
 
 # 13. Test Scripts
 
-Intended scripts (not implemented yet):
+Intended scripts:
 
-1. npm test
-   - Runs backend and frontend automated suites required for baseline confidence.
-2. npm run test:unit
-3. npm run test:integration
-4. npm run test:e2e
-5. npm run test:watch
-6. npm run test:coverage
-7. npm run lint
-8. npm run format
-9. npm run build
-10. npm run dev
+```text
+npm test
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run test:watch
+npm run test:coverage
+npm run lint
+npm run format
+npm run build
+npm run dev
+```
 
-Root-level orchestration scripts should proxy into frontend/backend package scripts.
+`npm test` is the primary automated test command.
+
+Root-level scripts should orchestrate frontend/backend test commands where necessary.
 
 ---
 
@@ -1042,15 +1384,20 @@ Root-level orchestration scripts should proxy into frontend/backend package scri
 
 Practical standards:
 
-1. ESLint required in CI/local pre-merge checks.
-2. Prettier formatting required for consistency.
-3. Clear, domain-explicit naming over short ambiguous names.
-4. Async errors must be centrally handled; avoid unhandled promise rejection patterns.
-5. Environment variables must be validated on startup.
-6. Secrets never committed.
-7. Structured logs with request IDs.
-8. New dependencies require explicit justification in PR/ticket notes.
-9. Comments should explain why, not restate obvious code behavior.
+1. ESLint runs locally and in CI where configured.
+2. Prettier provides consistent formatting.
+3. Use clear domain-specific naming.
+4. Avoid unnecessary abstraction.
+5. Controllers remain thin.
+6. Business rules belong in services.
+7. Database access belongs in repositories.
+8. Async errors must reach centralized error handling.
+9. Environment variables are validated on startup.
+10. Secrets are never committed.
+11. Logs use request IDs.
+12. New dependencies require explicit justification.
+13. Comments should explain why rather than restate what code does.
+14. Unrelated refactoring should not be included in feature tickets.
 
 ---
 
@@ -1058,139 +1405,303 @@ Practical standards:
 
 ## 15.1 Environments
 
-1. Development
-2. Test
-3. Production
+1. Development.
+2. Test.
+3. Production.
 
-## 15.2 Required Environment Variables (Initial)
+---
+
+## 15.2 Required Environment Variables
 
 Backend:
 
-1. NODE_ENV
-2. PORT
-3. DATABASE_URL
-4. JWT_SECRET
-5. JWT_EXPIRES_IN
-6. CORS_ORIGIN
-7. LOG_LEVEL
+```text
+NODE_ENV
+PORT
+DATABASE_URL
+JWT_SECRET
+JWT_EXPIRES_IN
+CORS_ORIGIN
+LOG_LEVEL
+```
 
 Frontend:
 
-1. VITE_API_BASE_URL
+```text
+VITE_API_BASE_URL
+```
 
-Optional geocoding configuration keys may be added once provider call strategy is finalized in foundation implementation.
+Geocoding configuration may be added if required by the finalized provider integration.
+
+---
 
 ## 15.3 Secret Classification
 
-Secrets:
+Secrets include:
 
-1. JWT_SECRET
-2. Any DB credential in DATABASE_URL
-3. Any future provider API keys
+1. `JWT_SECRET`
+2. Database credentials contained in `DATABASE_URL`
+3. Future private provider credentials
 
-Non-secret examples:
+Non-secret configuration includes:
 
-1. PORT
-2. LOG_LEVEL
-3. public API base URL
+1. `PORT`
+2. `LOG_LEVEL`
+3. `CORS_ORIGIN`
+4. Public frontend API base URL
 
-## 15.4 Env File Handling
+---
 
-1. Commit .env.example with placeholders only.
-2. Do not commit real .env files.
-3. Use separate local files for dev and test values.
+## 15.4 Environment File Handling
+
+1. Commit `.env.example` containing placeholders only.
+2. Never commit real `.env` files.
+3. Maintain separate development and test configuration.
+4. Production secrets are provided by the deployment environment.
 
 ---
 
 # 16. Security Baseline
 
-Minimum required practices:
+JoeKnock uses a lightweight but meaningful MVP security baseline.
 
-1. Passwords stored only as secure hashes.
-2. JWT verification required on protected routes.
-3. Strict authorization and organization isolation checks in backend.
-4. Input validation at API boundary.
-5. Parameterized ORM/query behavior to avoid injection risk.
-6. Sensitive error details never returned to clients.
-7. Secrets stored in environment only.
-8. Dependency hygiene via periodic audit/update.
-9. CORS restricted to intended frontend origins.
-10. Basic rate limiting is recommended for public auth endpoints to reduce brute-force risk.
+## 16.1 Required Security Controls
 
-Rate limiting note:
+1. Argon2id password hashing.
+2. JWT authentication.
+3. Backend authorization.
+4. Organization isolation.
+5. API input validation.
+6. Parameterized SQL.
+7. Helmet security headers.
+8. Explicit CORS configuration.
+9. Rate limiting.
+10. Request IDs.
+11. Centralized error handling.
+12. Safe logging.
+13. Secrets stored outside source control.
+14. Dependency auditing and updates.
 
-- Keep implementation simple for MVP, route-specific on auth endpoints first.
+---
+
+## 16.2 Rate Limiting
+
+Use `express-rate-limit`.
+
+Initial focus should be public/authentication-sensitive endpoints such as:
+
+- registration
+- login
+
+Rate limiting should remain simple for MVP.
+
+Distributed rate limiting infrastructure is deferred.
+
+---
+
+## 16.3 CORS
+
+CORS must be restricted to the intended frontend origin(s).
+
+Wildcard production CORS configuration is not permitted.
+
+---
+
+## 16.4 Helmet
+
+Helmet provides standard security-related HTTP headers.
+
+No custom security-header framework is required for MVP.
+
+---
+
+## 16.5 CSRF
+
+CSRF protection is **deferred for MVP**.
+
+Reason:
+
+The MVP authentication architecture uses JWT bearer tokens explicitly supplied through:
+
+```text
+Authorization: Bearer <token>
+```
+
+rather than authentication cookies.
+
+If authentication later moves to cookies, CSRF protection must be reevaluated before that architecture is implemented.
+
+---
+
+## 16.6 Deferred Security Infrastructure
+
+The following are intentionally outside MVP:
+
+1. Token blacklisting.
+2. Refresh-token rotation.
+3. Distributed sessions.
+4. Redis-backed rate limiting.
+5. Advanced WAF infrastructure.
+6. Distributed tracing.
+7. External security/observability platforms.
+
+These can be added when actual product requirements justify them.
 
 ---
 
 # 17. Error and Logging Strategy
 
-## 17.1 Development Logging
+## 17.1 Centralized Error Handling
 
-1. Human-readable logs with request ID and stack traces.
-2. Helpful context for debugging validation and DB errors.
+All unexpected route/service errors flow through centralized Express error middleware.
 
-## 17.2 Production-Safe Logging
+Controllers should not contain repetitive error-handling wrappers.
 
-1. Structured JSON logs.
-2. No password/token/secret values in logs.
-3. No full sensitive payload dumping.
+---
 
-## 17.3 Structured API Errors
+## 17.2 Application Errors
 
-Use consistent response envelope for known and unknown errors.
+Application-level errors should represent known conditions such as:
 
-## 17.4 Client Data Safety
+- validation failure
+- authentication failure
+- authorization failure
+- resource not found
+- conflict
 
-Never return:
+The centralized error middleware maps these to the appropriate HTTP response.
 
-1. Password hashes.
-2. JWT secrets.
-3. Raw internal stack traces.
-4. Detailed SQL/DB internal exceptions.
+---
 
-## 17.5 Unexpected Exception Handling
+## 17.3 Development Logging
 
-1. Global error middleware catches uncaught route/service errors.
-2. Logs details server-side.
-3. Returns generic 500 error response.
+Development logs should provide enough information to debug:
+
+- request flow
+- validation failures
+- database failures
+- unexpected application errors
+
+Stack traces may be available in development.
+
+---
+
+## 17.4 Production-Safe Logging
+
+Production logs should:
+
+1. Include request IDs.
+2. Avoid secrets.
+3. Avoid passwords and tokens.
+4. Avoid unnecessary sensitive payloads.
+5. Record useful error context.
+6. Never expose internal stack traces through API responses.
+
+---
+
+## 17.5 Request IDs
+
+Every API request should receive a request ID.
+
+The request ID should be:
+
+1. Available to request logging.
+2. Included in relevant API responses/headers where appropriate.
+3. Used to correlate frontend-visible failures with backend logs.
+
+---
+
+## 17.6 Health Endpoint
+
+Provide:
+
+```text
+GET /health
+```
+
+The health endpoint should provide a minimal indication of application/database availability.
+
+Expected statuses:
+
+```text
+200 → healthy
+503 → unavailable
+```
+
+---
+
+## 17.7 Graceful Shutdown
+
+The backend must handle:
+
+```text
+SIGINT
+SIGTERM
+```
+
+Shutdown sequence:
+
+```text
+Stop accepting new requests
+        ↓
+Allow in-flight requests to complete
+        ↓
+Close HTTP server
+        ↓
+Close PostgreSQL pool
+        ↓
+Exit
+```
+
+A reasonable shutdown timeout should prevent indefinite hanging.
 
 ---
 
 # 18. Development Workflow for Future Tickets
 
-Standard ticket workflow:
+Standard workflow:
 
-1. Read ticket implementation spec in docs/implementation/tickets.
-2. Read referenced architecture/API/schema/testing docs.
+1. Read the ticket implementation specification.
+2. Read referenced architecture/API/schema/testing documentation.
 3. Confirm dependencies are complete.
-4. Implement backend/API behavior.
-5. Implement automated tests for changed behavior.
-6. Implement frontend behavior.
-7. Run targeted tests.
-8. Run npm test.
-9. Run lint and build scripts.
-10. Verify against acceptance criteria and scope boundaries.
-11. Perform manual QA checks relevant to ticket.
-12. Document residual risks/open issues.
+4. Inspect existing implementation before making changes.
+5. Implement backend behavior.
+6. Add/update backend tests.
+7. Implement frontend behavior.
+8. Add/update frontend tests.
+9. Run targeted tests.
+10. Run `npm test`.
+11. Run lint.
+12. Run build.
+13. Verify acceptance criteria.
+14. Perform relevant manual QA.
+15. Document residual risks or issues.
+16. Review the final diff for unrelated changes.
 
 ---
 
 # 19. Copilot Implementation Rules
 
+GitHub Copilot is the implementation assistant, not the architecture owner.
+
 Copilot must:
 
-1. Read the ticket spec first.
+1. Read the ticket specification first.
 2. Read referenced source-of-truth documents.
 3. Inspect existing code before creating new code.
 4. Follow approved architecture and contracts.
 5. Implement only the scoped ticket.
 6. Add/update tests alongside implementation.
 7. Run tests and report results honestly.
-8. Stop and report conflicts rather than silently deciding architecture.
+8. Stop and report architectural conflicts rather than silently deciding them.
 9. Avoid unrelated refactoring.
-10. Avoid adding dependencies without clear justification.
-11. Update docs only when implementation changes approved behavior/contracts.
+10. Avoid adding dependencies without justification.
+11. Avoid replacing approved technologies with alternatives.
+12. Update documentation only when approved implementation changes require it.
+
+Architecture decisions remain owned by the project team.
+
+If Copilot proposes a different framework, library, architectural layer, database strategy, or API contract, that proposal must be reviewed before implementation.
 
 ---
 
@@ -1202,249 +1713,302 @@ Foundation must be implemented before US-001.
 
 Objective:
 
-1. Establish root + frontend + backend package boundaries and scripts.
+1. Establish root, frontend, and backend package boundaries and scripts.
 
 Expected files:
 
-1. ddd/frontend/package.json
-2. ddd/backend/package.json
-3. root package.json
+1. `ddd/frontend/package.json`
+2. `ddd/backend/package.json`
+3. root `package.json`
 
 Dependencies:
 
-1. None.
+- None.
 
 Tests required:
 
-1. TEST-001 baseline command existence.
+- TEST-001 baseline command existence.
 
 Acceptance criteria:
 
-1. Script placeholders exist for dev/build/test/lint.
+1. Script structure exists for development, build, test, lint, and formatting.
+2. Frontend and backend package boundaries are established.
 
-Verification commands:
-
-1. npm test (expected to run scaffold test command behavior once implemented)
+---
 
 ## Step 2: Backend App Skeleton and Middleware Pipeline
 
 Objective:
 
-1. Establish Express app, route mounting, central error handling.
+1. Establish Express application.
+2. Establish route mounting.
+3. Establish basic middleware pipeline.
+4. Establish centralized error handling.
+5. Establish request ID handling.
+6. Establish basic security middleware.
 
 Expected files:
 
-1. ddd/backend/src/app.ts
-2. ddd/backend/src/server.ts
-3. ddd/backend/src/middleware/errorMiddleware.ts
+```text
+ddd/backend/src/app.js
+ddd/backend/src/server.js
+ddd/backend/src/middleware/errorMiddleware.js
+ddd/backend/src/middleware/requestIdMiddleware.js
+```
 
 Dependencies:
 
-1. Step 1.
+- Step 1.
 
 Tests required:
 
-1. Basic API responds test.
+- Basic API response test.
+- Health endpoint test.
 
 Acceptance criteria:
 
-1. Health or baseline route returns successful response.
+1. Express starts.
+2. `/health` responds.
+3. Central error middleware is operational.
+4. Request IDs are generated.
+5. Baseline security middleware is configured.
 
-Verification commands:
-
-1. npm run test:integration
+---
 
 ## Step 3: Frontend App Skeleton and Routing
 
 Objective:
 
-1. Establish React app entry and protected route framework.
+1. Establish React application entry point.
+2. Establish routing.
+3. Establish authentication provider structure.
+4. Establish protected-route framework.
 
 Expected files:
 
-1. ddd/frontend/src/main.tsx
-2. ddd/frontend/src/app/router.tsx
-3. ddd/frontend/src/auth/ProtectedRoute.tsx
+```text
+ddd/frontend/src/main.jsx
+ddd/frontend/src/app/router.jsx
+ddd/frontend/src/auth/AuthProvider.jsx
+ddd/frontend/src/auth/ProtectedRoute.jsx
+```
 
 Dependencies:
 
-1. Step 1.
+- Step 1.
 
 Tests required:
 
-1. Frontend smoke test.
+- Frontend smoke test.
 
 Acceptance criteria:
 
-1. App starts and route guard infra exists.
+1. Frontend starts.
+2. Baseline shell renders.
+3. Routing infrastructure exists.
+4. Protected route infrastructure exists.
 
-Verification commands:
-
-1. npm run test:unit
+---
 
 ## Step 4: Database and Migration Foundation
 
 Objective:
 
-1. Establish DB client, migration pipeline, and initial schema integration path.
+1. Establish PostgreSQL connection.
+2. Establish `pg.Pool`.
+3. Establish repository database access pattern.
+4. Establish migration pipeline.
+5. Establish development/test database configuration.
 
 Expected files:
 
-1. ddd/backend/prisma/schema.prisma
-2. ddd/backend/prisma/migrations/
-3. ddd/backend/src/db/client.ts
+```text
+ddd/backend/src/db/client.js
+ddd/backend/src/db/transaction.js
+ddd/backend/migrations/
+```
 
 Dependencies:
 
-1. Step 2.
+- Step 2.
 
 Tests required:
 
-1. DB connectivity and migration execution checks.
+1. Database connectivity test.
+2. Migration execution test.
 
 Acceptance criteria:
 
-1. Local dev DB migrates successfully via defined commands.
+1. Development database connects successfully.
+2. Test database connects successfully.
+3. Migrations can be applied.
+4. PostgreSQL queries use parameterized values.
+5. Transaction helper works correctly.
 
-Verification commands:
-
-1. npm run build
-2. npm run test:integration
+---
 
 ## Step 5: Auth Infrastructure Baseline
 
 Objective:
 
-1. Implement reusable password/JWT/auth middleware infrastructure only.
+1. Establish reusable password hashing.
+2. Establish JWT creation/verification.
+3. Establish authentication middleware.
 
 Expected files:
 
-1. ddd/backend/src/auth/jwt.ts
-2. ddd/backend/src/auth/password.ts
-3. ddd/backend/src/middleware/authMiddleware.ts
+```text
+ddd/backend/src/auth/jwt.js
+ddd/backend/src/auth/password.js
+ddd/backend/src/middleware/authMiddleware.js
+```
 
 Dependencies:
 
-1. Steps 2 and 4.
+- Steps 2 and 4.
 
 Tests required:
 
-1. Password hashing utility tests.
-2. JWT verify/reject tests.
+1. Argon2id password hashing tests.
+2. Password verification tests.
+3. JWT creation/verification tests.
+4. JWT rejection tests.
 
 Acceptance criteria:
 
-1. Protected test route can enforce valid auth.
+1. Protected test route rejects missing authentication.
+2. Protected test route rejects invalid authentication.
+3. Protected test route accepts valid authentication.
 
-Verification commands:
-
-1. npm run test:unit
-2. npm run test:integration
+---
 
 ## Step 6: Validation and Error Contract Baseline
 
 Objective:
 
-1. Establish validation helpers and consistent API error shape.
+1. Establish `express-validator`.
+2. Establish application error types.
+3. Establish centralized API error formatting.
 
 Expected files:
 
-1. ddd/backend/src/validation/schemas/
-2. ddd/backend/src/common/errors.ts
-3. ddd/backend/src/common/response.ts
+```text
+ddd/backend/src/validation/
+ddd/backend/src/common/errors.js
+ddd/backend/src/common/response.js
+```
 
 Dependencies:
 
-1. Step 2.
+- Step 2.
 
 Tests required:
 
-1. Validation failure and error-shape tests.
+1. Validation failure tests.
+2. Error response contract tests.
 
 Acceptance criteria:
 
-1. Invalid requests return expected 400 contract.
+1. Invalid requests return `400`.
+2. Errors use the standard response envelope.
+3. Internal error details are not exposed.
 
-Verification commands:
-
-1. npm run test:integration
+---
 
 ## Step 7: Test Harness Foundation
 
 Objective:
 
-1. Finalize test runner wiring for unit, integration, frontend, e2e categories.
+1. Establish Vitest.
+2. Establish Supertest.
+3. Establish Playwright.
+4. Establish test database configuration.
+5. Establish test helper structure.
 
 Expected files:
 
-1. backend and frontend test configuration files.
-2. shared test helper modules.
+1. Frontend Vitest configuration.
+2. Backend Vitest configuration.
+3. Playwright configuration.
+4. Test database helpers.
+5. Shared test setup files.
 
 Dependencies:
 
-1. Steps 1-6.
+- Steps 1–6.
 
 Tests required:
 
-1. TEST-001 and TEST-002 core checks.
+- TEST-001.
+- TEST-002.
 
 Acceptance criteria:
 
-1. npm test runs and correctly reports pass/fail status.
+1. `npm test` executes automated tests.
+2. Intentional test failures cause the command to fail.
+3. Unit tests execute.
+4. Integration tests execute.
+5. E2E harness can execute.
 
-Verification commands:
+---
 
-1. npm test
-2. npm run test:coverage
-
-## Step 8: Organization Isolation and Authorization Test Fixtures
+## Step 8: Organization Isolation and Authorization Fixtures
 
 Objective:
 
-1. Build reusable fixture helpers for multi-organization and role scenarios.
+1. Establish reusable test factories for organizations, users, and authentication.
+2. Prove organization isolation and basic authorization behavior.
 
-Expected files:
+Expected files may include:
 
-1. ddd/backend/tests/helpers/authFactory.ts
-2. ddd/backend/tests/helpers/orgFactory.ts
+```text
+ddd/backend/tests/helpers/authFactory.js
+ddd/backend/tests/helpers/orgFactory.js
+ddd/backend/tests/helpers/userFactory.js
+```
 
 Dependencies:
 
-1. Steps 4-7.
+- Steps 4–7.
 
 Tests required:
 
-1. Cross-org denial baseline test.
-2. Protected route role denial baseline test.
+1. Cross-organization denial test.
+2. Protected route role denial test.
 
 Acceptance criteria:
 
-1. Foundation proves isolation and auth checks are testable prior to feature implementation.
-
-Verification commands:
-
-1. npm run test:integration
+1. Organization A and B can be created independently.
+2. Authenticated user A cannot access protected B resources.
+3. Authorization behavior is testable before feature implementation begins.
 
 ---
 
 # 21. Foundation Testing Requirements
 
-Before US-001 begins, foundation must prove:
+Before US-001 begins, the foundation must prove:
 
-1. Application processes start in dev mode (frontend and backend).
-2. Backend can connect to database.
-3. Migrations apply successfully in dev and test contexts.
-4. Test database setup works repeatedly.
-5. npm test runs and fails correctly on intentional failing test.
-6. lint script runs.
-7. build script runs.
-8. API server responds to baseline request.
-9. Frontend starts and renders baseline shell.
-10. Frontend test infrastructure works.
-11. Backend test infrastructure works.
-12. A protected route can be tested for 401 and success.
-13. Organization isolation can be tested with A/B org fixtures.
-14. Test data can be reset/isolated between tests.
+1. Frontend starts in development mode.
+2. Backend starts in development mode.
+3. Backend can connect to PostgreSQL.
+4. Development migrations apply successfully.
+5. Test migrations apply successfully.
+6. Test database setup is repeatable.
+7. `npm test` runs successfully.
+8. `npm test` fails on an intentional failing test.
+9. Lint runs successfully.
+10. Build runs successfully.
+11. Backend baseline endpoint responds.
+12. `/health` responds appropriately.
+13. Frontend renders the baseline shell.
+14. Frontend test infrastructure works.
+15. Backend unit/integration test infrastructure works.
+16. A protected route can be tested for `401` and successful authentication.
+17. Organization isolation can be tested with A/B organization fixtures.
+18. Test data can be isolated and cleaned between tests.
+19. Argon2id password hashing is operational.
+20. JWT authentication is operational.
+21. Basic security middleware is operational.
 
 Related matrix anchors:
 
@@ -1455,102 +2019,242 @@ Related matrix anchors:
 
 # 22. Foundation Definition of Done
 
-Functionality:
+## Functionality
 
-1. Repository has explicit frontend/backend runnable skeleton.
-2. Config and script strategy is documented and implemented.
+1. Repository has explicit frontend/backend runnable skeletons.
+2. Configuration and script strategy is documented and implemented.
+3. `/health` is operational.
+4. Database connectivity is operational.
+5. Database migrations are operational.
 
-Architecture alignment:
+## Architecture Alignment
 
-1. API foundation does not contradict docs/api_endpoints.md.
-2. DB foundation does not contradict docs/table_Schema_decisions.md.
-3. Auth/logout approach matches stateless MVP contracts.
+1. API foundation does not contradict `docs/api_endpoints.md`.
+2. Database foundation does not contradict `docs/table_Schema_decisions.md`.
+3. Authentication matches the finalized JWT bearer architecture.
+4. Immutable interaction behavior matches the approved schema design.
+5. Frontend uses native `fetch`.
+6. Backend uses `pg` and PostgreSQL.
+7. Controllers, services, and repositories follow the approved responsibilities.
 
-Security:
+## Security
 
-1. Auth middleware baseline exists and is tested.
-2. Organization isolation query pattern exists and is tested.
-3. No secret leakage through config or error responses.
+1. Passwords use Argon2id.
+2. JWT authentication is operational and tested.
+3. Organization isolation is enforced and tested.
+4. Authorization is enforced server-side.
+5. SQL uses parameterized queries.
+6. Helmet is configured.
+7. CORS is restricted.
+8. Rate limiting is configured.
+9. Secrets are not committed.
+10. Error responses do not expose sensitive implementation details.
+11. Logs do not expose passwords, tokens, or secrets.
 
-Testing:
+## Testing
 
-1. npm test exists and executes automated suite.
-2. Unit and integration layers are operational.
-3. Initial e2e harness is operational.
-4. TEST-001 and TEST-002 can pass.
+1. Vitest is operational.
+2. Supertest is operational.
+3. Playwright is operational.
+4. Dedicated test database is configured.
+5. `npm test` executes automated tests.
+6. Unit tests are operational.
+7. Integration tests are operational.
+8. Initial E2E harness is operational.
+9. TEST-001 and TEST-002 can pass.
 
-Quality:
+## Quality
 
-1. lint and format scripts exist and pass on scaffold.
-2. build scripts exist and pass on scaffold.
+1. ESLint is configured.
+2. Prettier is configured.
+3. Build scripts pass.
+4. No unnecessary dependencies are introduced.
 
-Process:
+## Process
 
-1. Foundation implementation sequence steps are complete.
+1. Foundation implementation sequence is complete.
 2. No application feature tickets are partially implemented as part of foundation.
+3. Copilot implementation rules are available to contributors.
+4. Architecture decisions are treated as locked unless explicitly revisited.
 
 ---
 
-# 23. Open Decisions
+# 23. Deferred Decisions and Future Infrastructure
 
-Only unresolved items that cannot be fully settled from current source-of-truth are listed.
+The following are intentionally deferred from MVP.
 
-Resolved by this foundation specification (no longer open):
+## Authentication
 
-1. TypeScript is selected for frontend and backend.
-2. Prisma is selected as the PostgreSQL ORM/migration tooling.
-3. JWT client storage is selected as localStorage for MVP.
-4. Testing stack is selected as Vitest + Supertest + Playwright.
+1. Token blacklisting.
+2. Refresh-token rotation.
+3. Server-side session management.
+4. OAuth/social login.
 
-## Decision 1: Geocoding Contract Reconciliation Across Docs
+## Security
 
-Why it matters:
+1. CSRF protection if authentication remains bearer-token based.
+2. If authentication changes to cookies, CSRF protection must be added before that architecture is released.
+3. Advanced WAF infrastructure.
+4. Distributed rate limiting.
 
-1. Impacts API contract authority, ticket implementation behavior, and regression risk.
+## Infrastructure
 
-Current contradiction:
+1. Redis.
+2. Background job/queue systems.
+3. Distributed tracing.
+4. External observability platforms.
+5. Kubernetes/container orchestration.
 
-1. ADR-016 describes public endpoints under /api/geocoding.
-2. docs/api_endpoints.md and .github/copilot-instructions.md define geocoding as an internal backend detail behind POST /api/properties/resolve.
+## Application Complexity
 
-Recommended implementation choice for MVP:
+1. Advanced caching.
+2. Sophisticated server-state management.
+3. Advanced geocoding infrastructure.
+4. Complex path optimization.
+5. Gamification infrastructure.
 
-1. Use docs/api_endpoints.md as operational contract for coding and testing.
-2. Keep geocoding internal behind POST /api/properties/resolve.
-
-Alternatives:
-
-1. Adopt ADR-016 public geocoding endpoints and revise API/contracts accordingly.
-
-Consequence of recommended choice:
-
-1. Preserves current endpoint inventory and minimizes MVP complexity.
-2. Keeps provider abstraction clean and avoids exposing unnecessary public geocoding surface.
-
-What requires Corey decision:
-
-1. Explicitly confirm which document is the long-term canonical geocoding contract.
-2. Approve harmonization update so ADR/API/Copilot instructions all match one model.
-
-Blocks implementation:
-
-1. Does not block foundation scaffolding.
-2. Should be resolved before geocoding-specific feature implementation to avoid contract drift.
+These are not forgotten. They are deliberately excluded from the MVP foundation until product requirements justify them.
 
 ---
 
-# Self-Review Notes
+# 24. Geocoding Contract Reconciliation
 
-This specification was reviewed against:
+Geocoding is intentionally kept behind the JoeKnock backend rather than making the frontend directly responsible for the provider integration.
 
-1. Finalized architecture, API, schema, and testing docs.
-2. Existing implementation ticket constraints for US-001/US-002/US-003.
-3. Copilot instruction guardrails for scope and architecture stability.
+Preferred flow:
 
-Review outcome:
+```text
+React
+  ↓
+JoeKnock API
+  ↓
+Geocoding service
+  ↓
+Nominatim / OpenStreetMap
+```
 
-1. No application behavior was added beyond documented MVP boundaries.
-2. No schema or endpoint redesign was introduced.
-3. TypeScript, Prisma, JWT client storage, and testing stack are now finalized foundation choices.
-4. Geocoding contract contradiction remains the only documented open decision requiring Corey confirmation.
-5. Foundation sequence is ordered to unblock US-001 dependency requirements.
+The backend is responsible for:
+
+1. Provider request formatting.
+2. Provider response normalization.
+3. Provider-specific implementation details.
+4. Rate limiting where appropriate.
+5. Preventing unnecessary frontend coupling to the provider.
+
+The exact public API contract remains controlled by:
+
+```text
+docs/api_endpoints.md
+```
+
+Any conflicting ADR or Copilot instruction must be reconciled against that authoritative API contract before geocoding-specific implementation begins.
+
+This does not block the general foundation.
+
+---
+
+# 25. Source-of-Truth Hierarchy
+
+When project documents disagree, implementation should not silently choose one.
+
+The following hierarchy applies for technical implementation conflicts:
+
+1. `docs/api_endpoints.md` and `docs/table_Schema_decisions.md` as technical contracts.
+2. This foundation specification for implementation baseline and conventions.
+3. ADRs for architectural rationale and historical decisions.
+4. Ticket-specific implementation requirements.
+5. GitHub issue text as work-tracking context.
+
+Product requirements remain authoritative for intended product behavior and scope.
+
+If two authoritative documents conflict, stop and reconcile them before implementing the affected behavior.
+
+---
+
+# 26. Self-Review
+
+This specification has been reconciled against the finalized MVP architecture.
+
+## Finalized
+
+1. React.
+2. JavaScript frontend.
+3. JavaScript backend.
+4. Vite.
+5. Node.js LTS.
+6. Express.
+7. PostgreSQL.
+8. `pg`.
+9. node-pg-migrate.
+10. JWT bearer authentication.
+11. localStorage token persistence for MVP.
+12. React Context authentication state.
+13. native `fetch`.
+14. express-validator.
+15. Argon2id.
+16. Helmet.
+17. CORS configuration.
+18. express-rate-limit.
+19. request IDs.
+20. centralized error handling.
+21. Vitest.
+22. Supertest.
+23. Playwright.
+24. ESLint.
+25. Prettier.
+26. dotenv/config module.
+27. Leaflet.
+28. OpenStreetMap/Nominatim through the backend.
+29. immutable interaction snapshots.
+30. organization isolation.
+31. role/visibility authorization model.
+32. lightweight operational health/shutdown behavior.
+
+## Explicitly Removed From MVP
+
+1. TypeScript.
+2. Prisma.
+3. Zod.
+4. Axios.
+5. Redux/global-state framework.
+6. CSRF middleware for the current bearer-token architecture.
+7. Interaction activity-log table.
+8. Refresh-token infrastructure.
+9. Token blacklisting.
+10. Redis/distributed infrastructure.
+
+## Remaining Documentation Work
+
+Before implementation of affected features, reconcile any remaining contradictions in:
+
+1. ADRs that still reference Prisma.
+2. ADRs that still reference TypeScript.
+3. ADRs that still reference Zod.
+4. Copilot instructions that reference superseded technologies.
+5. Geocoding documentation that conflicts with `docs/api_endpoints.md`.
+
+These are **documentation reconciliation tasks**, not new architecture decisions.
+
+---
+
+# Foundation Status
+
+**Architecture: LOCKED**
+
+**Technology stack: LOCKED**
+
+**Database approach: LOCKED**
+
+**Authentication approach: LOCKED**
+
+**Security baseline: LOCKED**
+
+**Testing stack: LOCKED**
+
+**Repository architecture: LOCKED**
+
+**Implementation workflow: LOCKED**
+
+The foundation is now ready to serve as the implementation baseline for JoeKnock MVP.
+
+No additional architecture decisions should be introduced unless implementation reveals a genuine requirement that is not addressed by this specification.

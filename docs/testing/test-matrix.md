@@ -13,7 +13,11 @@ It complements:
 
 This document is a testing inventory, not an implementation specification.
 
-The exact testing framework and test-file organization will be determined during project foundation based on the application's actual technology stack.
+The testing foundation is finalized as:
+
+- Vitest for unit/integration test running
+- Supertest for API/integration HTTP behavior
+- Playwright for end-to-end browser workflows
 
 A feature is not considered fully tested merely because one happy-path test passes. Important business rules, security boundaries, failure cases, and regression risks must be covered.
 
@@ -1188,6 +1192,46 @@ Attempt Organization B resource
     ↓
 Request rejected
 ```
+
+**Status:** Planned
+
+---
+
+## TEST-091 — Login Auth Context Includes Organization
+
+**Priority:** P0
+
+Verify successful login returns authenticated identity context sufficient for organization-isolated authorization rules.
+
+**Status:** Planned
+
+---
+
+## TEST-092 — Valid Logout Returns Success
+
+**Priority:** P0
+
+Verify authenticated logout succeeds and returns the documented stateless logout response.
+
+**Status:** Planned
+
+---
+
+## TEST-093 — Logout Requires Authentication
+
+**Priority:** P0
+
+Verify unauthenticated logout attempts are rejected according to the API contract.
+
+**Status:** Planned
+
+---
+
+## TEST-094 — Protected Routes Blocked After Logout
+
+**Priority:** P0
+
+Verify protected endpoints and routes are no longer accessible after client token removal/logout.
 
 **Status:** Planned
 

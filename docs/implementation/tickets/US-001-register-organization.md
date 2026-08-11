@@ -335,23 +335,25 @@ Repository currently has no application code scaffold in ddd.
 
 ## Expected New Files
 
-- ddd/backend/src/auth/register.route.[ext]
-- ddd/backend/src/auth/register.service.[ext]
-- ddd/backend/src/auth/register.validation.[ext]
-- ddd/backend/src/security/password-hash.[ext]
-- ddd/backend/src/db/migrations/[timestamp]\_create_core_tables.[ext] (only if foundation has not already created these tables)
-- ddd/backend/tests/integration/auth/register.[ext]
+- ddd/backend/src/auth/authRoutes.js
+- ddd/backend/src/auth/authController.js
+- ddd/backend/src/auth/authService.js
+- ddd/backend/src/auth/password.js
+- ddd/backend/src/validation/schemas/register.js
+- ddd/backend/migrations/[timestamp]\_create_core_tables.js (only if foundation has not already created these tables)
+- ddd/backend/tests/integration/auth/register.test.js
 
 ## Expected Modified Files
 
-- ddd/backend/src/app.[ext] (route wiring)
-- ddd/backend/src/db/index.[ext] (transaction wiring if needed)
-- ddd/frontend/src/auth/register.[ext] (if frontend scaffold exists)
+- ddd/backend/src/app.js (route wiring)
+- ddd/backend/src/db/transaction.js (transaction wiring if needed)
+- ddd/frontend/src/api/authApi.js (registration API call)
+- ddd/frontend/src/pages/RegisterPage.jsx (if registration UI exists)
 
 ## Potential Files
 
-- ddd/backend/src/common/errors.[ext]
-- ddd/backend/src/common/response.[ext]
+- ddd/backend/src/common/errors.js
+- ddd/backend/src/common/response.js
 
 # 16. Dependencies
 
@@ -457,7 +459,7 @@ Mitigation:
 1. Foundation gap: repository currently has no backend/frontend code scaffold under ddd.
    Impact:
 
-- Exact file paths and implementation details depend on project foundation decisions.
+- Implementation cannot begin until the planned foundation scaffold is created.
   Blocking status:
 - Not a product blocker, but implementation cannot start until foundation structure exists.
 
