@@ -705,6 +705,10 @@ A property whose initial knock occurred before the reporting period can still ap
 
 `changed_at` has **no effect on knock count**.
 
+Timestamps are stored in UTC.
+
+Reporting and export date interpretation/presentation use the organization's configured timezone.
+
 ## Result
 
 Reports provide a snapshot of field activity and resulting state during the selected period without inflating totals because of repeated edits.
@@ -731,7 +735,7 @@ Visibility is applied before determining the latest accessible interaction.
 
 Organizations configure representative visibility as:
 
-### Self
+### Own
 
 Representatives see only their own interactions.
 
@@ -763,7 +767,7 @@ Rep B
 └── Lead
 ```
 
-With `self` visibility:
+With `own` visibility:
 
 Rep A sees:
 

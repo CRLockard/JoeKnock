@@ -239,7 +239,6 @@ The database implementation must follow the finalized schema decisions:
 - Immutable interaction snapshots
 - `interaction_group_id`
 - `initial_interaction_at`
-- `interaction_at`
 - `changed_at`
 - `changed_by`
 - `is_current`
@@ -389,7 +388,7 @@ Implement team organization and permission-based interaction visibility.
 ## Canonical Visibility Values
 
 ```text
-self
+own
 team
 organization
 ```
@@ -486,8 +485,12 @@ A property may have multiple interaction groups.
 An interaction group represents:
 
 ```text
-representative + property
+organization + representative + property
 ```
+
+The representative who created the interaction group remains the owner of that group.
+
+Manager/admin edits do not transfer ownership, do not create a new relationship, and do not create a new knock.
 
 Each save creates a new immutable snapshot.
 
@@ -611,6 +614,11 @@ The approved CSV interaction date is:
 changed_at
 ```
 
+Reporting/export timezone rule:
+
+- Timestamps are stored in UTC.
+- Reporting and export date interpretation/presentation use the organization's configured timezone.
+
 ## Exit Criteria
 
 A user can generate an authorized report and export the corresponding accessible data without violating organization or visibility boundaries.
@@ -658,6 +666,7 @@ The map is the center of the representative workflow.
 - Current user location
 - Map positioning/follow behavior
 - Property markers
+- No map status/date filtering in MVP
 
 ## Property Interaction
 

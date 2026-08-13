@@ -185,7 +185,15 @@ Do not treat authentication as sufficient authorization.
 
 Protected endpoints must enforce the appropriate permissions defined by the architecture and API documentation.
 
-Managers and administrators must not automatically receive edit access to another representative's interaction simply because they can view it.
+Manager edit authority: managers may edit interactions belonging to representatives on their assigned teams within organization scope.
+
+Administrator edit authority: administrators may edit any interaction within their organization.
+
+Representative edit authority: representatives may edit only their own interactions.
+
+Manager/admin edits do not transfer interaction ownership.
+
+Follow `docs/MASTER_PROJECT_SPEC.md` as the current consolidated source of truth for these rules.
 
 Follow the finalized MVP permission model.
 

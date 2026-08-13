@@ -536,7 +536,10 @@ so that I can quickly understand what has already happened at nearby properties.
 
 - API returns properties within the visible map area.
 - Property coordinates are available.
-- Properties can display their current relevant status.
+- One property pin is shown when the user can see an interaction associated with that property.
+- Historical snapshots do not create additional pins.
+- Multiple representative interactions at one property still produce one pin.
+- Pin contains no contextual metadata in MVP (no status indicator, no counts).
 - Marker data respects organization visibility rules.
 - Properties from other organizations are never displayed.
 
@@ -544,10 +547,12 @@ so that I can quickly understand what has already happened at nearby properties.
 
 ## US-022 — Filter Map Properties
 
-**Priority:** P1
+**Priority:** P2
+
+**Status:** Deferred / POST-MVP
 
 **Labels:**
-`user-story` `priority:p1` `area:map` `area:properties` `frontend` `backend`
+`user-story` `priority:p2` `area:map` `area:properties` `frontend` `backend`
 
 ### User Story
 
@@ -557,11 +562,9 @@ so that I can focus on relevant properties.
 
 ### Acceptance Criteria
 
-- User can filter by status.
-- User can filter by date range.
-- Filters affect displayed property data.
-- Filtering respects the user's visibility permissions.
-- Filters can be cleared.
+- Story remains documented for post-MVP planning.
+- MVP scope excludes map status/date filtering behavior.
+- MVP map behavior remains focused on current authorized interaction/property state.
 
 ---
 
@@ -735,7 +738,8 @@ so that I can preserve the result of the interaction without interrupting my fie
 - User can select an organization-defined status.
 - User can enter notes.
 - User can enter available contact information.
-- Interaction date is recorded.
+- The first snapshot records `initial_interaction_at`.
+- Each snapshot records `changed_at`.
 - Authenticated user is recorded.
 - Interaction is associated with the correct property.
 - Interaction is associated with the user's organization.
@@ -816,7 +820,7 @@ so that I can understand what information was recorded.
 
 - Snapshot can be retrieved by ID.
 - Snapshot displays status.
-- Snapshot displays interaction date.
+- Snapshot displays `initial_interaction_at` and `changed_at`.
 - Snapshot displays notes when present.
 - Snapshot displays contact information when present.
 - Snapshot identifies the representative who recorded it.
@@ -868,12 +872,12 @@ so that field information is shared according to our organization's workflow.
 Organization can configure:
 
 ```text
-self
+own
 team
 organization
 ```
 
-For `self`:
+For `own`:
 
 - Representative sees their own interactions.
 
@@ -885,7 +889,7 @@ For `organization`:
 
 - Representative can see organization-wide interactions.
 
-Managers and administrators retain their appropriate elevated visibility.
+Managers and administrators retain elevated visibility based on role and team assignment.
 
 ---
 
@@ -955,21 +959,27 @@ Cannot:
 Can:
 
 - Perform representative functions.
+- Edit interactions belonging to representatives on their assigned teams, within organization scope.
 - View team activity.
 - Manage teams.
 - Manage statuses.
 - View activity reports.
+
+If a manager has no assigned team, they can still edit their own interactions.
 
 ### Administrator
 
 Can:
 
 - Perform manager functions.
+- Edit any interaction within their organization.
 - Manage organization settings.
 - Manage organization information.
 - Create users.
 - Deactivate users.
 - Manage organization configuration.
+
+Manager/admin edits do not transfer interaction ownership.
 
 ---
 
@@ -995,8 +1005,9 @@ so that I can understand canvassing activity and performance.
 - Report can filter by representative.
 - Report can filter by team.
 - Report can filter by status.
-- Results are generated from interaction data.
-- Historical revisions are not incorrectly counted as separate field interactions.
+- Knock count uses `initial_interaction_at` with one knock per `interaction_group_id`.
+- Status/current-state reporting uses `changed_at` and current snapshot semantics.
+- Historical revisions are not counted as additional knocks.
 - Organization isolation is enforced.
 
 ---
@@ -1095,13 +1106,15 @@ so that I can capture information quickly while standing at the property.
 - User can enter contact information.
 - User can save the interaction.
 - Successful save returns the user to the map.
-- Property marker reflects the updated interaction state.
+- Property marker remains a single non-contextual pin for the property in MVP.
 
 ---
 
-## US-042 — Display Interaction Status and Count
+## US-042 — Display Interaction Status and Count [POST-MVP]
 
 **Priority:** P1
+
+**Status:** Deferred / POST-MVP
 
 **Labels:**
 `user-story` `priority:p1` `area:map` `area:interactions` `frontend`
@@ -1114,10 +1127,10 @@ so that I can quickly understand the area's canvassing history.
 
 ### Acceptance Criteria
 
-- Property markers can indicate their current relevant status.
-- Interaction count can be displayed where appropriate.
-- Counts are based on appropriate interaction histories rather than individual revisions.
-- Display respects visibility permissions.
+- Story remains documented for post-MVP planning.
+- MVP map behavior excludes status/count pin metadata.
+- MVP map uses one non-contextual pin per visible property.
+- Historical snapshots remain internal and do not produce additional pins.
 
 ---
 
@@ -1250,7 +1263,6 @@ US-016  Update Status
 US-017  Deactivate Status
 
 US-020  Follow Current Location
-US-022  Filter Map Properties
 
 US-032  View Interaction Snapshot
 US-033  View Interaction History (Deferred/Post-MVP)
@@ -1271,6 +1283,7 @@ US-013  Remove User from Team
 
 US-024  Search for Address (Deferred/Post-MVP)
 US-025  Cache Geocoding Results (Deferred/Post-MVP)
+US-022  Filter Map Properties (Deferred/Post-MVP)
 
 US-038  View Activity by Status
 US-039  View Activity by Representative

@@ -317,25 +317,41 @@ Admin.
 
 ```text
 rep_visibility
+timezone
+```
+
+PATCH example:
+
+```json
+{
+  "rep_visibility": "own",
+  "timezone": "America/New_York"
+}
 ```
 
 Allowed values:
 
 ```text
-self
+own
 team
 organization
 ```
 
 ### Meaning
 
-| Value          | Representative visibility                            |
-| -------------- | ---------------------------------------------------- |
-| `self`         | self interactions only                               |
-| `team`         | self interactions plus interactions from their teams |
-| `organization` | Organization-wide interactions                       |
+| Value          | Representative visibility                               |
+| -------------- | ------------------------------------------------------- |
+| `own`          | only the user's own current interactions                |
+| `team`         | own current interactions plus current team interactions |
+| `organization` | Organization-wide interactions                          |
 
 Managers and administrators retain access according to their role permissions.
+
+Default value:
+
+```text
+own
+```
 
 ---
 
@@ -731,8 +747,6 @@ Authenticated.
 
 ### Supported Filters
 
-- Status
-- Date range
 - Geographic/map bounds
 
 ### Authorization
@@ -916,6 +930,7 @@ Authenticated.
 
 ```json
 {
+  "clientRequestId": "uuid",
   "statusId": "uuid",
   "contactName": "John Smith",
   "contactPhone": "555-555-5555",
@@ -923,6 +938,10 @@ Authenticated.
   "notes": "Homeowner interested in an inspection."
 }
 ```
+
+`clientRequestId` is an optional idempotency/retry key.
+
+It is not the identity of the interaction snapshot.
 
 ### Server-Controlled Fields
 
@@ -952,6 +971,14 @@ Before creating a new interaction group, the API checks whether the authenticate
 If one exists, the API does not create a second group.
 
 The representative must update the existing interaction through `POST /api/interactions/:id`.
+
+When `clientRequestId` is provided, retries of the same create operation must not create duplicate representative/property interaction relationships or duplicate snapshots for the same request intent.
+
+For a duplicate create request using the same `clientRequestId`, the API returns/reuses the original create result.
+
+MVP idempotency retention rule:
+
+- Do not introduce an arbitrary expiration window for `clientRequestId` handling.
 
 ---
 
@@ -996,9 +1023,11 @@ Authenticated.
 
 ### Authorization
 
-Only the representative who owns the interaction group can modify it.
+Representatives can edit their own interactions.
 
-Managers and administrators are view-only when accessing another representative's interaction.
+Managers and administrators can edit interactions they are authorized to see.
+
+Visibility scope and edit authority are evaluated separately.
 
 ### Request
 
@@ -1097,14 +1126,6 @@ east
 west
 ```
 
-Optional:
-
-```text
-status
-dateFrom
-dateTo
-```
-
 Example:
 
 ```text
@@ -1136,12 +1157,16 @@ Example:
   {
     "propertyId": "uuid",
     "latitude": 35.9,
-    "longitude": -84.0,
-    "status": "Interested",
-    "interactionCount": 1
+    "longitude": -84.0
   }
 ]
 ```
+
+MVP map pin semantics:
+
+- One pin per property when the user can see at least one current interaction at that property.
+- No map pin contextual metadata in MVP (no status indicator, no interaction count, no representative count, no snapshot count).
+- Historical snapshots must not create additional pins.
 
 ### Authorization
 
@@ -1208,6 +1233,12 @@ teamId
 statusId
 ```
 
+Date-range semantics:
+
+- `dateFrom` and `dateTo` are calendar dates in the organization's configured timezone.
+- Both boundaries are inclusive.
+- Backend converts the resulting inclusive organization-local boundaries to UTC for database queries.
+
 Example:
 
 ```text
@@ -1270,6 +1301,61 @@ Historical snapshots must not be counted as additional physical knocks.
 
 The MVP does not maintain a separate activity-log table.
 
+When selecting latest/current records for status/current-state reporting:
+
+- Primary ordering: `changed_at DESC`
+- Deterministic secondary ordering: interaction snapshot `id DESC`
+
+---
+
+## GET `/api/exports/properties`
+
+### Purpose
+
+Export authorized reporting/property activity data as CSV for MVP downstream use.
+
+### Authentication
+
+Manager/Admin.
+
+### Query Parameters
+
+Uses the same filters as activity reporting:
+
+```text
+dateFrom
+dateTo
+userId
+teamId
+statusId
+```
+
+### Authorization
+
+The export uses the same:
+
+- Organization isolation
+- Role authorization
+- Representative visibility filtering
+
+as activity reporting.
+
+### CSV Timestamp Semantics
+
+The CSV Interaction Date field maps to:
+
+```text
+changed_at
+```
+
+`initial_interaction_at` remains the knock-count reporting field.
+
+### Timezone Rules
+
+- Timestamps are stored in UTC.
+- The organization's configured timezone is authoritative for reporting and CSV export presentation.
+- Date-range interpretation for reporting/export is based on the organization's configured timezone.
+
 ---
 
 # 19. Authorization Rules
@@ -1306,7 +1392,7 @@ must not expose a property belonging to another organization.
 
 The MVP supports three organization-level visibility settings.
 
-## `self`
+## `own`
 
 A representative sees:
 
@@ -1355,9 +1441,9 @@ Can:
 
 - View permitted interactions.
 - Create their own interactions.
-- Edit their own interactions.
+- Edit interactions belonging to representatives on their assigned teams, within organization scope.
 
-Managers are view-only when viewing another representative's interaction.
+If a manager has no assigned team, they can still edit their own interactions.
 
 ### Administrator
 
@@ -1365,16 +1451,18 @@ Can:
 
 - View permitted interactions.
 - Create their own interactions.
-- Edit their own interactions.
+- Edit any interaction within their organization.
 
-Administrators are view-only when viewing another representative's interaction.
+Ownership rule:
+
+- When a manager/admin edits an interaction, ownership of the interaction group remains with the original representative owner.
+- Manager/admin edits do not create a new interaction relationship and do not create a new knock.
 
 The MVP does not include:
 
 - Lead ownership transfer
 - Lead reassignment
 - Credit reassignment
-- Manager override editing
 - Lead claiming
 
 ---
@@ -1526,6 +1614,12 @@ GET    /api/map/properties
 GET    /api/reports/activity
 ```
 
+## Exports
+
+```text
+GET    /api/exports/properties
+```
+
 ---
 
 # 25. Total MVP Endpoint Count
@@ -1542,7 +1636,8 @@ GET    /api/reports/activity
 | Interactions   |         4 |
 | Map            |         1 |
 | Reporting      |         1 |
-| **Total**      |    **33** |
+| Exports        |         1 |
+| **Total**      |    **34** |
 
 ---
 
@@ -1562,6 +1657,7 @@ GET    /api/reports/activity
 | Map                   | `properties`, `interactions`, `statuses`, `users`, `teams` |
 | Geocoding             | External provider; no JoeKnock table                       |
 | Reporting             | `interactions`, `properties`, `users`, `teams`, `statuses` |
+| Exports               | `interactions`, `properties`, `users`, `teams`, `statuses` |
 
 ---
 
@@ -1618,8 +1714,8 @@ The core architectural rules are:
 17. Organization data is never deleted in the MVP.
 18. Team membership can be removed without affecting historical interaction records.
 19. Visibility and editing permissions are separate concepts.
-20. Only the owner of an interaction group can edit it.
-21. Managers and administrators are view-only when viewing another representative's interaction.
+20. Representatives can edit their own interaction groups.
+21. Managers and administrators can edit interactions they are authorized to see.
 22. There is no lead ownership or credit reassignment system.
 23. Map data follows the same authorization rules as normal property data.
 24. Geocoding is handled internally by the JoeKnock backend.

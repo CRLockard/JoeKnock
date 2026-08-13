@@ -203,6 +203,7 @@ MVP:
 - Simple marker only
 - No colors
 - No status-based indicators
+- No interaction/representative/snapshot counts
 
 ---
 
@@ -343,6 +344,7 @@ Fields:
 - Business address
 - Billing address
 - Phone number
+- Timezone
 
 ---
 
@@ -362,7 +364,7 @@ Administrators define representative visibility.
 
 Options:
 
-## Self
+## Own
 
 Users see only their own interactions.
 

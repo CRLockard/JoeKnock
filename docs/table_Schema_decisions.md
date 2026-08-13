@@ -54,25 +54,30 @@ Stores the organization that owns all JoeKnock data.
 
 Stores organization-specific configuration.
 
-| Column            | Type        | Constraints          | Description                                    |
-| ----------------- | ----------- | -------------------- | ---------------------------------------------- |
-| `id`              | UUID        | PK                   | Unique settings identifier                     |
-| `organization_id` | UUID        | FK, UNIQUE, NOT NULL | Owning organization                            |
-| `rep_visibility`  | VARCHAR(50) | NOT NULL             | Controls representative interaction visibility |
-| `created_at`      | TIMESTAMP   | NOT NULL             | Settings creation timestamp                    |
-| `updated_at`      | TIMESTAMP   | NOT NULL             | Last settings update                           |
+| Column            | Type         | Constraints          | Description                                    |
+| ----------------- | ------------ | -------------------- | ---------------------------------------------- |
+| `id`              | UUID         | PK                   | Unique settings identifier                     |
+| `organization_id` | UUID         | FK, UNIQUE, NOT NULL | Owning organization                            |
+| `rep_visibility`  | VARCHAR(50)  | NOT NULL             | Controls representative interaction visibility |
+| `timezone`        | VARCHAR(100) | NOT NULL             | Organization timezone (IANA identifier)        |
+| `created_at`      | TIMESTAMP    | NOT NULL             | Settings creation timestamp                    |
+| `updated_at`      | TIMESTAMP    | NOT NULL             | Last settings update                           |
 
 ### `rep_visibility` values
 
 The MVP supports:
 
-- `self`
+- `own`
 - `team`
 - `organization`
 
+Default:
+
+- `own`
+
 ### Visibility behavior
 
-**Self**
+**Own**
 
 Representatives see only their own interaction history.
 
@@ -85,6 +90,17 @@ Representatives see interactions associated with their team visibility.
 Representatives see organization-wide interactions.
 
 Managers and administrators have additional visibility based on their role.
+
+Human-facing labels:
+
+- `own` -> Only my interactions
+- `team` -> My team's interactions
+- `organization` -> Organization-wide interactions
+
+### Timezone behavior
+
+- All timestamps are stored in UTC.
+- The organization `timezone` setting is authoritative for reporting and export date interpretation/presentation.
 
 ### Relationships
 
@@ -318,7 +334,6 @@ The previous snapshot remains unchanged except that `is_current` may be changed 
 | `status_id`              | UUID         | FK, NULL     | Status selected for this snapshot                                        |
 | `status_name`            | VARCHAR(100) | NOT NULL     | Status text preserved at snapshot creation                               |
 | `initial_interaction_at` | TIMESTAMP    | NOT NULL     | Date/time the representative first created the interaction group         |
-| `interaction_at`         | TIMESTAMP    | NOT NULL     | Date/time represented by the interaction                                 |
 | `changed_at`             | TIMESTAMP    | NOT NULL     | Date/time this snapshot was created                                      |
 | `changed_by`             | UUID         | FK, NOT NULL | User responsible for creating this snapshot                              |
 | `is_current`             | BOOLEAN      | NOT NULL     | Indicates the current snapshot for the interaction group                 |
@@ -882,6 +897,21 @@ WHERE is_current = true
 ```
 
 It can be a defensive optimization in strict MVP semantics, but it is not the definition of `interaction_group_id` and can be redundant when group invariants are correctly enforced.
+
+## Deterministic snapshot ordering
+
+When selecting latest/current snapshots for reporting/current-state reads:
+
+- Primary ordering: `changed_at DESC`
+- Secondary deterministic tie-break: interaction snapshot `id DESC`
+
+This ordering is required when two snapshots share the same `changed_at`.
+
+## Reporting date-range interpretation
+
+- `dateFrom` and `dateTo` are organization-local calendar dates.
+- Both boundaries are inclusive.
+- Query boundaries are converted to UTC before filtering persisted UTC timestamps.
 
 ## Immutability and atomicity guidance
 

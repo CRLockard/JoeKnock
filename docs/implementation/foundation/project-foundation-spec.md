@@ -1077,8 +1077,9 @@ Therefore:
 
 1. Existing interaction snapshots are never edited in place.
 2. A meaningful change creates a new interaction snapshot.
-3. Managers/admins do not automatically gain permission to modify another representative's historical interaction.
-4. Viewing and editing are separate authorization decisions.
+3. Representatives may modify their own interactions.
+4. Managers/admins may modify interactions they are authorized to see.
+5. Viewing and editing are separate authorization decisions.
 
 ---
 
@@ -1086,13 +1087,18 @@ Therefore:
 
 The finalized visibility model includes:
 
-1. My interactions.
+1. Only my interactions.
 2. My team's interactions.
 3. Organization-wide interactions.
 
 Visibility controls what a user can read.
 
-Visibility does not automatically grant permission to modify another user's historical interaction.
+Edit authorization rules are:
+
+1. Representatives edit only their own interactions.
+2. Managers edit authorized team-member interactions within organization scope.
+3. Administrators edit any interaction within organization scope.
+4. Manager/admin edits do not transfer interaction ownership.
 
 ---
 

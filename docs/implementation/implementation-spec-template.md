@@ -254,7 +254,10 @@ List every business rule this implementation must enforce.
 Examples:
 
 - Organization ownership must be respected.
-- Only the authenticated representative may modify their interaction.
+- Representatives may modify their own interactions.
+- Managers may modify interactions belonging to representatives on their assigned teams within organization scope.
+- Administrators may modify any interaction within organization scope.
+- Manager/admin edits must not transfer interaction ownership.
 - A revision must use the existing interaction group.
 - A revision must not create a new knock.
 - Existing notes must carry forward.

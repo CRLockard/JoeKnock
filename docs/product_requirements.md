@@ -84,7 +84,8 @@ Organizations represent the company or group using JoeKnock.
 
 # 3. Team Management
 
-Teams provide a flexible way to organize users and manage visibility.
+- Timezone
+  Teams provide a flexible way to organize users and manage visibility.
 
 Teams support:
 
@@ -221,7 +222,7 @@ Organizations define visibility settings.
 
 Available options:
 
-## Self
+## Own
 
 Users see only their own interactions.
 
@@ -233,7 +234,13 @@ Users see interactions from assigned teams.
 
 Users see organization-wide interactions.
 
-Managers and administrators maintain broader access based on role.
+Managers and administrators maintain broader access based on role and organization scope.
+
+Edit rules remain separate:
+
+- Representatives edit only their own interactions.
+- Managers edit authorized team-member interactions.
+- Administrators edit any interaction in their organization.
 
 ---
 

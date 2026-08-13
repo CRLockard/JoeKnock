@@ -627,7 +627,12 @@ Verify selecting a property on the map opens the expected property interaction w
 
 **Priority:** P1
 
-Verify properties with accessible current interactions display the correct map state/marker information.
+Verify map pin behavior follows MVP rules:
+
+- One pin per visible property.
+- Historical snapshots do not create additional pins.
+- Multiple representative interactions at one property still produce one pin.
+- No pin status/count/representative/snapshot metadata in MVP.
 
 **Status:** Planned
 
@@ -638,6 +643,14 @@ Verify properties with accessible current interactions display the correct map s
 **Priority:** P0
 
 Verify map-visible interaction/property information respects the representative visibility configuration.
+
+Verify MVP map endpoint does not support status/date/count filter behavior.
+
+Verify organization visibility mode allows representatives, managers, and administrators to see all current interactions.
+
+Verify canonical visibility setting values are `own`, `team`, `organization`.
+
+Verify default organization visibility is `own`.
 
 **Status:** Planned
 
@@ -687,7 +700,7 @@ Verify returning to the same property as the same representative does not create
 
 **Priority:** P0
 
-Verify the interaction model correctly handles another representative interacting with the same property according to the finalized schema and API rules.
+Verify different representatives can each create one knock for the same property through separate interaction groups.
 
 **Status:** Planned
 
@@ -698,6 +711,12 @@ Verify the interaction model correctly handles another representative interactin
 **Priority:** P0
 
 Verify repeated submission cannot accidentally create duplicate interaction groups.
+
+Verify idempotent retry using the same `client_request_id` does not create duplicate create results.
+
+Verify duplicate `client_request_id` create retries return/reuse the original create result.
+
+Verify there is no arbitrary expiration-window behavior applied to MVP idempotency handling.
 
 **Status:** Planned
 
@@ -742,6 +761,10 @@ Verify the new snapshot becomes the current snapshot according to the finalized 
 **Priority:** P0
 
 Verify revisions retain the original `interaction_group_id`.
+
+Verify `initial_interaction_at` remains unchanged across revisions.
+
+Verify `changed_at` updates when a revision snapshot is created.
 
 **Status:** Planned
 
@@ -847,21 +870,29 @@ Verify a representative can modify their own interaction according to the finali
 
 ---
 
-## TEST-067 — Manager View-Only Behavior
+## TEST-067 — Manager Authorized Edit Behavior
 
 **Priority:** P0
 
-Verify a manager cannot edit another representative's interaction when the finalized MVP rules make that interaction view-only.
+Verify a manager can edit a team member interaction when that interaction is within authorized organization/team scope.
+
+Verify manager edits do not transfer interaction ownership.
+
+Verify the owning representative still sees the interaction after manager edit.
 
 **Status:** Planned
 
 ---
 
-## TEST-068 — Administrator View-Only Behavior
+## TEST-068 — Administrator Authorized Edit Behavior
 
 **Priority:** P0
 
-Verify an administrator cannot edit another representative's interaction when the finalized MVP rules make that interaction view-only.
+Verify an administrator can edit any interaction within authorized organization scope.
+
+Verify administrator edits do not transfer interaction ownership.
+
+Verify the owning representative still sees the interaction after administrator edit.
 
 **Status:** Planned
 
@@ -872,6 +903,10 @@ Verify an administrator cannot edit another representative's interaction when th
 **Priority:** P0
 
 Verify no user can modify an interaction belonging to another organization.
+
+Verify a representative cannot edit another representative interaction even when organization visibility allows viewing it.
+
+Verify a manager with no assigned team can still edit their own interactions but cannot edit non-team representative interactions.
 
 **Status:** Planned
 
@@ -1021,6 +1056,10 @@ Verify the activity report returns data according to the finalized reporting API
 
 Verify report filtering correctly respects the requested date range.
 
+Verify date-range interpretation uses organization timezone while stored timestamps remain UTC.
+
+Verify `dateFrom` and `dateTo` are inclusive organization-local calendar boundaries.
+
 **Status:** Planned
 
 ---
@@ -1060,6 +1099,12 @@ Interaction Group A
 
 verify reporting counts the interaction according to the finalized knock-counting rules rather than counting three rows as three knocks.
 
+Verify knock counting uses `initial_interaction_at` rather than snapshot row count.
+
+Verify status/current-state reporting uses `changed_at` current snapshot semantics.
+
+Verify equal `changed_at` timestamps use deterministic `id DESC` tie-breaking.
+
 **Status:** Planned
 
 ---
@@ -1069,6 +1114,8 @@ verify reporting counts the interaction according to the finalized knock-countin
 **Priority:** P0
 
 Verify reports cannot include data belonging to another organization.
+
+Verify exported timestamps are presented using organization timezone while stored data remains UTC.
 
 **Status:** Planned
 

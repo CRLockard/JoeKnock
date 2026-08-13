@@ -294,7 +294,7 @@ Pins represent the **most recent interaction the current user is allowed to see*
 
 Representative visibility is controlled by organization settings.
 
-### Self
+### Own
 
 Representatives only see pins created from their own interactions.
 
@@ -760,7 +760,7 @@ Teams are simply named collections of users.
 
 Names do not have to be unique.
 
-Soft deletion removes teams from the user interface without destroying historical relationships.
+Teams are not deleted in MVP. Team membership relationships can be removed through the documented API behavior.
 
 ---
 
@@ -898,7 +898,7 @@ Pins appear on the map only for properties that contain an interaction visible t
 
 Examples:
 
-Representative visibility = SELF
+Representative visibility = OWN
 
 Rep A creates an interaction.
 
@@ -924,17 +924,13 @@ Selecting a pin opens the latest visible interaction.
 
 # Reporting Philosophy
 
-JoeKnock reporting is intentionally simple.
+JoeKnock reporting separates knock counting from current/revision status reporting.
 
-JoeKnock reports on the current known state of properties.
+Knock count uses `initial_interaction_at` with one knock per `interaction_group_id`.
 
-It is not intended to become historical business intelligence.
+Current/revision status reporting uses `changed_at` and current-snapshot semantics.
 
-When generating reports for a date range:
-
-1. Retrieve interactions within the selected dates.
-2. Group by Property.
-3. If multiple interaction snapshots exist for the same property, use only the newest snapshot.
+Snapshot count is never treated as knock count.
 
 Example:
 

@@ -338,7 +338,15 @@ These roles represent the primary operational hierarchy without creating unneces
 
 **Decision:** Visibility and editing are separate authorization decisions.
 
-Managers/admins do **not** automatically receive permission to edit another representative's interaction simply because they can view it.
+Managers/admins may edit interactions they are authorized to see.
+
+Representatives edit only their own interactions.
+
+Managers edit authorized team-member interactions within organization scope.
+
+Administrators edit any interaction within their organization.
+
+Manager/admin edits do not transfer interaction ownership.
 
 **Why:**
 Viewing organizational data and modifying another user's historical work are different operations.

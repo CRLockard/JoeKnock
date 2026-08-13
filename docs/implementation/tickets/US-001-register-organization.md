@@ -35,7 +35,7 @@ so that I can begin using JoeKnock.
 Implement initial organization onboarding through POST /api/auth/register so a valid request atomically creates:
 
 - One organization
-- One organization_settings record linked to that organization
+- One organization_settings record linked to that organization, initialized to satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required and initialized per the finalized organization timezone contract)
 - One administrator user linked to that organization with a securely hashed password
 - Authentication response data for immediate signed-in context
 
@@ -124,7 +124,7 @@ Columns/constraints used:
 
 - organizations.id, organizations.name
 - organization_settings.organization_id unique ownership link
-- users.organization_id, users.email (unique), users.password_hash, users.role, users.is_active
+- users.organization_id, users.email (organization-scoped unique; the same email may exist in different organizations), users.password_hash, users.role, users.is_active
 
 Transaction requirement:
 
@@ -189,11 +189,11 @@ Registration form submit
 # 9. Business Rules
 
 - Organization registration creates a new organization boundary.
-- Organization settings record is created with each new organization.
+- Organization settings record is created with each new organization and must satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required and initialized per the finalized organization timezone contract).
 - Initial user is associated to the new organization.
 - Initial user role is administrator.
 - Password is stored only as hash.
-- Duplicate email registrations are rejected.
+- Duplicate email registration within the same organization is rejected according to the finalized schema/API contract; the same email address may exist in different organizations.
 - Registration failures do not leave partial records.
 - No delete behavior is introduced.
 
