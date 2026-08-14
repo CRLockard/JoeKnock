@@ -125,10 +125,12 @@ describeDb('POST /api/auth/login', () => {
   it('rejects unknown email with authenticated error envelope', async () => {
     const app = createApp();
 
-    const response = await request(app).post('/api/auth/login').send({
-      email: `missing.${Date.now()}@example.com`,
-      password: 'StrongPass123!',
-    });
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: `missing.${Date.now()}@example.com`,
+        password: 'StrongPass123!',
+      });
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('UNAUTHENTICATED');
@@ -189,9 +191,11 @@ describeDb('POST /api/auth/login', () => {
   it('returns 400 validation envelope for missing password', async () => {
     const app = createApp();
 
-    const response = await request(app).post('/api/auth/login').send({
-      email: `no-password.${Date.now()}@example.com`,
-    });
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: `no-password.${Date.now()}@example.com`,
+      });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');

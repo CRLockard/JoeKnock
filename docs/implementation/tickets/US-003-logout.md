@@ -4,7 +4,7 @@ GitHub Issue: #3
 
 Title: US-003 - Log Out
 
-Status: Planned
+Status: Completed
 
 Priority: P0
 
@@ -271,28 +271,17 @@ Then:
 6. Add API and frontend tests (existing + proposed IDs).
 7. Run targeted tests, then npm test.
 
-# 15. Expected Files
+# 15. Implementation Files
 
-Repository currently has no application code scaffold in ddd.
+## New Files Added
 
-## Expected New Files
+- ddd/backend/tests/integration/auth-logout.test.js
+- ddd/frontend/src/tests/logout-flow.test.jsx
+
+## Existing Files Modified
 
 - ddd/backend/src/auth/authRoutes.js
-- ddd/backend/src/auth/authController.js
-- ddd/backend/tests/integration/auth/logout.test.js
-- ddd/frontend/src/auth/AuthProvider.jsx
-- ddd/frontend/tests/auth/logout.test.js
-
-## Expected Modified Files
-
-- ddd/backend/src/app.js (auth route registration)
-- ddd/frontend/src/auth/authStorage.js (clear token from localStorage)
-- ddd/frontend/src/auth/ProtectedRoute.jsx (redirect behavior)
-- ddd/frontend/src/layout/UserMenu.jsx (logout trigger)
-
-## Potential Files
-
-- ddd/frontend/src/app/router.jsx
+- ddd/frontend/src/app/App.jsx
 
 # 16. Dependencies
 
@@ -327,36 +316,36 @@ Repository currently has no application code scaffold in ddd.
 
 Functionality
 
-- [ ] Logout endpoint implemented per contract.
-- [ ] Acceptance criteria satisfied.
-- [ ] Out-of-scope functionality not implemented.
+- [x] Logout endpoint implemented per contract.
+- [x] Acceptance criteria satisfied.
+- [x] Out-of-scope functionality not implemented.
 
 Architecture
 
-- [ ] Stateless JWT logout behavior preserved.
-- [ ] API behavior matches docs/api_endpoints.md.
-- [ ] No unapproved architecture introduced.
+- [x] Stateless JWT logout behavior preserved.
+- [x] API behavior matches docs/api_endpoints.md.
+- [x] No unapproved architecture introduced.
 
 Security
 
-- [ ] Unauthenticated logout attempts are rejected.
-- [ ] Client auth state is reliably cleared.
-- [ ] Protected routes are blocked after logout.
+- [x] Unauthenticated logout attempts are rejected.
+- [x] Client auth state is reliably cleared.
+- [x] Protected routes are blocked after logout.
 
 Testing
 
-- [ ] TEST-011/012 behavior covered for logout endpoint protection.
-- [ ] TEST-092/093/094 implemented.
-- [ ] npm test passes.
+- [x] TEST-011/012 behavior covered for logout endpoint protection.
+- [x] TEST-092/093/094 implemented.
+- [x] npm test passes.
 
 Documentation
 
-- [ ] Spec remains aligned with source-of-truth docs.
+- [x] Spec remains aligned with source-of-truth docs.
 
 Review
 
 - [ ] No unrelated files modified.
-- [ ] Manual QA requirements identified.
+- [x] Manual QA requirements identified.
 
 # 19. Manual QA
 
@@ -394,19 +383,12 @@ Mitigation:
 
 # 21. Open Questions / Blocking Decisions
 
-1. Foundation gap: repository currently has no backend/frontend scaffold in ddd.
+1. No active blockers.
    Impact:
 
-- Implementation cannot begin until the planned foundation scaffold is created.
+- None for current MVP scope.
   Blocking status:
-- Implementation-blocking until foundation scaffold exists.
-
-2. Repeated logout request behavior detail is not explicitly specified (for example already-cleared client state calling endpoint again).
-   Impact:
-
-- Potential inconsistency in UX unless team standardizes behavior.
-  Blocking status:
-- Not blocking; can be handled with consistent auth-middleware + frontend behavior.
+- Closed.
 
 # 22. Copilot Implementation Notes
 
@@ -415,40 +397,57 @@ Mitigation:
 - Verify post-logout route protection with automated tests.
 - Avoid introducing server-side session architecture.
 
-# 23. Completion Report Template
+# 23. Completion Report
 
 Implemented
 
-- Logout endpoint and frontend auth-state clear flow
+- Backend authenticated POST /api/auth/logout endpoint using existing auth middleware and stateless response contract.
+- Frontend logout action in the authenticated shell that calls logout API and always clears client auth state before redirecting to /login.
+- Logout regression tests covering success and invalid/missing auth on backend plus client state/route guard behavior on frontend.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/auth/authRoutes.js
+- ddd/backend/tests/integration/auth-logout.test.js
+- ddd/frontend/src/app/App.jsx
+- ddd/frontend/src/tests/logout-flow.test.jsx
+- docs/implementation/tickets/US-003-logout.md
 
 Tests Added
 
-- [to be filled during implementation]
+- ddd/backend/tests/integration/auth-logout.test.js (3 integration tests)
+- ddd/frontend/src/tests/logout-flow.test.jsx (2 frontend auth-flow tests)
 
 Tests Run
 
-npm test
+- npm run test --prefix ddd/backend -- tests/integration/auth-logout.test.js
+- npm run test --prefix ddd/frontend -- src/tests/logout-flow.test.jsx
+- npm run test:integration --prefix ddd/backend
+- npm test
+- npm run lint
+- npm run build
+- npm run test:e2e
 
 Result:
 
-PASS / FAIL
+- PASS
 
 Manual QA Required
 
-- Logout UX, redirect, and post-logout protection checks
+- Login, then logout from authenticated header action.
+- Verify redirect to /login after logout.
+- Attempt browser back navigation to protected routes and confirm redirect/denial.
+- Verify localStorage keys joeknock.jwt and joeknock.user are removed.
+- Confirm refresh after logout does not restore protected access.
 
 Documentation Updated
 
-- None required unless approved contracts change
+- docs/implementation/tickets/US-003-logout.md updated to completed state with implementation and validation evidence.
 
 Known Limitations
 
-- [to be filled during implementation]
+- React Router v7 future-flag warnings remain in frontend test output; non-blocking and outside US-003 scope.
 
 Remaining Issues
 
-- Foundation scaffolding and final repeated-logout behavior standardization
+- Working tree still contains pre-existing unrelated modifications outside US-003 scope that should be reviewed separately before merge.

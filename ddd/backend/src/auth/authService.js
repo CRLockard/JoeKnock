@@ -52,7 +52,10 @@ export function createAuthService({
         throw invalidCredentialsError();
       }
 
-      const passwordMatches = await passwordVerifier(user.password_hash, password);
+      const passwordMatches = await passwordVerifier(
+        user.password_hash,
+        password,
+      );
 
       if (!passwordMatches) {
         throw invalidCredentialsError();
