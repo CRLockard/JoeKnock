@@ -31,6 +31,10 @@ function invalidCredentialsError() {
   return new AuthError('Invalid email or password.');
 }
 
+function invalidAuthContextError() {
+  return new AuthError('Invalid or expired token.');
+}
+
 export function createAuthService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
@@ -40,6 +44,35 @@ export function createAuthService({
   onOrganizationCreated = async () => {},
 } = {}) {
   return {
+    async getCurrentUser({ userId, organizationId }) {
+      const user = await runInTransaction(async (client) => {
+        return repository.findUserByIdAndOrganization(client, {
+          userId,
+          organizationId,
+        });
+      });
+
+      // The authenticated principal must still resolve to an organization-
+      // scoped user row. Missing rows indicate stale or invalid auth context.
+      if (!user) {
+        throw invalidAuthContextError();
+      }
+
+      if (!user.is_active) {
+        throw new AppError(403, 'FORBIDDEN', 'Account is inactive.');
+      }
+
+      return {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        organizationId: user.organization_id,
+        teams: [],
+      };
+    },
+
     async login({ email, password }) {
       const normalizedEmail = normalizeEmail(email);
       const user = await runInTransaction(async (client) => {

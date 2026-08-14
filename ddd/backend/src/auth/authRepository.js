@@ -40,7 +40,31 @@ const USER_BY_EMAIL_LOGIN_SQL = `
   LIMIT 1
 `;
 
+const USER_BY_ID_AND_ORG_SQL = `
+  SELECT
+    u.id,
+    u.organization_id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.role,
+    u.is_active
+  FROM users u
+  INNER JOIN organizations o ON o.id = u.organization_id
+  WHERE u.id = $1 AND u.organization_id = $2
+  LIMIT 1
+`;
+
 export const authRepository = {
+  async findUserByIdAndOrganization(client, { userId, organizationId }) {
+    const result = await client.query(USER_BY_ID_AND_ORG_SQL, [
+      userId,
+      organizationId,
+    ]);
+
+    return result.rows[0] ?? null;
+  },
+
   async findUserByEmail(client, { email }) {
     const result = await client.query(USER_BY_EMAIL_LOGIN_SQL, [email]);
     return result.rows[0] ?? null;

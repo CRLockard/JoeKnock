@@ -3,11 +3,27 @@ import { body } from 'express-validator';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { validate } from '../validation/validate.js';
 import { buildAuthRoutes } from '../auth/authRoutes.js';
+import { createAuthService } from '../auth/authService.js';
 
 export function buildApiRoutes({ authService } = {}) {
   const router = Router();
+  const resolvedAuthService = authService ?? createAuthService();
 
-  router.use('/auth', buildAuthRoutes({ authService }));
+  router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
+
+  router.get('/me', authMiddleware, async (req, res, next) => {
+    try {
+      // Identity is derived from validated JWT claims, never from request input.
+      const user = await resolvedAuthService.getCurrentUser({
+        userId: req.auth.userId,
+        organizationId: req.auth.organizationId,
+      });
+
+      return res.status(200).json(user);
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/_scaffold/protected', authMiddleware, (req, res) => {
     return res.status(200).json({

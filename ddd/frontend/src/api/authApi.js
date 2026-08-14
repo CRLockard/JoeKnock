@@ -19,3 +19,9 @@ export function logout() {
     method: 'POST',
   });
 }
+
+export function getCurrentUser() {
+  return apiFetch('/me', {
+    method: 'GET',
+  });
+}

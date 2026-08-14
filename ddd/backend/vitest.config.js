@@ -13,5 +13,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.js'],
+    // Integration suites share one test database and reset common tables.
+    // Running files in parallel causes nondeterministic cross-suite races.
+    fileParallelism: false,
   },
 });

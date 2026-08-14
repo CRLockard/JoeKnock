@@ -2,9 +2,9 @@
 
 GitHub Issue: #4
 
-Title: US-004 Î“Ã‡Ã¶ View Current User
+Title: US-004 - View Current User
 
-Status: Planned
+Status: Completed
 
 Priority: P1
 
@@ -31,15 +31,16 @@ Use the GitHub issue body as the approved user-story intent.
 
 # 3. Objective
 
-Implement this user story according to the finalized MVP source of truth and corrected GitHub issue requirements.
+Deliver authenticated current-user retrieval for MVP via a protected `GET /api/me` endpoint and profile page integration, enforcing JWT-derived identity and organization isolation.
 
 # 4. Scope
 
 ## 4.1 Included
 
-- Implement behavior described in the corrected GitHub issue and finalized master spec.
-- Enforce organization isolation, authorization, and API/schema contract consistency for this story.
-- Add/update tests required to verify acceptance criteria and prevent regressions.
+- Backend `GET /api/me` endpoint protected by auth middleware.
+- Service/repository logic for organization-scoped current-user lookup by authenticated claims.
+- Frontend profile page data fetch/render for current authenticated user.
+- Integration and frontend test coverage for success and failure paths.
 
 ## 4.2 Explicitly Not Included
 
@@ -77,11 +78,18 @@ Tables implicated by GitHub issue:
 
 # 7. API Contract
 
-Endpoint implications from GitHub issue:
+Implemented endpoint:
 
-- See issue and docs/api_endpoints.md.
+- `GET /api/me`
 
-Final contract must align with docs/api_endpoints.md.
+Behavior:
+
+- Requires valid bearer JWT.
+- Uses server-validated JWT claims (`sub`, `organizationId`) as sole identity source.
+- Ignores client-supplied identity overrides.
+- Returns current-user profile fields for authenticated user.
+- Returns `401 UNAUTHENTICATED` for missing/invalid/expired token, nonexistent user, or org mismatch.
+- Returns `403 FORBIDDEN` for inactive user.
 
 # 8. Data Flow
 
@@ -218,11 +226,11 @@ Repository currently has partial/no app scaffold assumptions depending on ticket
 
 # 18. Definition of Done
 
-- [ ] Acceptance criteria implemented and verified.
+- [x] Acceptance criteria implemented and verified.
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [x] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
+- [x] Organization isolation and authorization requirements are verified.
+- [x] No unrelated scope changes introduced.
 
 # 19. Manual QA
 
@@ -261,27 +269,49 @@ Mitigation:
 
 Implemented
 
-- [to be filled during implementation]
+- Added protected backend endpoint `GET /api/me` in API router.
+- Added auth service method for current-user retrieval with org-scoped lookup.
+- Added auth repository query for `userId + organizationId` lookup.
+- Added frontend API client method `getCurrentUser()`.
+- Replaced placeholder profile page with API-backed loading/success/error rendering.
+- Added backend integration test suite for `GET /api/me` happy/error/isolation scenarios.
+- Added frontend tests for profile-page success and API-failure rendering.
+- Stabilized backend integration execution by disabling Vitest file parallelism due shared DB reset races.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/auth/authRepository.js
+- ddd/backend/src/auth/authService.js
+- ddd/backend/src/routes/apiRoutes.js
+- ddd/backend/tests/integration/current-user.test.js
+- ddd/backend/vitest.config.js
+- ddd/frontend/src/api/authApi.js
+- ddd/frontend/src/pages/ProfilePage.jsx
+- ddd/frontend/src/tests/profile-page.test.jsx
 
 Tests Added
 
-- [to be filled during implementation]
+- ddd/backend/tests/integration/current-user.test.js
+- ddd/frontend/src/tests/profile-page.test.jsx
 
 Tests Run
 
-npm test
+- npm run test --prefix ddd/backend -- tests/integration/current-user.test.js
+- npm run test --prefix ddd/frontend -- src/tests/profile-page.test.jsx
+- npm run test:integration --prefix ddd/backend
+- npm test
+- npm run lint
+- npm run build
+- npm run test:e2e
 
 Result:
 
-PASS / FAIL
+PASS
 
 Manual QA Required
 
-- [to be filled during implementation]
+- Verify authenticated profile page displays current user in browser session.
+- Verify unauthenticated navigation to profile path results in login flow.
 
 Documentation Updated
 
@@ -289,8 +319,8 @@ Documentation Updated
 
 Known Limitations
 
-- [to be filled during implementation]
+- `teams` is currently returned as an empty array placeholder pending team-management story implementation.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- None identified for US-004 scope.
