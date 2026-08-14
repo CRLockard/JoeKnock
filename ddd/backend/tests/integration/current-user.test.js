@@ -136,7 +136,12 @@ describeDb('GET /api/me', () => {
     });
 
     const response = await request(app)
-      .get('/api/me?userId=' + userB.user.id + '&organizationId=' + userB.organizationId)
+      .get(
+        '/api/me?userId=' +
+          userB.user.id +
+          '&organizationId=' +
+          userB.organizationId,
+      )
       .set('Authorization', `Bearer ${token}`);
 
     expect(response.status).toBe(200);
@@ -166,7 +171,9 @@ describeDb('GET /api/me', () => {
 
   it('rejects expired token', async () => {
     const app = createApp();
-    const seeded = await seedUser({ email: `expired.${Date.now()}@example.com` });
+    const seeded = await seedUser({
+      email: `expired.${Date.now()}@example.com`,
+    });
 
     const token = jwt.sign(
       {

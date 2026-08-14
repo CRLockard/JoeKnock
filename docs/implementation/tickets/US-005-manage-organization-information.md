@@ -2,9 +2,9 @@
 
 GitHub Issue: #5
 
-Title: US-005 Î“Ã‡Ã¶ Manage Organization Information
+Title: US-005 - Manage Organization Information
 
-Status: Planned
+Status: Completed
 
 Priority: P1
 
@@ -31,15 +31,16 @@ Use the GitHub issue body as the approved user-story intent.
 
 # 3. Objective
 
-Implement this user story according to the finalized MVP source of truth and corrected GitHub issue requirements.
+Implement organization information management for MVP by allowing authenticated manager/admin read access and admin-only organization-name updates within the authenticated organization boundary.
 
 # 4. Scope
 
 ## 4.1 Included
 
-- Implement behavior described in the corrected GitHub issue and finalized master spec.
-- Enforce organization isolation, authorization, and API/schema contract consistency for this story.
-- Add/update tests required to verify acceptance criteria and prevent regressions.
+- Implement `GET /api/organization` for manager/admin read access.
+- Implement `PATCH /api/organization` for admin-only organization-name updates.
+- Enforce role authorization and organization isolation using authenticated JWT context.
+- Add backend integration tests and frontend tests for happy/error/authorization paths.
 
 ## 4.2 Explicitly Not Included
 
@@ -76,11 +77,19 @@ Tables implicated by GitHub issue:
 
 # 7. API Contract
 
-Endpoint implications from GitHub issue:
+Implemented endpoints:
 
-- See issue and docs/api_endpoints.md.
+- `GET /api/organization`
+- `PATCH /api/organization`
 
-Final contract must align with docs/api_endpoints.md.
+Behavior:
+
+- Authentication required for both endpoints.
+- Organization identity is derived from validated JWT claims, never from client input.
+- `GET /api/organization` allows `manager` and `admin` roles.
+- `PATCH /api/organization` allows `admin` role only.
+- `PATCH /api/organization` accepts `{ "name": "..." }` and validates string, trimmed, non-empty, max length 255.
+- Errors follow the shared envelope (`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_ERROR`).
 
 # 8. Data Flow
 
@@ -102,12 +111,12 @@ Final contract must align with docs/api_endpoints.md.
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition                  | Expected Behavior                                    |
+| -------------------------- | ---------------------------------------------------- |
+| Validation failure         | Consistent 400-style validation error behavior       |
+| Missing/invalid auth       | Protected endpoints reject unauthorized access       |
+| Cross-organization access  | Deny access per organization isolation               |
+| Unexpected backend failure | Controlled error response without partial corruption |
 
 # 12. Test Requirements
 
@@ -217,11 +226,11 @@ Repository currently has partial/no app scaffold assumptions depending on ticket
 
 # 18. Definition of Done
 
-- [ ] Acceptance criteria implemented and verified.
+- [x] Acceptance criteria implemented and verified.
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [x] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
+- [x] Organization isolation and authorization requirements are verified.
+- [x] No unrelated scope changes introduced.
 
 # 19. Manual QA
 
@@ -260,27 +269,51 @@ Mitigation:
 
 Implemented
 
-- [to be filled during implementation]
+- Added backend organization module with route -> validation -> service -> repository flow for organization retrieval and update.
+- Added role-based authorization guard for manager/admin read and admin-only update.
+- Added frontend organization API client and settings page for viewing organization information and admin updates.
+- Added frontend route `/settings` behind existing protected-route guard.
+- Added backend integration and frontend test coverage for US-005 behavior.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/app.js
+- ddd/backend/src/routes/apiRoutes.js
+- ddd/backend/src/organization/organizationRepository.js
+- ddd/backend/src/organization/organizationRoutes.js
+- ddd/backend/src/organization/organizationService.js
+- ddd/backend/src/organization/organizationValidation.js
+- ddd/backend/tests/integration/organization.test.js
+- ddd/frontend/src/api/organizationApi.js
+- ddd/frontend/src/app/router.jsx
+- ddd/frontend/src/pages/SettingsPage.jsx
+- ddd/frontend/src/tests/settings-page.test.jsx
 
 Tests Added
 
-- [to be filled during implementation]
+- ddd/backend/tests/integration/organization.test.js
+- ddd/frontend/src/tests/settings-page.test.jsx
 
 Tests Run
 
-npm test
+- npm run test --prefix ddd/backend -- tests/integration/organization.test.js
+- npm run test --prefix ddd/frontend -- src/tests/settings-page.test.jsx
+- npm run test:integration --prefix ddd/backend
+- npm test
+- npm run lint
+- npm run build
+- npm run test:e2e
 
 Result:
 
-PASS / FAIL
+PASS
 
 Manual QA Required
 
-- [to be filled during implementation]
+- Log in as admin and navigate to /settings.
+- Verify organization name loads and can be updated.
+- Log in as manager and verify organization data loads but update controls are unavailable.
+- Verify logout/login preserves expected access behavior and organization name updates are reflected.
 
 Documentation Updated
 
@@ -288,8 +321,8 @@ Documentation Updated
 
 Known Limitations
 
-- [to be filled during implementation]
+- This story does not implement organization settings updates (`rep_visibility`, `timezone`); those remain scoped to separate settings endpoints/stories.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- None identified within US-005 scope.

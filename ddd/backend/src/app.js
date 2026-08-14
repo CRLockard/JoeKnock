@@ -20,7 +20,11 @@ function parseCorsOrigins(value) {
     .filter(Boolean);
 }
 
-export function createApp({ db = { query }, authService } = {}) {
+export function createApp({
+  db = { query },
+  authService,
+  organizationService,
+} = {}) {
   const app = express();
 
   app.use(requestIdMiddleware);
@@ -57,7 +61,7 @@ export function createApp({ db = { query }, authService } = {}) {
   });
 
   app.use(buildHealthRoutes({ db }));
-  app.use('/api', buildApiRoutes({ authService }));
+  app.use('/api', buildApiRoutes({ authService, organizationService }));
 
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);

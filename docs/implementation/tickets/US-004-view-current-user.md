@@ -111,12 +111,12 @@ Behavior:
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition                  | Expected Behavior                                    |
+| -------------------------- | ---------------------------------------------------- |
+| Validation failure         | Consistent 400-style validation error behavior       |
+| Missing/invalid auth       | Protected endpoints reject unauthorized access       |
+| Cross-organization access  | Deny access per organization isolation               |
+| Unexpected backend failure | Controlled error response without partial corruption |
 
 # 12. Test Requirements
 

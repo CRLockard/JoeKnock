@@ -4,12 +4,23 @@ import { authMiddleware } from '../middleware/authMiddleware.js';
 import { validate } from '../validation/validate.js';
 import { buildAuthRoutes } from '../auth/authRoutes.js';
 import { createAuthService } from '../auth/authService.js';
+import { buildOrganizationRoutes } from '../organization/organizationRoutes.js';
+import { createOrganizationService } from '../organization/organizationService.js';
 
-export function buildApiRoutes({ authService } = {}) {
+export function buildApiRoutes({ authService, organizationService } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
+  const resolvedOrganizationService =
+    organizationService ?? createOrganizationService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
+  router.use(
+    '/organization',
+    authMiddleware,
+    buildOrganizationRoutes({
+      organizationService: resolvedOrganizationService,
+    }),
+  );
 
   router.get('/me', authMiddleware, async (req, res, next) => {
     try {

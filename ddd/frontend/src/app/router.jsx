@@ -4,6 +4,7 @@ import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { MapPage } from '../pages/MapPage.jsx';
 import { ProfilePage } from '../pages/ProfilePage.jsx';
+import { SettingsPage } from '../pages/SettingsPage.jsx';
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings',
+        element: (
+          <ProtectedRoute>
+            <SettingsPage />
           </ProtectedRoute>
         ),
       },
