@@ -12,11 +12,17 @@ import { App } from '../app/App.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { UsersPage } from '../pages/UsersPage.jsx';
-import { createUser, getUsers, updateUser } from '../api/usersApi.js';
+import {
+  createUser,
+  getUsers,
+  setUserActive,
+  updateUser,
+} from '../api/usersApi.js';
 
 vi.mock('../api/usersApi.js', () => ({
   createUser: vi.fn(),
   getUsers: vi.fn(),
+  setUserActive: vi.fn(),
   updateUser: vi.fn(),
 }));
 
@@ -316,6 +322,148 @@ describe('users page', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid request data.',
+    );
+  });
+
+  it('deactivates a user for admin role', async () => {
+    setStoredUser('admin');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    setUserActive.mockResolvedValue({
+      id: 'user-2',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      email: 'jane@example.com',
+      role: 'rep',
+      organizationId: 'org-1',
+      isActive: false,
+    });
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Deactivate Jane Smith' }),
+    );
+
+    await waitFor(() => {
+      expect(setUserActive).toHaveBeenCalledWith('user-2', false);
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Jane Smith is now inactive.',
+    );
+    expect(
+      await screen.findByText('Jane Smith (jane@example.com) - rep - Inactive'),
+    ).toBeInTheDocument();
+  });
+
+  it('reactivates an inactive user for admin role', async () => {
+    setStoredUser('admin');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: false,
+      },
+    ]);
+
+    setUserActive.mockResolvedValue({
+      id: 'user-2',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      email: 'jane@example.com',
+      role: 'rep',
+      organizationId: 'org-1',
+      isActive: true,
+    });
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Inactive');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reactivate Jane Smith' }),
+    );
+
+    await waitFor(() => {
+      expect(setUserActive).toHaveBeenCalledWith('user-2', true);
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Jane Smith is now active.',
+    );
+  });
+
+  it('does not render deactivate controls for manager role', async () => {
+    setStoredUser('manager');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+
+    expect(
+      screen.queryByRole('button', { name: 'Deactivate Jane Smith' }),
+    ).not.toBeInTheDocument();
+    expect(setUserActive).not.toHaveBeenCalled();
+  });
+
+  it('shows API error when deactivate request fails', async () => {
+    setStoredUser('admin');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    setUserActive.mockRejectedValue(new Error('User not found.'));
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Deactivate Jane Smith' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'User not found.',
     );
   });
 

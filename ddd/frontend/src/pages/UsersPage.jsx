@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { createUser, getUsers, updateUser } from '../api/usersApi.js';
+import {
+  createUser,
+  getUsers,
+  setUserActive,
+  updateUser,
+} from '../api/usersApi.js';
 import { useAuth } from '../auth/useAuth.js';
 
 const DEFAULT_FORM = {
@@ -28,6 +33,8 @@ export function UsersPage() {
   const [editError, setEditError] = useState('');
   const [editSuccessMessage, setEditSuccessMessage] = useState('');
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [isSetActiveSubmitting, setIsSetActiveSubmitting] = useState(false);
+  const [setActiveUserId, setSetActiveUserId] = useState('');
   const [form, setForm] = useState(DEFAULT_FORM);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -35,6 +42,7 @@ export function UsersPage() {
 
   const canManageUsers =
     auth.user?.role === 'admin' || auth.user?.role === 'manager';
+  const canSetActive = auth.user?.role === 'admin';
 
   useEffect(() => {
     if (!canManageUsers) {
@@ -213,6 +221,45 @@ export function UsersPage() {
     }
   }
 
+  async function handleSetUserActive(user, isActive) {
+    setEditError('');
+    setEditSuccessMessage('');
+
+    if (!canSetActive) {
+      setEditError('Only administrators can change user active status.');
+      return;
+    }
+
+    setIsSetActiveSubmitting(true);
+    setSetActiveUserId(user.id);
+
+    try {
+      const updated = await setUserActive(user.id, isActive);
+      setUsers((previousUsers) =>
+        previousUsers.map((currentUser) =>
+          currentUser.id === updated.id
+            ? {
+                ...currentUser,
+                ...updated,
+              }
+            : currentUser,
+        ),
+      );
+      setEditSuccessMessage(
+        `${updated.firstName} ${updated.lastName} is now ${
+          updated.isActive ? 'active' : 'inactive'
+        }.`,
+      );
+    } catch (submitError) {
+      setEditError(
+        submitError.message || 'Unable to update user active status.',
+      );
+    } finally {
+      setIsSetActiveSubmitting(false);
+      setSetActiveUserId('');
+    }
+  }
+
   return (
     <section>
       <h2>User Management</h2>
@@ -277,10 +324,25 @@ export function UsersPage() {
                   <button
                     type="button"
                     onClick={() => startEditingUser(user)}
-                    disabled={isEditSubmitting}
+                    disabled={isEditSubmitting || isSetActiveSubmitting}
                   >
                     Edit {user.firstName} {user.lastName}
                   </button>
+                  {canSetActive ? (
+                    <button
+                      type="button"
+                      onClick={() => handleSetUserActive(user, !user.isActive)}
+                      disabled={isSetActiveSubmitting || isEditSubmitting}
+                    >
+                      {isSetActiveSubmitting && setActiveUserId === user.id
+                        ? user.isActive
+                          ? 'Deactivating...'
+                          : 'Reactivating...'
+                        : user.isActive
+                          ? `Deactivate ${user.firstName} ${user.lastName}`
+                          : `Reactivate ${user.firstName} ${user.lastName}`}
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>

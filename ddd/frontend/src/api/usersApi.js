@@ -30,3 +30,10 @@ export function updateUser(userId, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function setUserActive(userId, isActive) {
+  return apiFetch(`/users/${userId}/active`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  });
+}

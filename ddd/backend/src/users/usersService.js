@@ -45,6 +45,22 @@ export function createUsersService({
   passwordHasher = hashPassword,
 } = {}) {
   return {
+    async setUserActiveStatus({ organizationId, userId, isActive }) {
+      const updatedUser = await runInTransaction(async (client) => {
+        return repository.setUserActiveStatus(client, {
+          organizationId,
+          userId,
+          isActive,
+        });
+      });
+
+      if (!updatedUser) {
+        throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
+      }
+
+      return toPublicUser(updatedUser);
+    },
+
     async updateUser({ organizationId, userId, firstName, lastName, role }) {
       if (!hasAnyUpdatableField({ firstName, lastName, role })) {
         throw new AppError(

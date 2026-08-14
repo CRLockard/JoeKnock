@@ -4,6 +4,7 @@ import { createUsersService } from './usersService.js';
 import {
   createUserValidators,
   listUsersValidators,
+  updateUserActiveValidators,
   updateUserValidators,
 } from './usersValidation.js';
 import { validate } from '../validation/validate.js';
@@ -90,6 +91,26 @@ export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
           firstName: req.body.firstName,
           lastName: req.body.lastName,
           role: req.body.role,
+        });
+
+        return res.status(200).json(updatedUser);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
+  router.patch(
+    '/:id/active',
+    requireRoles(['admin']),
+    updateUserActiveValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const updatedUser = await usersService.setUserActiveStatus({
+          userId: req.params.id,
+          organizationId: req.auth.organizationId,
+          isActive: req.body.isActive,
         });
 
         return res.status(200).json(updatedUser);

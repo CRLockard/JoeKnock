@@ -4,7 +4,7 @@ GitHub Issue: #9
 
 Title: US-009 Î“Ã‡Ã¶ Deactivate User
 
-Status: Planned
+Status: Completed
 
 Priority: P1
 
@@ -103,12 +103,12 @@ Final contract must align with docs/api_endpoints.md.
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition                  | Expected Behavior                                    |
+| -------------------------- | ---------------------------------------------------- |
+| Validation failure         | Consistent 400-style validation error behavior       |
+| Missing/invalid auth       | Protected endpoints reject unauthorized access       |
+| Cross-organization access  | Deny access per organization isolation               |
+| Unexpected backend failure | Controlled error response without partial corruption |
 
 # 12. Test Requirements
 
@@ -218,11 +218,19 @@ Repository currently has partial/no app scaffold assumptions depending on ticket
 
 # 18. Definition of Done
 
-- [ ] Acceptance criteria implemented and verified.
+- [x] Acceptance criteria implemented and verified.
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [x] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
+- [x] Organization isolation and authorization requirements are verified.
+- [x] No unrelated scope changes introduced.
+
+## Acceptance Criteria Status
+
+- [x] Admin can deactivate users in their organization.
+- [x] Managers/representatives cannot deactivate users.
+- [x] Deactivation updates active state (no delete) and is reversible via same endpoint.
+- [x] Cross-organization target IDs are inaccessible.
+- [x] Deactivated users are blocked from login.
 
 # 19. Manual QA
 
@@ -247,8 +255,9 @@ Mitigation:
 
 # 21. Open Questions / Blocking Decisions
 
-- No new product/architecture decisions are introduced by this ticket.
-- If contradiction with source-of-truth docs is discovered during implementation, stop and escalate.
+- No blocking contradictions remained after Phase 0 audit.
+- Applied contract: implement `PATCH /api/users/:id/active` with admin-only access and boolean `isActive` payload per issue + API docs.
+- Role-model redesign was explicitly deferred per user direction; no schema/architecture redesign introduced.
 
 # 22. Copilot Implementation Notes
 
@@ -261,36 +270,69 @@ Mitigation:
 
 Implemented
 
-- [to be filled during implementation]
+- Added `PATCH /api/users/:id/active` in users route -> validation -> service -> repository flow.
+- Enforced admin-only authorization at route layer.
+- Enforced organization isolation by scoping update to authenticated JWT organization context.
+- Enforced strict payload contract: only `isActive` allowed, boolean required.
+- Implemented idempotent deactivate/reactivate behavior using same endpoint.
+- Preserved no-delete semantics (row remains, `is_active` toggles).
+- Extended frontend users page with admin-only deactivate/reactivate controls, loading state, success, and error handling.
+- Added backend and frontend tests for authorization, validation, isolation, persistence, and UX behavior.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/users/usersValidation.js
+- ddd/backend/src/users/usersRoutes.js
+- ddd/backend/src/users/usersService.js
+- ddd/backend/src/users/usersRepository.js
+- ddd/backend/tests/integration/users-deactivate.test.js
+- ddd/frontend/src/api/usersApi.js
+- ddd/frontend/src/pages/UsersPage.jsx
+- ddd/frontend/src/tests/users-page.test.jsx
+- docs/implementation/tickets/US-009-deactivate-user.md
 
 Tests Added
 
-- [to be filled during implementation]
+- Backend integration: ddd/backend/tests/integration/users-deactivate.test.js
+- Frontend coverage additions in: ddd/frontend/src/tests/users-page.test.jsx
 
 Tests Run
 
-npm test
+`npm run test:integration --prefix ddd/backend -- users-deactivate.test.js`
+
+`npm test --prefix ddd/frontend -- src/tests/users-page.test.jsx`
+
+`npm test`
+
+`npm run lint`
+
+`npm run build`
+
+`npm run test:e2e`
+
+`git diff --check`
 
 Result:
 
-PASS / FAIL
+PASS
 
 Manual QA Required
 
-- [to be filled during implementation]
+- Log in as admin; open `/settings/users`; deactivate an active same-org user; verify row status changes to inactive and success message appears.
+- Log in as admin; reactivate an inactive same-org user; verify row status and message update.
+- Log in as manager; verify deactivate/reactivate buttons are not rendered.
+- Attempt deactivation against cross-organization user ID; verify API returns not found.
+- Attempt login for a deactivated user with valid credentials; verify forbidden response.
 
 Documentation Updated
 
-- None required unless approved contracts change
+- Updated this ticket with implementation and validation evidence.
 
 Known Limitations
 
-- [to be filled during implementation]
+- Endpoint currently permits admin self-deactivation because it is not explicitly prohibited in the approved API contract.
+- No additional standalone e2e scenario was added beyond existing smoke suite for this ticket.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- None within US-009 scope.

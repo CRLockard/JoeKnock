@@ -2,6 +2,7 @@ import { body, param, query } from 'express-validator';
 
 const USER_ROLES = ['admin', 'manager', 'rep'];
 const MUTABLE_USER_FIELDS = ['firstName', 'lastName', 'role'];
+const USER_ACTIVE_MUTABLE_FIELDS = ['isActive'];
 
 export const createUserValidators = [
   body('firstName').isString().trim().notEmpty().isLength({ max: 100 }),
@@ -65,4 +66,32 @@ export const updateUserValidators = [
     .notEmpty()
     .isLength({ max: 100 }),
   body('role').optional().isString().trim().isIn(USER_ROLES),
+];
+
+export const updateUserActiveValidators = [
+  param('id').isUUID(),
+  body().custom((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Request body must be an object.');
+    }
+
+    const providedFields = Object.keys(value);
+
+    if (providedFields.length === 0) {
+      throw new Error('isActive is required.');
+    }
+
+    const disallowedFields = providedFields.filter(
+      (field) => !USER_ACTIVE_MUTABLE_FIELDS.includes(field),
+    );
+
+    if (disallowedFields.length > 0) {
+      throw new Error(
+        `Unsupported fields for user activation update: ${disallowedFields.join(', ')}.`,
+      );
+    }
+
+    return true;
+  }),
+  body('isActive').exists().isBoolean(),
 ];

@@ -73,6 +73,18 @@ function buildUpdateUserQuery({
   };
 }
 
+function buildUpdateUserActiveQuery({ organizationId, userId, isActive }) {
+  return {
+    text: `
+      UPDATE users
+      SET is_active = $3, updated_at = now()
+      WHERE organization_id = $1 AND id = $2
+      RETURNING id, organization_id, email, first_name, last_name, role, is_active, created_at, updated_at
+    `,
+    values: [organizationId, userId, isActive],
+  };
+}
+
 export const usersRepository = {
   async createUser(
     client,
@@ -115,6 +127,17 @@ export const usersRepository = {
       firstName,
       lastName,
       role,
+    });
+
+    const result = await client.query(sql.text, sql.values);
+    return result.rows[0] ?? null;
+  },
+
+  async setUserActiveStatus(client, { organizationId, userId, isActive }) {
+    const sql = buildUpdateUserActiveQuery({
+      organizationId,
+      userId,
+      isActive,
     });
 
     const result = await client.query(sql.text, sql.values);
