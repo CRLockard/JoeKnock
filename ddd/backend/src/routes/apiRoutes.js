@@ -6,12 +6,19 @@ import { buildAuthRoutes } from '../auth/authRoutes.js';
 import { createAuthService } from '../auth/authService.js';
 import { buildOrganizationRoutes } from '../organization/organizationRoutes.js';
 import { createOrganizationService } from '../organization/organizationService.js';
+import { buildUsersRoutes } from '../users/usersRoutes.js';
+import { createUsersService } from '../users/usersService.js';
 
-export function buildApiRoutes({ authService, organizationService } = {}) {
+export function buildApiRoutes({
+  authService,
+  organizationService,
+  usersService,
+} = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
   const resolvedOrganizationService =
     organizationService ?? createOrganizationService();
+  const resolvedUsersService = usersService ?? createUsersService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
   router.use(
@@ -19,6 +26,13 @@ export function buildApiRoutes({ authService, organizationService } = {}) {
     authMiddleware,
     buildOrganizationRoutes({
       organizationService: resolvedOrganizationService,
+    }),
+  );
+  router.use(
+    '/users',
+    authMiddleware,
+    buildUsersRoutes({
+      usersService: resolvedUsersService,
     }),
   );
 

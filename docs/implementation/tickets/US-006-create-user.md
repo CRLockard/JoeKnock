@@ -2,9 +2,9 @@
 
 GitHub Issue: #6
 
-Title: US-006 Î“Ã‡Ã¶ Create User
+Title: US-006 - Create User
 
-Status: Planned
+Status: Completed
 
 Priority: P0
 
@@ -31,15 +31,18 @@ Use the GitHub issue body as the approved user-story intent.
 
 # 3. Objective
 
-Implement this user story according to the finalized MVP source of truth and corrected GitHub issue requirements.
+Implement organization-scoped user creation for MVP through `POST /api/users` with manager/admin authorization, secure password hashing, server-derived organization ownership, and safe response fields.
 
 # 4. Scope
 
 ## 4.1 Included
 
-- Implement behavior described in the corrected GitHub issue and finalized master spec.
-- Enforce organization isolation, authorization, and API/schema contract consistency for this story.
-- Add/update tests required to verify acceptance criteria and prevent regressions.
+- Implement backend `POST /api/users` endpoint using existing route -> validation -> service -> repository architecture.
+- Enforce manager/admin authorization and authenticated organization scoping.
+- Hash passwords using existing Argon2id utility and persist new users as active by default.
+- Return only non-sensitive user fields (never password hash).
+- Add frontend user-creation workflow at `/settings/users` and associated tests.
+- Add backend integration tests covering authorization, validation, uniqueness, and organization isolation.
 
 ## 4.2 Explicitly Not Included
 
@@ -77,11 +80,21 @@ Tables implicated by GitHub issue:
 
 # 7. API Contract
 
-Endpoint implications from GitHub issue:
+Implemented endpoint:
 
-- POST /api/users
+- `POST /api/users`
 
-Final contract must align with docs/api_endpoints.md.
+Behavior:
+
+- Authentication required.
+- Authorization: `manager` and `admin` allowed; `rep` denied.
+- Organization ownership comes from authenticated JWT context and cannot be selected by client payload.
+- Request fields: `firstName`, `lastName`, `email`, `password`, `role`.
+- `role` accepted values: `admin`, `manager`, `rep`.
+- New users are created with `isActive = true`.
+- Duplicate email in same organization returns `409 CONFLICT`.
+- Same email across different organizations is allowed.
+- Response excludes password hash and returns safe public fields.
 
 # 8. Data Flow
 
@@ -104,12 +117,12 @@ Final contract must align with docs/api_endpoints.md.
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition                  | Expected Behavior                                    |
+| -------------------------- | ---------------------------------------------------- |
+| Validation failure         | Consistent 400-style validation error behavior       |
+| Missing/invalid auth       | Protected endpoints reject unauthorized access       |
+| Cross-organization access  | Deny access per organization isolation               |
+| Unexpected backend failure | Controlled error response without partial corruption |
 
 # 12. Test Requirements
 
@@ -221,15 +234,15 @@ Repository currently has partial/no app scaffold assumptions depending on ticket
 
 # 18. Definition of Done
 
-- [ ] Acceptance criteria are implemented and verified.
-- [ ] Frontend behavior is validated for the intended field workflow and error states.
-- [ ] API behavior matches the documented contract and authorization rules.
-- [ ] Persistence changes align with the documented MVP schema and preserve historical integrity.
-- [ ] Automated tests are added or updated where appropriate for the changed behavior.
+- [x] Acceptance criteria are implemented and verified.
+- [x] Frontend behavior is validated for the intended field workflow and error states.
+- [x] API behavior matches the documented contract and authorization rules.
+- [x] Persistence changes align with the documented MVP schema and preserve historical integrity.
+- [x] Automated tests are added or updated where appropriate for the changed behavior.
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [x] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
+- [x] Organization isolation and authorization requirements are verified.
+- [x] No unrelated scope changes introduced.
 
 # 19. Manual QA
 
@@ -268,27 +281,56 @@ Mitigation:
 
 Implemented
 
-- [to be filled during implementation]
+- Added backend users module for `POST /api/users`:
+  - `usersRoutes` for endpoint + role guard + validation wiring.
+  - `usersValidation` for request-shape rules.
+  - `usersService` for organization-scoped creation, hashing, and conflict mapping.
+  - `usersRepository` for users table insert.
+- Wired `/api/users` into API routing behind existing auth middleware.
+- Added frontend API client `createUser()`.
+- Added protected frontend page `/settings/users` with create-user form, loading/submission states, and error/success feedback.
+- Added backend integration tests and frontend tests for US-006 acceptance criteria.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/app.js
+- ddd/backend/src/routes/apiRoutes.js
+- ddd/backend/src/users/usersRepository.js
+- ddd/backend/src/users/usersRoutes.js
+- ddd/backend/src/users/usersService.js
+- ddd/backend/src/users/usersValidation.js
+- ddd/backend/tests/integration/users-create.test.js
+- ddd/frontend/src/api/usersApi.js
+- ddd/frontend/src/app/router.jsx
+- ddd/frontend/src/pages/UsersPage.jsx
+- ddd/frontend/src/tests/users-page.test.jsx
 
 Tests Added
 
-- [to be filled during implementation]
+- ddd/backend/tests/integration/users-create.test.js
+- ddd/frontend/src/tests/users-page.test.jsx
 
 Tests Run
 
-npm test
+- npm run test --prefix ddd/backend -- tests/integration/users-create.test.js
+- npm run test --prefix ddd/frontend -- src/tests/users-page.test.jsx
+- npm run test:integration --prefix ddd/backend
+- npm test
+- npm run lint
+- npm run build
+- npm run test:e2e
 
 Result:
 
-PASS / FAIL
+PASS
 
 Manual QA Required
 
-- [to be filled during implementation]
+- Log in as manager and create a representative user from `/settings/users`.
+- Log in as admin and create a manager/admin user from `/settings/users`.
+- Confirm duplicate email in same organization is rejected with error feedback.
+- Confirm representative accounts cannot create users.
+- Confirm created users can log in and are active by default.
 
 Documentation Updated
 
@@ -296,8 +338,8 @@ Documentation Updated
 
 Known Limitations
 
-- [to be filled during implementation]
+- This ticket only implements create-user behavior (`POST /api/users`) and does not implement user listing/editing/deactivation flows from later stories.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- None identified for US-006 scope.

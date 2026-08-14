@@ -5,6 +5,7 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { MapPage } from '../pages/MapPage.jsx';
 import { ProfilePage } from '../pages/ProfilePage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
+import { UsersPage } from '../pages/UsersPage.jsx';
 
 export const router = createBrowserRouter([
   {
@@ -34,6 +35,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/users',
+        element: (
+          <ProtectedRoute>
+            <UsersPage />
           </ProtectedRoute>
         ),
       },

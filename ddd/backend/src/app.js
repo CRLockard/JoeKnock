@@ -24,6 +24,7 @@ export function createApp({
   db = { query },
   authService,
   organizationService,
+  usersService,
 } = {}) {
   const app = express();
 
@@ -61,7 +62,10 @@ export function createApp({
   });
 
   app.use(buildHealthRoutes({ db }));
-  app.use('/api', buildApiRoutes({ authService, organizationService }));
+  app.use(
+    '/api',
+    buildApiRoutes({ authService, organizationService, usersService }),
+  );
 
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);
