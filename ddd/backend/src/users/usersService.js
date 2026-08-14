@@ -25,12 +25,32 @@ function isUniqueViolation(error) {
   return error && error.code === '23505';
 }
 
+function parseActiveFilter(active) {
+  if (active === undefined) {
+    return undefined;
+  }
+
+  return active === 'true';
+}
+
 export function createUsersService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
   passwordHasher = hashPassword,
 } = {}) {
   return {
+    async listUsers({ organizationId, active, role }) {
+      const rows = await runInTransaction(async (client) => {
+        return repository.listUsers(client, {
+          organizationId,
+          active: parseActiveFilter(active),
+          role,
+        });
+      });
+
+      return rows.map(toPublicUser);
+    },
+
     async createUser({
       organizationId,
       firstName,

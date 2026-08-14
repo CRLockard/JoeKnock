@@ -12,10 +12,11 @@ import { App } from '../app/App.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { UsersPage } from '../pages/UsersPage.jsx';
-import { createUser } from '../api/usersApi.js';
+import { createUser, getUsers } from '../api/usersApi.js';
 
 vi.mock('../api/usersApi.js', () => ({
   createUser: vi.fn(),
+  getUsers: vi.fn(),
 }));
 
 function setStoredUser(role) {
@@ -67,8 +68,72 @@ afterEach(() => {
 });
 
 describe('users page', () => {
+  it('loads organization users for authorized role and applies filters', async () => {
+    setStoredUser('manager');
+
+    getUsers
+      .mockResolvedValueOnce([
+        {
+          id: 'user-2',
+          firstName: 'Ana',
+          lastName: 'Manager',
+          email: 'ana.manager@example.com',
+          role: 'manager',
+          isActive: true,
+          organizationId: 'org-1',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'user-2',
+          firstName: 'Ana',
+          lastName: 'Manager',
+          email: 'ana.manager@example.com',
+          role: 'manager',
+          isActive: true,
+          organizationId: 'org-1',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'user-2',
+          firstName: 'Ana',
+          lastName: 'Manager',
+          email: 'ana.manager@example.com',
+          role: 'manager',
+          isActive: true,
+          organizationId: 'org-1',
+        },
+      ]);
+
+    renderUsersPage();
+
+    expect(
+      await screen.findByText(
+        'Ana Manager (ana.manager@example.com) - manager - Active',
+      ),
+    ).toBeInTheDocument();
+    expect(getUsers).toHaveBeenCalledWith({});
+
+    fireEvent.change(screen.getByLabelText('Active status'), {
+      target: { value: 'active' },
+    });
+    fireEvent.change(screen.getByLabelText('Role filter'), {
+      target: { value: 'manager' },
+    });
+
+    await waitFor(() => {
+      expect(getUsers).toHaveBeenCalledWith({
+        active: true,
+        role: 'manager',
+      });
+    });
+  });
+
   it('creates a user for authorized role', async () => {
     setStoredUser('manager');
+
+    getUsers.mockResolvedValue([]);
 
     createUser.mockResolvedValue({
       id: 'user-2',
@@ -117,6 +182,7 @@ describe('users page', () => {
 
   it('shows API error when create user fails', async () => {
     setStoredUser('admin');
+    getUsers.mockResolvedValue([]);
     createUser.mockRejectedValue(new Error('Invalid request data.'));
 
     renderUsersPage();
@@ -146,10 +212,27 @@ describe('users page', () => {
 
     renderUsersPage();
 
+    expect(getUsers).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        'Only managers and administrators can view organization users.',
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('Only managers and administrators can create users.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('First name')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Create user' })).toBeDisabled();
+  });
+
+  it('shows API error when user listing fails', async () => {
+    setStoredUser('admin');
+    getUsers.mockRejectedValue(new Error('Unable to load users.'));
+
+    renderUsersPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load users.',
+    );
   });
 });

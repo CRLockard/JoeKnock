@@ -2,9 +2,9 @@
 
 GitHub Issue: #7
 
-Title: US-007 Î“Ã‡Ã¶ View Organization Users
+Title: US-007 - View Organization Users
 
-Status: Planned
+Status: In Progress
 
 Priority: P1
 
@@ -103,12 +103,12 @@ Final contract must align with docs/api_endpoints.md.
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition                  | Expected Behavior                                    |
+| -------------------------- | ---------------------------------------------------- |
+| Validation failure         | Consistent 400-style validation error behavior       |
+| Missing/invalid auth       | Protected endpoints reject unauthorized access       |
+| Cross-organization access  | Deny access per organization isolation               |
+| Unexpected backend failure | Controlled error response without partial corruption |
 
 # 12. Test Requirements
 
@@ -220,9 +220,19 @@ Repository currently has partial/no app scaffold assumptions depending on ticket
 
 - [ ] Acceptance criteria implemented and verified.
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [x] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
+- [x] Organization isolation and authorization requirements are verified.
+- [x] No unrelated scope changes introduced.
+
+## Acceptance Criteria Status
+
+- [x] Authorized users can retrieve organization users.
+- [x] Users from other organizations are never returned.
+- [x] Users can be filtered by active status.
+- [x] Users can be filtered by role.
+- [ ] Users can be filtered by team when applicable.
+      Blocked pending teams foundation work (schema/tables and membership flows):
+      US-010, US-011, US-012, and US-013.
 
 # 19. Manual QA
 
@@ -247,8 +257,10 @@ Mitigation:
 
 # 21. Open Questions / Blocking Decisions
 
-- No new product/architecture decisions are introduced by this ticket.
-- If contradiction with source-of-truth docs is discovered during implementation, stop and escalate.
+- Team-based filtering for `GET /api/users?teamId=<uuid>` is blocked in strict scope.
+- Current applied schema includes organizations, organization_settings, and users only.
+- `teams` and `team_users` support is deferred to teams foundation tickets (US-010 through US-013).
+- This ticket intentionally rejects `teamId` with validation error until that foundation is implemented.
 
 # 22. Copilot Implementation Notes
 
@@ -261,27 +273,46 @@ Mitigation:
 
 Implemented
 
-- [to be filled during implementation]
+- Added `GET /api/users` manager/admin endpoint with organization-scoped listing.
+- Implemented active and role query filters (`active=true|false`, `role=admin|manager|rep`).
+- Preserved strict organization isolation using authenticated organization context.
+- Added frontend organization user listing on `/settings/users` with active/role filter controls.
+- Added explicit blocked handling for `teamId` filter via validation error.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/users/usersRoutes.js
+- ddd/backend/src/users/usersService.js
+- ddd/backend/src/users/usersRepository.js
+- ddd/backend/src/users/usersValidation.js
+- ddd/backend/tests/integration/users-list.test.js
+- ddd/frontend/src/api/usersApi.js
+- ddd/frontend/src/pages/UsersPage.jsx
+- ddd/frontend/src/tests/users-page.test.jsx
+- docs/implementation/tickets/US-007-view-organization-users.md
 
 Tests Added
 
-- [to be filled during implementation]
+- Backend integration: `ddd/backend/tests/integration/users-list.test.js`
+- Frontend page coverage updates: `ddd/frontend/src/tests/users-page.test.jsx`
 
 Tests Run
 
-npm test
+`npm test --prefix ddd/backend -- users-list.test.js`
+
+`npm test --prefix ddd/frontend -- users-page.test.jsx`
 
 Result:
 
-PASS / FAIL
+PASS
 
 Manual QA Required
 
-- [to be filled during implementation]
+- Log in as manager and verify `/settings/users` displays organization users.
+- Apply active filter and verify only active/inactive users are shown.
+- Apply role filter and verify only selected role is shown.
+- Confirm representative users cannot list organization users.
+- Confirm `GET /api/users?teamId=<uuid>` returns validation error until teams foundation tickets are completed.
 
 Documentation Updated
 
@@ -289,8 +320,10 @@ Documentation Updated
 
 Known Limitations
 
-- [to be filled during implementation]
+- `teamId` filtering is intentionally blocked and returns a validation error.
+- No `teams`/`team_users` schema or membership behavior is introduced in this ticket.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- Complete team-based filtering once teams foundation tickets are implemented:
+  US-010 (Create Team), US-011 (View Teams), US-012 (Add User to Team), US-013 (Remove User from Team).

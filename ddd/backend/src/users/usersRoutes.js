@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { AppError } from '../common/errors.js';
 import { createUsersService } from './usersService.js';
-import { createUserValidators } from './usersValidation.js';
+import {
+  createUserValidators,
+  listUsersValidators,
+} from './usersValidation.js';
 import { validate } from '../validation/validate.js';
 
 function requireRoles(allowedRoles) {
@@ -28,6 +31,26 @@ function requireRoles(allowedRoles) {
 
 export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
   const router = Router();
+
+  router.get(
+    '/',
+    requireRoles(['manager', 'admin']),
+    listUsersValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const users = await usersService.listUsers({
+          organizationId: req.auth.organizationId,
+          active: req.query.active,
+          role: req.query.role,
+        });
+
+        return res.status(200).json(users);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
 
   router.post(
     '/',
