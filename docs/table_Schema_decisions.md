@@ -99,6 +99,12 @@ Human-facing labels:
 
 ### Timezone behavior
 
+- `timezone` is required during `POST /api/auth/register` and is supplied by the client as an organization setting value.
+- `timezone` must be a valid IANA timezone identifier.
+- Registration does not infer timezone from server/browser/user location.
+- Registration does not apply a silent default or hidden fallback timezone.
+- The submitted registration timezone is stored in `organization_settings.timezone`.
+- The organization timezone can later be changed through `PATCH /api/organization/settings`.
 - All timestamps are stored in UTC.
 - The organization `timezone` setting is authoritative for reporting and export date interpretation/presentation.
 

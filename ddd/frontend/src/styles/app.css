@@ -1,0 +1,30 @@
+:root {
+  font-family:
+    Segoe UI,
+    sans-serif;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f7f7;
+  color: #1c1c1c;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: 1rem 1.25rem;
+  background: #0f2f5f;
+  color: #ffffff;
+}
+
+.app-main {
+  padding: 1.25rem;
+}

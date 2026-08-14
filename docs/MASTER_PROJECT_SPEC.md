@@ -384,6 +384,7 @@ Current documented inventory: 34 endpoints. [CONSISTENT]
 
 Core contract highlights:
 
+- POST /api/auth/register requires a client-supplied organization timezone (IANA identifier); registration does not infer or silently default timezone.
 - POST /api/properties/resolve is the MVP geocoding/property resolution gateway.
 - POST /api/properties/:propertyId/interactions supports interaction creation with idempotency key.
 - POST /api/interactions/:id creates revision snapshots.

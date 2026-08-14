@@ -35,7 +35,7 @@ so that I can begin using JoeKnock.
 Implement initial organization onboarding through POST /api/auth/register so a valid request atomically creates:
 
 - One organization
-- One organization_settings record linked to that organization, initialized to satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required and initialized per the finalized organization timezone contract)
+- One organization_settings record linked to that organization, initialized to satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required, submitted in registration as a valid IANA timezone identifier, and stored without inference/default fallback)
 - One administrator user linked to that organization with a securely hashed password
 - Authentication response data for immediate signed-in context
 
@@ -83,7 +83,7 @@ Relevant architectural decisions and impacts:
 Components required (framework-agnostic):
 
 - Auth route registration for POST /api/auth/register
-- Request validator for organizationName, firstName, lastName, email, password
+- Request validator for organizationName, firstName, lastName, email, password, timezone
 - Auth service use case for registration transaction
 - Password hashing utility integration
 - Repository/data-access layer methods for organizations, organization_settings, users
@@ -94,13 +94,14 @@ Behavior summary:
 
 1. Validate request body.
 2. Normalize/validate email format.
-3. Check duplicate conditions per API/schema rules.
-4. Start transaction.
-5. Insert organization.
-6. Insert organization_settings linked to organization.
-7. Hash password and insert administrator user linked to organization.
-8. Commit transaction.
-9. Return auth information + newly created user.
+3. Validate timezone as a required IANA timezone identifier.
+4. Check duplicate conditions per API/schema rules.
+5. Start transaction.
+6. Insert organization.
+7. Insert organization_settings linked to organization using the submitted timezone.
+8. Hash password and insert administrator user linked to organization.
+9. Commit transaction.
+10. Return auth information + newly created user.
 
 ## 6.2 Frontend
 
@@ -151,7 +152,8 @@ Not applicable for anonymous registration.
 "firstName": "John",
 "lastName": "Smith",
 "email": "john@example.com",
-"password": "password"
+"password": "password",
+"timezone": "America/New_York"
 }
 
 ## Response
@@ -189,13 +191,16 @@ Registration form submit
 # 9. Business Rules
 
 - Organization registration creates a new organization boundary.
-- Organization settings record is created with each new organization and must satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required and initialized per the finalized organization timezone contract).
+- Organization settings record is created with each new organization and must satisfy finalized MVP schema/API requirements (rep_visibility defaults to "own"; timezone is required, client-supplied in registration, validated as IANA, and stored on organization_settings).
+- Registration must not infer timezone from server/browser/user location.
+- Registration must not silently default timezone or apply a hidden fallback timezone.
 - Initial user is associated to the new organization.
 - Initial user role is administrator.
 - Password is stored only as hash.
 - Duplicate email registration within the same organization is rejected according to the finalized schema/API contract; the same email address may exist in different organizations.
 - Registration failures do not leave partial records.
 - No delete behavior is introduced.
+- The organization timezone can later be changed through organization settings functionality.
 
 # 10. Security Requirements
 
@@ -204,6 +209,7 @@ Registration form submit
 - Do not expose password hash or sensitive internals in response.
 - Prevent duplicate/abusive registration edge cases from causing inconsistent state.
 - Ensure organization ownership is server-defined, never client-supplied.
+- Ensure timezone is explicitly provided by the registration payload and never inferred from execution environment.
 
 # 11. Error Handling
 
@@ -211,6 +217,8 @@ Registration form submit
 | ----------------------------- | ------------------------------------------------------------------ |
 | Missing required input        | 400 validation error with consistent error structure               |
 | Invalid input format          | 400 validation error                                               |
+| Missing timezone              | 400 validation error                                               |
+| Invalid timezone identifier   | 400 validation error                                               |
 | Unauthenticated request       | Not applicable (public endpoint)                                   |
 | Unauthorized request          | Not applicable                                                     |
 | Resource not found            | Not applicable                                                     |

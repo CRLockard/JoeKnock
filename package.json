@@ -1,0 +1,21 @@
+{
+  "name": "joeknock",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix ddd/backend\" \"npm run dev --prefix ddd/frontend\"",
+    "build": "npm run build --prefix ddd/backend && npm run build --prefix ddd/frontend",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "npm run test:unit --prefix ddd/backend && npm run test --prefix ddd/frontend",
+    "test:integration": "npm run test:integration --prefix ddd/backend",
+    "test:e2e": "playwright test -c ddd/frontend/playwright.config.js",
+    "test:watch": "npm run test:watch --prefix ddd/backend",
+    "test:coverage": "npm run test:coverage --prefix ddd/backend && npm run test:coverage --prefix ddd/frontend",
+    "lint": "npm run lint --prefix ddd/backend && npm run lint --prefix ddd/frontend",
+    "format": "npm run format --prefix ddd/backend && npm run format --prefix ddd/frontend"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "concurrently": "^9.0.1"
+  }
+}

@@ -111,9 +111,18 @@ Public.
   "firstName": "John",
   "lastName": "Smith",
   "email": "john@example.com",
-  "password": "password"
+  "password": "password",
+  "timezone": "America/New_York"
 }
 ```
+
+### Validation Rules
+
+- `timezone` is required during registration.
+- `timezone` must be a valid IANA timezone identifier.
+- `timezone` is an organization setting supplied by the client for the new organization.
+- Registration must not infer timezone from server/browser/user location.
+- Registration must not apply a silent default or hidden fallback timezone.
 
 ### Database Interaction
 
@@ -122,6 +131,8 @@ Creates:
 - `organizations`
 - `organization_settings`
 - `users`
+
+`organization_settings.timezone` stores the submitted registration timezone.
 
 The newly created user becomes the initial organization administrator.
 
@@ -328,6 +339,10 @@ PATCH example:
   "timezone": "America/New_York"
 }
 ```
+
+`timezone` must be a valid IANA timezone identifier.
+
+The organization timezone may be changed after registration through this endpoint.
 
 Allowed values:
 
