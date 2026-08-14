@@ -12,11 +12,12 @@ import { App } from '../app/App.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { UsersPage } from '../pages/UsersPage.jsx';
-import { createUser, getUsers } from '../api/usersApi.js';
+import { createUser, getUsers, updateUser } from '../api/usersApi.js';
 
 vi.mock('../api/usersApi.js', () => ({
   createUser: vi.fn(),
   getUsers: vi.fn(),
+  updateUser: vi.fn(),
 }));
 
 function setStoredUser(role) {
@@ -178,6 +179,117 @@ describe('users page', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Created user Jane Smith.',
     );
+  });
+
+  it('updates an existing user for authorized role', async () => {
+    setStoredUser('admin');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    updateUser.mockResolvedValue({
+      id: 'user-2',
+      firstName: 'Janet',
+      lastName: 'Smith',
+      email: 'jane@example.com',
+      role: 'manager',
+      organizationId: 'org-1',
+      isActive: true,
+    });
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
+
+    fireEvent.change(screen.getByLabelText('Edit first name'), {
+      target: { value: 'Janet' },
+    });
+    fireEvent.change(screen.getByLabelText('Edit role'), {
+      target: { value: 'manager' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save user' }));
+
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith('user-2', {
+        firstName: 'Janet',
+        lastName: 'Smith',
+        role: 'manager',
+      });
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Updated user Janet Smith.',
+    );
+  });
+
+  it('shows API error when update fails', async () => {
+    setStoredUser('manager');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    updateUser.mockRejectedValue(new Error('User not found.'));
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save user' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'User not found.',
+    );
+  });
+
+  it('shows validation error when edit form is incomplete', async () => {
+    setStoredUser('admin');
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane@example.com',
+        role: 'rep',
+        organizationId: 'org-1',
+        isActive: true,
+      },
+    ]);
+
+    renderUsersPage();
+
+    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
+    fireEvent.change(screen.getByLabelText('Edit first name'), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save user' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'First name and last name are required for update.',
+    );
+    expect(updateUser).not.toHaveBeenCalled();
   });
 
   it('shows API error when create user fails', async () => {

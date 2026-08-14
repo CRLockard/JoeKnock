@@ -4,6 +4,7 @@ import { createUsersService } from './usersService.js';
 import {
   createUserValidators,
   listUsersValidators,
+  updateUserValidators,
 } from './usersValidation.js';
 import { validate } from '../validation/validate.js';
 
@@ -70,6 +71,28 @@ export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
         });
 
         return res.status(201).json(user);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
+  router.patch(
+    '/:id',
+    requireRoles(['manager', 'admin']),
+    updateUserValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const updatedUser = await usersService.updateUser({
+          userId: req.params.id,
+          organizationId: req.auth.organizationId,
+          firstName: req.body.firstName,
+          lastName: req.body.lastName,
+          role: req.body.role,
+        });
+
+        return res.status(200).json(updatedUser);
       } catch (error) {
         return next(error);
       }

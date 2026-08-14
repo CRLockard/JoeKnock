@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createUser, getUsers } from '../api/usersApi.js';
+import { createUser, getUsers, updateUser } from '../api/usersApi.js';
 import { useAuth } from '../auth/useAuth.js';
 
 const DEFAULT_FORM = {
@@ -10,6 +10,12 @@ const DEFAULT_FORM = {
   role: 'rep',
 };
 
+const DEFAULT_EDIT_FORM = {
+  firstName: '',
+  lastName: '',
+  role: 'rep',
+};
+
 export function UsersPage() {
   const auth = useAuth();
   const [users, setUsers] = useState([]);
@@ -17,6 +23,11 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [editForm, setEditForm] = useState(DEFAULT_EDIT_FORM);
+  const [editingUserId, setEditingUserId] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSuccessMessage, setEditSuccessMessage] = useState('');
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -82,6 +93,83 @@ export function UsersPage() {
     }));
   }
 
+  function startEditingUser(user) {
+    setEditingUserId(user.id);
+    setEditError('');
+    setEditSuccessMessage('');
+    setEditForm({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    });
+  }
+
+  function stopEditingUser() {
+    setEditingUserId('');
+    setEditError('');
+    setEditForm(DEFAULT_EDIT_FORM);
+  }
+
+  function handleEditChange(event) {
+    const { name, value } = event.target;
+    setEditForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  async function handleEditSubmit(event) {
+    event.preventDefault();
+    setEditError('');
+    setEditSuccessMessage('');
+
+    if (!canManageUsers) {
+      setEditError('You do not have permission to update users.');
+      return;
+    }
+
+    if (!editingUserId) {
+      setEditError('No user selected for update.');
+      return;
+    }
+
+    const payload = {
+      firstName: editForm.firstName.trim(),
+      lastName: editForm.lastName.trim(),
+      role: editForm.role,
+    };
+
+    if (!payload.firstName || !payload.lastName) {
+      setEditError('First name and last name are required for update.');
+      return;
+    }
+
+    setIsEditSubmitting(true);
+
+    try {
+      const updated = await updateUser(editingUserId, payload);
+      setUsers((previousUsers) =>
+        previousUsers.map((user) =>
+          user.id === updated.id
+            ? {
+                ...user,
+                ...updated,
+              }
+            : user,
+        ),
+      );
+      setEditSuccessMessage(
+        `Updated user ${updated.firstName} ${updated.lastName}.`,
+      );
+      setEditingUserId('');
+      setEditForm(DEFAULT_EDIT_FORM);
+    } catch (submitError) {
+      setEditError(submitError.message || 'Unable to update user.');
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -130,6 +218,8 @@ export function UsersPage() {
       <h2>User Management</h2>
 
       {usersError ? <p role="alert">{usersError}</p> : null}
+      {editError ? <p role="alert">{editError}</p> : null}
+      {editSuccessMessage ? <p role="status">{editSuccessMessage}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {successMessage ? <p role="status">{successMessage}</p> : null}
 
@@ -184,9 +274,67 @@ export function UsersPage() {
                 <li key={user.id}>
                   {user.firstName} {user.lastName} ({user.email}) - {user.role}{' '}
                   - {user.isActive ? 'Active' : 'Inactive'}
+                  <button
+                    type="button"
+                    onClick={() => startEditingUser(user)}
+                    disabled={isEditSubmitting}
+                  >
+                    Edit {user.firstName} {user.lastName}
+                  </button>
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {editingUserId ? (
+            <form onSubmit={handleEditSubmit} aria-label="edit user form">
+              <h4>Edit User</h4>
+
+              <label htmlFor="edit-first-name">Edit first name</label>
+              <input
+                id="edit-first-name"
+                name="firstName"
+                type="text"
+                value={editForm.firstName}
+                onChange={handleEditChange}
+                disabled={isEditSubmitting}
+              />
+
+              <label htmlFor="edit-last-name">Edit last name</label>
+              <input
+                id="edit-last-name"
+                name="lastName"
+                type="text"
+                value={editForm.lastName}
+                onChange={handleEditChange}
+                disabled={isEditSubmitting}
+              />
+
+              <label htmlFor="edit-role">Edit role</label>
+              <select
+                id="edit-role"
+                name="role"
+                value={editForm.role}
+                onChange={handleEditChange}
+                disabled={isEditSubmitting}
+              >
+                <option value="rep">Representative</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Administrator</option>
+              </select>
+
+              <button type="submit" disabled={isEditSubmitting}>
+                {isEditSubmitting ? 'Saving...' : 'Save user'}
+              </button>
+
+              <button
+                type="button"
+                onClick={stopEditingUser}
+                disabled={isEditSubmitting}
+              >
+                Cancel
+              </button>
+            </form>
           ) : null}
         </section>
       ) : null}

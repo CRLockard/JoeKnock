@@ -37,6 +37,42 @@ function buildListUsersQuery({ organizationId, active, role }) {
   };
 }
 
+function buildUpdateUserQuery({
+  organizationId,
+  userId,
+  firstName,
+  lastName,
+  role,
+}) {
+  const values = [organizationId, userId];
+  const setClauses = [];
+
+  if (firstName !== undefined) {
+    values.push(firstName);
+    setClauses.push(`first_name = $${values.length}`);
+  }
+
+  if (lastName !== undefined) {
+    values.push(lastName);
+    setClauses.push(`last_name = $${values.length}`);
+  }
+
+  if (role !== undefined) {
+    values.push(role);
+    setClauses.push(`role = $${values.length}`);
+  }
+
+  return {
+    text: `
+      UPDATE users
+      SET ${setClauses.join(', ')}, updated_at = now()
+      WHERE organization_id = $1 AND id = $2
+      RETURNING id, organization_id, email, first_name, last_name, role, is_active, created_at, updated_at
+    `,
+    values,
+  };
+}
+
 export const usersRepository = {
   async createUser(
     client,
@@ -67,5 +103,21 @@ export const usersRepository = {
     const sql = buildListUsersQuery({ organizationId, active, role });
     const result = await client.query(sql.text, sql.values);
     return result.rows;
+  },
+
+  async updateUser(
+    client,
+    { organizationId, userId, firstName, lastName, role },
+  ) {
+    const sql = buildUpdateUserQuery({
+      organizationId,
+      userId,
+      firstName,
+      lastName,
+      role,
+    });
+
+    const result = await client.query(sql.text, sql.values);
+    return result.rows[0] ?? null;
   },
 };

@@ -23,3 +23,10 @@ export function createUser(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function updateUser(userId, payload) {
+  return apiFetch(`/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

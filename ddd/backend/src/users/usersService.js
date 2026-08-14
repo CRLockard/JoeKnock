@@ -33,12 +33,44 @@ function parseActiveFilter(active) {
   return active === 'true';
 }
 
+function hasAnyUpdatableField({ firstName, lastName, role }) {
+  return (
+    firstName !== undefined || lastName !== undefined || role !== undefined
+  );
+}
+
 export function createUsersService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
   passwordHasher = hashPassword,
 } = {}) {
   return {
+    async updateUser({ organizationId, userId, firstName, lastName, role }) {
+      if (!hasAnyUpdatableField({ firstName, lastName, role })) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'At least one updatable field is required.',
+        );
+      }
+
+      const updatedUser = await runInTransaction(async (client) => {
+        return repository.updateUser(client, {
+          organizationId,
+          userId,
+          firstName,
+          lastName,
+          role,
+        });
+      });
+
+      if (!updatedUser) {
+        throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
+      }
+
+      return toPublicUser(updatedUser);
+    },
+
     async listUsers({ organizationId, active, role }) {
       const rows = await runInTransaction(async (client) => {
         return repository.listUsers(client, {

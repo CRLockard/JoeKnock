@@ -1,6 +1,7 @@
-import { body, query } from 'express-validator';
+import { body, param, query } from 'express-validator';
 
 const USER_ROLES = ['admin', 'manager', 'rep'];
+const MUTABLE_USER_FIELDS = ['firstName', 'lastName', 'role'];
 
 export const createUserValidators = [
   body('firstName').isString().trim().notEmpty().isLength({ max: 100 }),
@@ -24,4 +25,44 @@ export const listUsersValidators = [
         'teamId filtering is not available until team foundation tickets are implemented.',
       );
     }),
+];
+
+export const updateUserValidators = [
+  param('id').isUUID(),
+  body().custom((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Request body must be an object.');
+    }
+
+    const providedFields = Object.keys(value);
+
+    if (providedFields.length === 0) {
+      throw new Error('At least one updatable field is required.');
+    }
+
+    const disallowedFields = providedFields.filter(
+      (field) => !MUTABLE_USER_FIELDS.includes(field),
+    );
+
+    if (disallowedFields.length > 0) {
+      throw new Error(
+        `Unsupported fields for user update: ${disallowedFields.join(', ')}.`,
+      );
+    }
+
+    return true;
+  }),
+  body('firstName')
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty()
+    .isLength({ max: 100 }),
+  body('lastName')
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty()
+    .isLength({ max: 100 }),
+  body('role').optional().isString().trim().isIn(USER_ROLES),
 ];
