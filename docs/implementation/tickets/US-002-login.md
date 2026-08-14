@@ -4,7 +4,7 @@ GitHub Issue: #2
 
 Title: US-002 - Log In
 
-Status: Planned
+Status: Completed
 
 Priority: P0
 
@@ -311,33 +311,20 @@ Then:
 7. Add/execute TEST-007/008/009/010 and TEST-091.
 8. Run broader auth-related tests and npm test.
 
-# 15. Expected Files
+# 15. Implementation Files
 
-Repository currently has no application code scaffold in ddd.
+## New Files Added
 
-## Expected New Files
+- ddd/backend/tests/integration/auth-login.test.js
+- ddd/frontend/src/tests/login-flow.test.jsx
 
-- ddd/backend/src/auth/authRoutes.js
-- ddd/backend/src/auth/authController.js
+## Existing Files Modified
+
+- ddd/backend/src/auth/authValidation.js
+- ddd/backend/src/auth/authRepository.js
 - ddd/backend/src/auth/authService.js
-- ddd/backend/src/auth/jwt.js
-- ddd/backend/src/validation/schemas/login.js
-- ddd/backend/tests/integration/auth/login.test.js
-- ddd/frontend/src/api/authApi.js
+- ddd/backend/src/auth/authRoutes.js
 - ddd/frontend/src/pages/LoginPage.jsx
-- ddd/frontend/tests/auth/login.test.js
-
-## Expected Modified Files
-
-- ddd/backend/src/app.js (auth route registration)
-- ddd/frontend/src/auth/AuthProvider.jsx (auth storage/session state)
-- ddd/frontend/src/auth/authStorage.js (localStorage token handling)
-- ddd/frontend/src/auth/ProtectedRoute.jsx (auth gate)
-
-## Potential Files
-
-- ddd/backend/src/common/errors.js
-- ddd/backend/src/common/response.js
 
 # 16. Dependencies
 
@@ -373,37 +360,37 @@ Repository currently has no application code scaffold in ddd.
 
 Functionality
 
-- [ ] Login endpoint implemented per contract.
-- [ ] Acceptance criteria satisfied.
-- [ ] Out-of-scope functionality not implemented.
+- [x] Login endpoint implemented per contract.
+- [x] Acceptance criteria satisfied.
+- [x] Out-of-scope functionality not implemented.
 
 Architecture
 
-- [ ] Implementation matches approved architecture.
-- [ ] API behavior matches docs/api_endpoints.md.
-- [ ] No unapproved architecture introduced.
+- [x] Implementation matches approved architecture.
+- [x] API behavior matches docs/api_endpoints.md.
+- [x] No unapproved architecture introduced.
 
 Security
 
-- [ ] Credential verification secure.
-- [ ] Inactive users denied authentication.
-- [ ] Organization context derived from persisted identity.
+- [x] Credential verification secure.
+- [x] Inactive users denied authentication.
+- [x] Organization context derived from persisted identity.
 
 Testing
 
-- [ ] TEST-007/008/009/010 implemented and passing.
-- [ ] TEST-011/012 coverage validated for protected-route behavior.
-- [ ] TEST-091 implemented.
-- [ ] npm test passes.
+- [x] TEST-007/008/009/010 implemented and passing.
+- [x] TEST-011/012 coverage validated for protected-route behavior.
+- [x] TEST-091 implemented.
+- [x] npm test passes.
 
 Documentation
 
-- [ ] Spec remains aligned with source-of-truth docs.
+- [x] Spec remains aligned with source-of-truth docs.
 
 Review
 
 - [ ] No unrelated files modified.
-- [ ] Manual QA requirements identified.
+- [x] Manual QA requirements identified.
 
 # 19. Manual QA
 
@@ -440,19 +427,12 @@ Mitigation:
 
 # 21. Open Questions / Blocking Decisions
 
-1. Foundation gap: repository currently has no backend/frontend scaffold in ddd.
+1. No active blockers.
    Impact:
 
-- Implementation cannot begin until the planned foundation scaffold is created.
+- None for current MVP scope.
   Blocking status:
-- Implementation-blocking until foundation exists.
-
-2. Response contract detail: API docs specify JWT + authenticated user information but do not yet define exact response field schema.
-   Impact:
-
-- Frontend/backend contract may drift without explicit response shape.
-  Blocking status:
-- Not fully blocking if team establishes one consistent response schema before coding begins.
+- Closed.
 
 # 22. Copilot Implementation Notes
 
@@ -461,40 +441,56 @@ Mitigation:
 - Ensure tests verify behavior, not framework internals.
 - Do not add architecture or feature scope beyond docs.
 
-# 23. Completion Report Template
+# 23. Completion Report
 
 Implemented
 
-- Login endpoint and frontend auth state integration
+- Backend POST /api/auth/login with validation, credential verification, inactive-user rejection, JWT issuance, and authenticated user context response.
+- Frontend login submission, error handling, auth session persistence, and protected-route access flow.
+- Integration test hardening for migration execution race during full suite runs.
 
 Files Changed
 
-- [to be filled during implementation]
+- ddd/backend/src/auth/authValidation.js
+- ddd/backend/src/auth/authRepository.js
+- ddd/backend/src/auth/authService.js
+- ddd/backend/src/auth/authRoutes.js
+- ddd/backend/tests/integration/auth-login.test.js
+- ddd/frontend/src/pages/LoginPage.jsx
+- ddd/frontend/src/tests/login-flow.test.jsx
 
 Tests Added
 
-- [to be filled during implementation]
+- ddd/backend/tests/integration/auth-login.test.js (6 integration tests)
+- ddd/frontend/src/tests/login-flow.test.jsx (3 frontend auth-flow tests)
 
 Tests Run
 
-npm test
+- npm run test:integration --prefix ddd/backend
+- npm test
+- npm run lint
+- npm run build
+- npm run test:e2e
 
 Result:
 
-PASS / FAIL
+- PASS
 
 Manual QA Required
 
-- Login success/failure/inactive-account checks
+- Login success flow with valid active account.
+- Login failure flow with invalid credentials.
+- Inactive-account login rejection.
+- Browser refresh/session persistence behavior.
 
 Documentation Updated
 
-- None required unless approved contracts change
+- docs/implementation/tickets/US-002-login.md updated to completed state with implementation evidence.
 
 Known Limitations
 
-- [to be filled during implementation]
+- React Router v7 future-flag warnings appear in frontend test output; not blocking and unrelated to login behavior.
 
 Remaining Issues
 
-- Foundation scaffolding and explicit response-shape standardization
+- Working tree still includes pre-existing unrelated modifications outside this ticket scope that should be reviewed separately before merge.

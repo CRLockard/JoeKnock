@@ -24,7 +24,28 @@ const USER_INSERT_SQL = `
   RETURNING id, organization_id, email, first_name, last_name, role, is_active, created_at, updated_at
 `;
 
+const USER_BY_EMAIL_LOGIN_SQL = `
+  SELECT
+    u.id,
+    u.organization_id,
+    u.email,
+    u.password_hash,
+    u.first_name,
+    u.last_name,
+    u.role,
+    u.is_active
+  FROM users u
+  INNER JOIN organizations o ON o.id = u.organization_id
+  WHERE lower(u.email) = lower($1)
+  LIMIT 1
+`;
+
 export const authRepository = {
+  async findUserByEmail(client, { email }) {
+    const result = await client.query(USER_BY_EMAIL_LOGIN_SQL, [email]);
+    return result.rows[0] ?? null;
+  },
+
   async createOrganization(client, { name }) {
     const result = await client.query(ORGANIZATION_INSERT_SQL, [name]);
     return result.rows[0];

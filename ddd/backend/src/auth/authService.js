@@ -1,7 +1,7 @@
-import { AppError } from '../common/errors.js';
+import { AppError, AuthError } from '../common/errors.js';
 import { withTransaction } from '../db/transaction.js';
 import { signAccessToken } from './jwt.js';
-import { hashPassword } from './password.js';
+import { hashPassword, verifyPassword } from './password.js';
 import { authRepository as defaultRepository } from './authRepository.js';
 
 const DEFAULT_REP_VISIBILITY = 'own';
@@ -27,14 +27,54 @@ function isUniqueViolation(error) {
   return error && error.code === '23505';
 }
 
+function invalidCredentialsError() {
+  return new AuthError('Invalid email or password.');
+}
+
 export function createAuthService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
   passwordHasher = hashPassword,
   tokenSigner = signAccessToken,
+  passwordVerifier = verifyPassword,
   onOrganizationCreated = async () => {},
 } = {}) {
   return {
+    async login({ email, password }) {
+      const normalizedEmail = normalizeEmail(email);
+      const user = await runInTransaction(async (client) => {
+        return repository.findUserByEmail(client, {
+          email: normalizedEmail,
+        });
+      });
+
+      if (!user) {
+        throw invalidCredentialsError();
+      }
+
+      const passwordMatches = await passwordVerifier(user.password_hash, password);
+
+      if (!passwordMatches) {
+        throw invalidCredentialsError();
+      }
+
+      if (!user.is_active) {
+        throw new AppError(403, 'FORBIDDEN', 'Account is inactive.');
+      }
+
+      const publicUser = toPublicUser(user);
+      const token = tokenSigner({
+        userId: publicUser.id,
+        organizationId: publicUser.organizationId,
+        role: publicUser.role,
+      });
+
+      return {
+        token,
+        user: publicUser,
+      };
+    },
+
     async registerOrganization({
       organizationName,
       firstName,

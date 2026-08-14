@@ -22,3 +22,8 @@ export const registerValidators = [
     .bail()
     .custom((value) => isValidIanaTimeZone(value)),
 ];
+
+export const loginValidators = [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isString().trim().notEmpty(),
+];

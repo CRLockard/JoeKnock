@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createAuthService } from './authService.js';
-import { registerValidators } from './authValidation.js';
+import { loginValidators, registerValidators } from './authValidation.js';
 import { validate } from '../validation/validate.js';
 
 export function buildAuthRoutes({ authService = createAuthService() } = {}) {
@@ -27,6 +27,19 @@ export function buildAuthRoutes({ authService = createAuthService() } = {}) {
       }
     },
   );
+
+  router.post('/login', loginValidators, validate, async (req, res, next) => {
+    try {
+      const result = await authService.login({
+        email: req.body.email,
+        password: req.body.password,
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   return router;
 }
