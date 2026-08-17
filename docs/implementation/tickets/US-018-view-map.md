@@ -1,8 +1,8 @@
-﻿# 1. Ticket Information
+# 1. Ticket Information
 
 GitHub Issue: #18
 
-Title: US-018 Î“Ã‡Ã¶ View Map
+Title: US-018 - View Map
 
 Status: Planned
 
@@ -13,7 +13,7 @@ MVP: Yes
 Dependencies:
 
 - #46 foundation scaffold and test harness.
-- Practical dependency on authentication flow readiness (#1/#2/#3).
+- #2 login and protected app shell readiness.
 
 Related Documentation:
 
@@ -27,271 +27,317 @@ Related Documentation:
 
 # 2. User Story
 
-Use the GitHub issue body as the approved user-story intent.
+As a sales representative, I want to see a map of the area I am canvassing, so that I can navigate properties while working in the field.
 
 # 3. Objective
 
-Implement this user story according to the finalized MVP source of truth and corrected GitHub issue requirements.
+Deliver the approved user-story outcome for Issue #18 with endpoint, authorization, and data behavior aligned to the finalized MVP architecture. The completed implementation should satisfy the acceptance criteria without expanding scope beyond this story.
 
 # 4. Scope
 
 ## 4.1 Included
 
-- Implement behavior described in the corrected GitHub issue and finalized master spec.
-- Enforce organization isolation, authorization, and API/schema contract consistency for this story.
-- Add/update tests required to verify acceptance criteria and prevent regressions.
+- Map is displayed as the primary application experience.
+- Map supports panning.
+- Map supports zooming.
+- Properties can be represented as map markers.
+- Map works effectively on a tablet-sized display.
+- Map attribution is displayed appropriately.
 
 ## 4.2 Explicitly Not Included
 
-- Deferred/Post-MVP functionality not explicitly included in this story.
-- Unrelated feature implementation outside this story scope.
-- Unapproved architecture/schema/API redesign.
+- Changes to unrelated endpoints, tables, or user workflows outside this story.
+- Post-MVP functionality not explicitly included in this issue.
+- Unapproved schema, API, or architecture redesign.
 
 # 5. Existing Architecture
 
-Relevant architecture constraints for this story:
-
-- Use `docs/MASTER_PROJECT_SPEC.md` as authoritative behavior source.
-- Enforce organization isolation for all organization-owned resources.
-- Preserve immutable interaction snapshot model with current-state retrieval semantics.
-- Preserve map-first workflow and MVP map constraints.
+- Node.js + Express backend with middleware/service/repository layering.
+- PostgreSQL schema and constraints defined in docs/table_Schema_decisions.md.
+- JWT-derived organization context for protected-resource ownership.
+- Source-of-truth role and visibility rules from docs/MASTER_PROJECT_SPEC.md and docs/api_endpoints.md.
+- Relevant ADRs:
+- ADR-001: Map-First Application Design
+- ADR-011: Interaction Visibility Is Permission-Based
 
 # 6. Technical Design
 
 ## 6.1 Backend
 
-- Implement endpoint/service/repository behavior needed for this story per API contract and master spec.
-- Enforce backend authorization and organization isolation checks.
-- Preserve immutable/historical data semantics where applicable.
+- Implement or align route, validation, service, and repository behavior for the in-scope endpoint(s).
+- Enforce authorization and organization isolation for every resource lookup.
+- Apply request validation and return standardized API error envelopes.
+- Preserve MVP no-delete and historical-integrity behavior where applicable.
 
 ## 6.2 Frontend
 
-- Implement only story-required UI/workflow behavior.
-- Preserve map-first workflow and finalized MVP scope constraints where applicable.
-- Handle loading, error, and validation feedback paths.
+- Implement story-specific workflow UI and API client integration.
+- Provide loading, success, and error feedback in the user flow.
+- Preserve role-aware behavior for visible actions and responses.
 
 ## 6.3 Database
 
-Tables implicated by GitHub issue:
+- properties
+- interactions
+- statuses
+- users
+- teams
+- team_users
 
-- See issue and schema docs for table scope.
+- Use existing documented constraints and relationships; do not introduce unapproved schema changes.
 
 # 7. API Contract
 
-Endpoint implications from GitHub issue:
+- GET /api/map/properties
 
-- See issue and docs/api_endpoints.md.
-
-Final contract must align with docs/api_endpoints.md.
+Authentication, authorization, request payload validation, and response/error behavior must match docs/api_endpoints.md for each listed endpoint.
 
 # 8. Data Flow
 
-1. Frontend/user action triggers story workflow.
-2. API request(s) execute within authenticated org context where protected.
-3. Backend validates, authorizes, applies business rules, and persists/retrieves state.
-4. API response updates client state.
-5. UI renders finalized MVP behavior.
+1. User executes the in-scope workflow action.
+2. Frontend invokes the relevant API endpoint(s) where applicable.
+3. Backend validates/authenticates/authorizes and applies organization scope.
+4. Backend reads/writes approved tables and returns contract response.
+5. Frontend renders resulting state and user feedback.
 
 # 9. Business Rules
 
-- Do not introduce behavior that conflicts with the finalized MVP scope or deferred boundaries.
+- Map is displayed as the primary application experience.
+- Map supports panning.
+- Map supports zooming.
+- Properties can be represented as map markers.
+- Map works effectively on a tablet-sized display.
+- Map attribution is displayed appropriately.
+
+- Organization isolation always applies.
+- Role permissions and visibility behavior follow finalized MVP rules.
 
 # 10. Security Requirements
 
-- Validate all external input on the backend boundary.
-- Do not trust client-supplied organization ownership identifiers.
-- Preserve no-delete/deactivation semantics where applicable.
+- Enforce authentication and authorization according to endpoint contract.
+- Enforce organization isolation using server-derived organization context.
+- Do not expose sensitive/internal fields beyond approved response contract.
+- Validate request input at backend boundary.
 
 # 11. Error Handling
 
-| Condition                     | Expected Behavior                                    |
-| ----------------------------- | ---------------------------------------------------- |
-| Validation failure            | Consistent 400-style validation error behavior       |
-| Missing/invalid auth          | Protected endpoints reject unauthorized access       |
-| Cross-organization access     | Deny access per organization isolation               |
-| Unexpected backend failure    | Controlled error response without partial corruption |
+| Condition | Expected Behavior |
+| --- | --- |
+| Validation failure | 400 validation error envelope with actionable detail. |
+| Missing/invalid auth | 401 unauthenticated error envelope for protected endpoints. |
+| Unauthorized role | 403 forbidden error envelope. |
+| Cross-organization access | Denied per contract (not-found/forbidden as documented). |
+| Unexpected backend failure | 500 internal error envelope without sensitive leakage. |
 
 # 12. Test Requirements
 
 ## Existing Tests
 
-- Align with relevant entries in docs/testing/test-matrix.md.
-
-## New Tests
-
-- Add targeted tests required to prove this story's acceptance criteria.
+- TEST-044 Map Loads
 
 ## Unit Tests
 
-- Validate core business logic branches and authorization gates.
+- Validate in-scope business-rule and permission branch behavior.
 
 ## Integration/API Tests
 
-- Validate endpoint behavior, org isolation, and persistence side effects.
+- Validate happy path, validation failures, authorization failures, and organization isolation.
 
 ## Frontend Tests
 
-- Validate story workflow, validation, and error rendering.
+- Validate workflow rendering, loading states, error states, and role-aware UI behavior.
 
 ## End-to-End Tests
 
-- Add/extend scenario coverage where this story impacts critical workflow.
+- Extend critical workflow coverage if this story changes end-to-end behavior.
 
 # 13. Test Scenarios
 
 ## Scenario 1 - Happy Path
 
-Given valid input and authorized context,
-when story workflow is executed,
-then expected behavior is produced according to acceptance criteria.
+Given authorized context and valid input,
+when the workflow is executed,
+then behavior matches acceptance criteria.
 
 ## Scenario 2 - Validation Failure
 
 Given invalid input,
-when request/action is attempted,
-then validation is rejected with safe, consistent error behavior.
+when the request is submitted,
+then validation fails safely with no invalid persistence.
 
 ## Scenario 3 - Unauthorized/Forbidden
 
-Given missing or unauthorized context,
+Given missing auth or insufficient role,
 when protected behavior is attempted,
-then access is denied according to finalized authorization rules.
+then access is denied per contract.
 
 ## Scenario 4 - Organization Isolation
 
-Given cross-organization resource identifiers,
+Given a cross-organization resource ID,
 when access is attempted,
 then cross-organization access is denied.
 
 # 14. Implementation Sequence
 
-1. Confirm dependency readiness and existing contracts.
-2. Implement backend/frontend behavior required by scope.
-3. Implement authorization/isolation and business-rule checks.
-4. Add/extend tests for acceptance criteria and regression protection.
-5. Validate against docs/MASTER_PROJECT_SPEC.md and API/schema docs.
+1. Confirm endpoint, schema, and role requirements in source-of-truth docs.
+2. Implement backend behavior for in-scope endpoint(s).
+3. Implement frontend workflow behavior and API client updates.
+4. Add/extend tests mapped to acceptance criteria.
+5. Validate behavior against test-matrix and source-of-truth docs.
 
 # 15. Expected Files
 
-Repository currently has partial/no app scaffold assumptions depending on ticket sequence.
-
-## Expected New Files
-
-- Determined by implementation phase and scaffold maturity.
-
 ## Expected Modified Files
 
-- Determined by story scope in backend/frontend layers.
+- ddd/backend/src/<domain>/*
+- ddd/frontend/src/pages/<feature>*.jsx
+- ddd/frontend/src/api/*
+- ddd/backend/tests/integration/*
+- ddd/frontend/src/tests/*
 
-## Potential Files
+## Potential New Files
 
-- Tests and shared validation/util modules required by story behavior.
+- ddd/backend/src/<domain>/<feature>.js
+- ddd/frontend/src/pages/<feature>Page.jsx
+- ddd/backend/tests/integration/<feature>.test.js
+- ddd/frontend/src/tests/<feature>.test.jsx
 
 # 16. Dependencies
 
 ## Required Previous Tickets
 
 - #46 foundation scaffold and test harness.
-- Practical dependency on authentication flow readiness (#1/#2/#3).
+- #2 login and protected app shell readiness.
 
 ## Required Architecture
 
-- See master spec and architecture docs.
+- Source-of-truth behavior in docs/MASTER_PROJECT_SPEC.md and relevant ADRs.
 
 ## Required API
 
-- See issue and docs/api_endpoints.md.
+- Endpoint(s) listed in Section 7.
 
 ## Required Database
 
-- See issue and schema docs for table scope.
+- Tables/constraints listed in Section 6.3.
 
 ## Required Frontend
 
-- Story-specific UI workflow integration where applicable.
+- Workflow behavior listed in Section 6.2.
 
 # 17. Implementation Constraints
 
-- Do not introduce delete behavior unless explicitly documented (MVP generally uses deactivation/no-delete semantics).
+- Do not add unapproved schema/API/architecture changes.
 - Do not trust client-supplied organization ownership identifiers.
-- Do not introduce unapproved schema/API/architecture changes.
-- Preserve deferred/post-MVP boundaries.
+- Preserve MVP no-delete/historical-integrity rules where applicable.
+- Keep scope limited to this issue's acceptance criteria.
 
 # 18. Definition of Done
 
-- [ ] Acceptance criteria implemented and verified.
+Functionality
 
-- [ ] Behavior aligns with docs/MASTER_PROJECT_SPEC.md.
-- [ ] Organization isolation and authorization requirements are verified.
-- [ ] No unrelated scope changes introduced.
+- [ ] Acceptance criteria implemented and verified.
+- [ ] Out-of-scope functionality not introduced.
+
+Architecture
+
+- [ ] Behavior matches docs/api_endpoints.md and docs/table_Schema_decisions.md.
+- [ ] ADR constraints are respected.
+
+Security
+
+- [ ] Authentication, authorization, and organization isolation enforced for affected behavior.
+
+Testing
+
+- [ ] Relevant automated tests added/updated and passing.
+
+Documentation
+
+- [ ] GitHub issue and repository ticket remain aligned.
+
+Review/Scope
+
+- [ ] No unrelated files or features included.
 
 # 19. Manual QA
 
-- Execute representative happy-path workflow.
-- Execute negative validation path.
-- Execute unauthorized/cross-org access checks.
-- Verify behavior against finalized MVP expectations in master spec.
+- Execute authorized happy path end-to-end.
+- Execute invalid-input flow and verify error messaging.
+- Execute unauthorized role flow.
+- Execute cross-organization access attempt.
 
 # 20. Known Risks
 
 Risk:
 
-- Scope drift away from finalized MVP behavior.
+- Contract drift between implementation and documented endpoint behavior.
 
 Impact:
 
-- Implementation inconsistency across API/UI/data layers.
+- Security/behavior regressions and inconsistent UX.
 
 Mitigation:
 
-- Enforce source-of-truth hierarchy and test coverage mapped to acceptance criteria.
+- Enforce endpoint contract checks and automated regression tests.
+
+Risk:
+
+- Scope creep into adjacent stories.
+
+Impact:
+
+- Delivery delays and increased defect surface.
+
+Mitigation:
+
+- Keep implementation and testing constrained to accepted story scope.
 
 # 21. Open Questions / Blocking Decisions
 
-- No new product/architecture decisions are introduced by this ticket.
-- If contradiction with source-of-truth docs is discovered during implementation, stop and escalate.
+- No blocking decisions identified from current source-of-truth docs.
+- If contradictions arise during implementation, stop and escalate.
 
 # 22. Copilot Implementation Notes
 
-- Follow source-of-truth hierarchy in .github/copilot-instructions.md.
-- Keep implementation constrained to this story.
-- Preserve locked MVP rules from docs/MASTER_PROJECT_SPEC.md.
-- Raise contradictions before coding.
+- Follow .github/copilot-instructions.md hierarchy.
+- Keep scope strictly to this issue.
+- Add tests with implementation; do not defer test coverage.
 
 # 23. Completion Report Template
 
 Implemented
 
-- [to be filled during implementation]
+- Summarize implemented behavior for this ticket.
 
 Files Changed
 
-- [to be filled during implementation]
+- List modified files.
 
-Tests Added
+Tests Added/Updated
 
-- [to be filled during implementation]
+- List added/updated test coverage.
 
 Tests Run
 
-npm test
+- List executed validation commands.
 
-Result:
+Result
 
-PASS / FAIL
+- PASS / FAIL.
 
-Manual QA Required
+Manual QA Completed
 
-- [to be filled during implementation]
+- List executed manual QA checks and outcomes.
 
 Documentation Updated
 
-- None required unless approved contracts change
+- Confirm issue body and repository ticket alignment.
 
 Known Limitations
 
-- [to be filled during implementation]
+- List approved limitations remaining.
 
 Remaining Issues
 
-- [to be filled during implementation]
+- List follow-up issues if any.
