@@ -556,7 +556,33 @@ Do not create architecture for hypothetical future requirements.
 
 The MVP should be simple enough to understand and maintain.
 
+Code should be understandable to another developer who is familiar with the project but did not write the implementation.
+
+Do not rely on cleverness, implicit behavior, or unexplained conventions when a small amount of clarity would make the implementation easier to maintain.
+
 ---
+
+### Code Comments
+
+Use comments to explain code that is not obvious from the implementation itself.
+
+Comments are expected for:
+
+- Non-obvious business rules
+- Security or authorization decisions
+- Complex database queries or filtering logic
+- Architectural decisions that may not be apparent from the surrounding code
+- Browser, third-party library, or platform behavior that requires explanation
+- Intentional workarounds or compatibility decisions
+- Important edge cases where the reason for the behavior is not self-evident
+
+Comments should explain **why** the code behaves a certain way, not simply restate **what** the code does.
+
+Do not add comments to obvious code merely for the sake of increasing comment coverage.
+
+## Prefer concise, meaningful comments that help another developer understand the reasoning behind the implementation.
+
+When implementing a complex feature, add comments at the important decision points rather than relying on comments throughout every function.
 
 # 29. When Requirements Conflict
 
