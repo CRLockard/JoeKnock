@@ -13,6 +13,12 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { getOrganization, updateOrganization } from '../api/organizationApi.js';
+import {
+  createStatus,
+  getStatuses,
+  setStatusActive,
+  updateStatus,
+} from '../api/statusesApi.js';
 import { getUsers } from '../api/usersApi.js';
 import {
   addUserToTeam,
@@ -33,6 +39,13 @@ vi.mock('../api/teamsApi.js', () => ({
   getTeam: vi.fn(),
   getTeams: vi.fn(),
   removeUserFromTeam: vi.fn(),
+}));
+
+vi.mock('../api/statusesApi.js', () => ({
+  createStatus: vi.fn(),
+  getStatuses: vi.fn(),
+  setStatusActive: vi.fn(),
+  updateStatus: vi.fn(),
 }));
 
 vi.mock('../api/usersApi.js', () => ({
@@ -83,6 +96,7 @@ beforeEach(() => {
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   getTeams.mockResolvedValue([]);
   getUsers.mockResolvedValue([]);
+  getStatuses.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -162,6 +176,285 @@ describe('settings page', () => {
     expect(await screen.findByText('Alpha Team')).toBeInTheDocument();
     expect(screen.getByText('Beta Team')).toBeInTheDocument();
     expect(getTeams).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads and renders active statuses', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses.mockResolvedValue([
+      {
+        id: 'status-1',
+        organizationId: 'org-1',
+        name: 'No Answer',
+        description: 'No contact established',
+        displayOrder: 1,
+        isActive: true,
+      },
+      {
+        id: 'status-2',
+        organizationId: 'org-1',
+        name: 'Interested',
+        description: null,
+        displayOrder: 2,
+        isActive: true,
+      },
+    ]);
+
+    renderSettings(['/settings']);
+
+    expect(
+      await screen.findByText('No Answer (order: 1) - No contact established'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Interested (order: 2)')).toBeInTheDocument();
+    expect(getStatuses).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows representative to view active organization statuses', async () => {
+    setStoredUser('rep');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses.mockResolvedValue([
+      {
+        id: 'status-1',
+        organizationId: 'org-1',
+        name: 'No Answer',
+        description: 'No contact established',
+        displayOrder: 1,
+        isActive: true,
+      },
+      {
+        id: 'status-2',
+        organizationId: 'org-1',
+        name: 'Interested',
+        description: null,
+        displayOrder: 2,
+        isActive: true,
+      },
+    ]);
+
+    renderSettings(['/settings']);
+
+    expect(
+      await screen.findByText('No Answer (order: 1) - No contact established'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Interested (order: 2)')).toBeInTheDocument();
+    expect(getStatuses).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows manager to create a status', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: 'status-1',
+        organizationId: 'org-1',
+        name: 'Not Home',
+        description: 'No one answered door',
+        displayOrder: 3,
+        isActive: true,
+      },
+    ]);
+
+    createStatus.mockResolvedValue({
+      id: 'status-1',
+      organizationId: 'org-1',
+      name: 'Not Home',
+      description: 'No one answered door',
+      displayOrder: 3,
+      isActive: true,
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('No active statuses found.');
+
+    fireEvent.change(screen.getByLabelText('Status name'), {
+      target: { value: 'Not Home' },
+    });
+    fireEvent.change(screen.getByLabelText('Status description'), {
+      target: { value: 'No one answered door' },
+    });
+    fireEvent.change(screen.getByLabelText('Display order'), {
+      target: { value: '3' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create status' }));
+
+    await waitFor(() => {
+      expect(createStatus).toHaveBeenCalledWith({
+        name: 'Not Home',
+        description: 'No one answered door',
+        displayOrder: 3,
+      });
+    });
+
+    expect(
+      await screen.findByText('Status created successfully.'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Not Home (order: 3) - No one answered door'),
+    ).toBeInTheDocument();
+  });
+
+  it('allows admin to update an existing status', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses
+      .mockResolvedValueOnce([
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'Interested',
+          description: '',
+          displayOrder: 1,
+          isActive: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'Very Interested',
+          description: 'Requested callback',
+          displayOrder: 4,
+          isActive: true,
+        },
+      ]);
+
+    updateStatus.mockResolvedValue({
+      id: 'status-1',
+      organizationId: 'org-1',
+      name: 'Very Interested',
+      description: 'Requested callback',
+      displayOrder: 4,
+      isActive: true,
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Interested (order: 1)');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Interested' }));
+
+    fireEvent.change(screen.getByLabelText('Edit status name'), {
+      target: { value: 'Very Interested' },
+    });
+    fireEvent.change(screen.getByLabelText('Edit status description'), {
+      target: { value: 'Requested callback' },
+    });
+    fireEvent.change(screen.getByLabelText('Edit display order'), {
+      target: { value: '4' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+
+    await waitFor(() => {
+      expect(updateStatus).toHaveBeenCalledWith('status-1', {
+        name: 'Very Interested',
+        description: 'Requested callback',
+        displayOrder: 4,
+      });
+    });
+
+    expect(
+      await screen.findByText('Status updated successfully.'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Very Interested (order: 4) - Requested callback',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('allows admin to deactivate a status and removes it from active list', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses
+      .mockResolvedValueOnce([
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'Keep Me',
+          description: null,
+          displayOrder: 1,
+          isActive: true,
+        },
+        {
+          id: 'status-2',
+          organizationId: 'org-1',
+          name: 'Deactivate Me',
+          description: null,
+          displayOrder: 2,
+          isActive: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'Keep Me',
+          description: null,
+          displayOrder: 1,
+          isActive: true,
+        },
+      ]);
+
+    setStatusActive.mockResolvedValue({
+      id: 'status-2',
+      organizationId: 'org-1',
+      name: 'Deactivate Me',
+      description: null,
+      displayOrder: 2,
+      isActive: false,
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Deactivate Me (order: 2)');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Deactivate Deactivate Me' }),
+    );
+
+    await waitFor(() => {
+      expect(setStatusActive).toHaveBeenCalledWith('status-2', false);
+    });
+
+    expect(
+      await screen.findByText('Status deactivated successfully.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Deactivate Me (order: 2)')).toBeNull();
+    expect(screen.getByText('Keep Me (order: 1)')).toBeInTheDocument();
   });
 
   it('renders teams loading state', async () => {

@@ -10,12 +10,15 @@ import { buildTeamsRoutes } from '../teams/teamsRoutes.js';
 import { createTeamsService } from '../teams/teamsService.js';
 import { buildUsersRoutes } from '../users/usersRoutes.js';
 import { createUsersService } from '../users/usersService.js';
+import { buildStatusesRoutes } from '../statuses/statusesRoutes.js';
+import { createStatusesService } from '../statuses/statusesService.js';
 
 export function buildApiRoutes({
   authService,
   organizationService,
   teamsService,
   usersService,
+  statusesService,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
@@ -23,6 +26,7 @@ export function buildApiRoutes({
     organizationService ?? createOrganizationService();
   const resolvedTeamsService = teamsService ?? createTeamsService();
   const resolvedUsersService = usersService ?? createUsersService();
+  const resolvedStatusesService = statusesService ?? createStatusesService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
   router.use(
@@ -44,6 +48,13 @@ export function buildApiRoutes({
     authMiddleware,
     buildTeamsRoutes({
       teamsService: resolvedTeamsService,
+    }),
+  );
+  router.use(
+    '/statuses',
+    authMiddleware,
+    buildStatusesRoutes({
+      statusesService: resolvedStatusesService,
     }),
   );
 
