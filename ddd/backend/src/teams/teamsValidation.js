@@ -10,3 +10,8 @@ export const addTeamUserValidators = [
   param('id').isUUID(),
   body('userId').isUUID(),
 ];
+
+export const removeTeamUserValidators = [
+  param('id').isUUID(),
+  param('userId').isUUID(),
+];

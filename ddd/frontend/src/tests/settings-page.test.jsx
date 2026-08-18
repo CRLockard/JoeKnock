@@ -19,6 +19,7 @@ import {
   createTeam,
   getTeam,
   getTeams,
+  removeUserFromTeam,
 } from '../api/teamsApi.js';
 
 vi.mock('../api/organizationApi.js', () => ({
@@ -31,6 +32,7 @@ vi.mock('../api/teamsApi.js', () => ({
   createTeam: vi.fn(),
   getTeam: vi.fn(),
   getTeams: vi.fn(),
+  removeUserFromTeam: vi.fn(),
 }));
 
 vi.mock('../api/usersApi.js', () => ({
@@ -78,6 +80,7 @@ function renderSettings(initialEntries = ['/settings']) {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
   getTeams.mockResolvedValue([]);
   getUsers.mockResolvedValue([]);
 });
@@ -351,6 +354,272 @@ describe('settings page', () => {
         name: 'Ben Baker (ben@example.com)',
       }),
     ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('button', { name: 'Remove Ana Able' }),
+    ).toBeInTheDocument();
+  });
+
+  it('removes a selected team member and refreshes team detail', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([]);
+
+    getTeam
+      .mockResolvedValueOnce({
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+        members: [
+          {
+            id: 'user-1',
+            organizationId: 'org-1',
+            firstName: 'Ana',
+            lastName: 'Able',
+            email: 'ana@example.com',
+            role: 'rep',
+            isActive: true,
+          },
+          {
+            id: 'user-2',
+            organizationId: 'org-1',
+            firstName: 'Ben',
+            lastName: 'Baker',
+            email: 'ben@example.com',
+            role: 'rep',
+            isActive: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+        members: [
+          {
+            id: 'user-2',
+            organizationId: 'org-1',
+            firstName: 'Ben',
+            lastName: 'Baker',
+            email: 'ben@example.com',
+            role: 'rep',
+            isActive: true,
+          },
+        ],
+      });
+
+    removeUserFromTeam.mockResolvedValue({
+      organizationId: 'org-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('Ana Able (ana@example.com) - rep');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
+
+    await waitFor(() => {
+      expect(removeUserFromTeam).toHaveBeenCalledWith('team-1', 'user-1');
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Team member removed successfully.',
+    );
+    expect(screen.queryByText('Ana Able (ana@example.com) - rep')).toBeNull();
+    expect(
+      await screen.findByText('Ben Baker (ben@example.com) - rep'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not remove member when confirmation is canceled', async () => {
+    window.confirm.mockReturnValue(false);
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [
+        {
+          id: 'user-1',
+          organizationId: 'org-1',
+          firstName: 'Ana',
+          lastName: 'Able',
+          email: 'ana@example.com',
+          role: 'rep',
+          isActive: true,
+        },
+      ],
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('Ana Able (ana@example.com) - rep');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
+
+    expect(removeUserFromTeam).not.toHaveBeenCalled();
+  });
+
+  it('shows loading state while removing a member', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [
+        {
+          id: 'user-1',
+          organizationId: 'org-1',
+          firstName: 'Ana',
+          lastName: 'Able',
+          email: 'ana@example.com',
+          role: 'rep',
+          isActive: true,
+        },
+      ],
+    });
+
+    let resolveRemoval;
+    removeUserFromTeam.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRemoval = resolve;
+      }),
+    );
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('Ana Able (ana@example.com) - rep');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Removing member...' }),
+    ).toBeDisabled();
+
+    resolveRemoval({
+      organizationId: 'org-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    await waitFor(() => {
+      expect(removeUserFromTeam).toHaveBeenCalledWith('team-1', 'user-1');
+    });
+  });
+
+  it('shows API error when member removal fails', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [
+        {
+          id: 'user-1',
+          organizationId: 'org-1',
+          firstName: 'Ana',
+          lastName: 'Able',
+          email: 'ana@example.com',
+          role: 'rep',
+          isActive: true,
+        },
+      ],
+    });
+
+    removeUserFromTeam.mockRejectedValue(
+      new Error('Team membership not found.'),
+    );
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('Ana Able (ana@example.com) - rep');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Team membership not found.',
+    );
   });
 
   it('adds a selected user to a team and refreshes team detail', async () => {

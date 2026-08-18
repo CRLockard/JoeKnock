@@ -31,6 +31,14 @@ const TEAM_USER_INSERT_SQL = `
   RETURNING organization_id, team_id, user_id, created_at
 `;
 
+const TEAM_USER_DELETE_SQL = `
+  DELETE FROM team_users
+  WHERE organization_id = $1
+    AND team_id = $2
+    AND user_id = $3
+  RETURNING organization_id, team_id, user_id, created_at
+`;
+
 const TEAM_MEMBERS_SQL = `
   SELECT
     u.id,
@@ -90,6 +98,16 @@ export const teamsRepository = {
 
   async addUserToTeam(client, { organizationId, teamId, userId }) {
     const result = await client.query(TEAM_USER_INSERT_SQL, [
+      organizationId,
+      teamId,
+      userId,
+    ]);
+
+    return result.rows[0] ?? null;
+  },
+
+  async removeUserFromTeam(client, { organizationId, teamId, userId }) {
+    const result = await client.query(TEAM_USER_DELETE_SQL, [
       organizationId,
       teamId,
       userId,

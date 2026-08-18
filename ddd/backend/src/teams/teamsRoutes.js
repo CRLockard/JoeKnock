@@ -5,6 +5,7 @@ import {
   addTeamUserValidators,
   createTeamValidators,
   getTeamValidators,
+  removeTeamUserValidators,
 } from './teamsValidation.js';
 import { validate } from '../validation/validate.js';
 
@@ -80,6 +81,26 @@ export function buildTeamsRoutes({ teamsService = createTeamsService() } = {}) {
         });
 
         return res.status(201).json(membership);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
+  router.delete(
+    '/:id/users/:userId',
+    requireRoles(['manager', 'admin']),
+    removeTeamUserValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const membership = await teamsService.removeUserFromTeam({
+          organizationId: req.auth.organizationId,
+          teamId: req.params.id,
+          userId: req.params.userId,
+        });
+
+        return res.status(200).json(membership);
       } catch (error) {
         return next(error);
       }

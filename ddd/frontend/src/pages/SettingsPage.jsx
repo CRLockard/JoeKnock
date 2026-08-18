@@ -6,6 +6,7 @@ import {
   createTeam,
   getTeam,
   getTeams,
+  removeUserFromTeam,
 } from '../api/teamsApi.js';
 import { useAuth } from '../auth/useAuth.js';
 
@@ -26,6 +27,9 @@ export function SettingsPage() {
   const [teamDetailError, setTeamDetailError] = useState('');
   const [addMemberError, setAddMemberError] = useState('');
   const [addMemberSuccessMessage, setAddMemberSuccessMessage] = useState('');
+  const [removeMemberError, setRemoveMemberError] = useState('');
+  const [removeMemberSuccessMessage, setRemoveMemberSuccessMessage] =
+    useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,6 +38,7 @@ export function SettingsPage() {
   const [isUsersLoading, setIsUsersLoading] = useState(true);
   const [isTeamDetailLoading, setIsTeamDetailLoading] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
 
   const isAdmin = auth.user?.role === 'admin';
   const canViewTeams = isAdmin || auth.user?.role === 'manager';
@@ -81,6 +86,8 @@ export function SettingsPage() {
       setTeamDetailError('');
       setAddMemberError('');
       setAddMemberSuccessMessage('');
+      setRemoveMemberError('');
+      setRemoveMemberSuccessMessage('');
       setOrganizationUsers([]);
       setSelectedUserId('');
       setIsTeamsLoading(false);
@@ -226,6 +233,8 @@ export function SettingsPage() {
   async function handleViewTeam(teamId) {
     setAddMemberError('');
     setAddMemberSuccessMessage('');
+    setRemoveMemberError('');
+    setRemoveMemberSuccessMessage('');
     setSelectedUserId('');
     setTeamDetailError('');
     setSelectedTeam(null);
@@ -245,6 +254,8 @@ export function SettingsPage() {
     event.preventDefault();
     setAddMemberError('');
     setAddMemberSuccessMessage('');
+    setRemoveMemberError('');
+    setRemoveMemberSuccessMessage('');
 
     if (!canViewTeams) {
       setAddMemberError(
@@ -278,6 +289,48 @@ export function SettingsPage() {
     }
   }
 
+  async function handleRemoveMember(member) {
+    setRemoveMemberError('');
+    setRemoveMemberSuccessMessage('');
+    setAddMemberError('');
+    setAddMemberSuccessMessage('');
+
+    if (!canViewTeams) {
+      setRemoveMemberError(
+        'Only managers and administrators can remove users from teams.',
+      );
+      return;
+    }
+
+    if (!selectedTeam) {
+      setRemoveMemberError('Select a team before removing a member.');
+      return;
+    }
+
+    const shouldRemove = window.confirm(
+      `Remove ${member.firstName} ${member.lastName} from ${selectedTeam.name}?`,
+    );
+
+    if (!shouldRemove) {
+      return;
+    }
+
+    setIsRemovingMember(true);
+
+    try {
+      await removeUserFromTeam(selectedTeam.id, member.id);
+      const refreshedTeam = await getTeam(selectedTeam.id);
+      setSelectedTeam(refreshedTeam);
+      setRemoveMemberSuccessMessage('Team member removed successfully.');
+    } catch (removeError) {
+      setRemoveMemberError(
+        removeError.message || 'Unable to remove team member.',
+      );
+    } finally {
+      setIsRemovingMember(false);
+    }
+  }
+
   return (
     <section>
       <h2>Organization Settings</h2>
@@ -292,6 +345,10 @@ export function SettingsPage() {
       {addMemberError ? <p role="alert">{addMemberError}</p> : null}
       {addMemberSuccessMessage ? (
         <p role="status">{addMemberSuccessMessage}</p>
+      ) : null}
+      {removeMemberError ? <p role="alert">{removeMemberError}</p> : null}
+      {removeMemberSuccessMessage ? (
+        <p role="status">{removeMemberSuccessMessage}</p>
       ) : null}
 
       {!isLoading && organization ? (
@@ -389,7 +446,16 @@ export function SettingsPage() {
                     {selectedTeam.members.map((member) => (
                       <li key={member.id}>
                         {member.firstName} {member.lastName} ({member.email}) -{' '}
-                        {member.role}
+                        {member.role}{' '}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member)}
+                          disabled={isRemovingMember || isAddingMember}
+                        >
+                          {isRemovingMember
+                            ? 'Removing member...'
+                            : `Remove ${member.firstName} ${member.lastName}`}
+                        </button>
                       </li>
                     ))}
                   </ul>

@@ -152,5 +152,43 @@ export function createTeamsService({
         throw error;
       }
     },
+
+    async removeUserFromTeam({ organizationId, teamId, userId }) {
+      const removedMembership = await runInTransaction(async (client) => {
+        const team = await repository.findTeamByIdAndOrganization(client, {
+          teamId,
+          organizationId,
+        });
+
+        if (!team) {
+          throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Team not found.');
+        }
+
+        const user = await repository.findUserByIdAndOrganization(client, {
+          userId,
+          organizationId,
+        });
+
+        if (!user) {
+          throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
+        }
+
+        return repository.removeUserFromTeam(client, {
+          organizationId,
+          teamId,
+          userId,
+        });
+      });
+
+      if (!removedMembership) {
+        throw new AppError(
+          404,
+          'RESOURCE_NOT_FOUND',
+          'Team membership not found.',
+        );
+      }
+
+      return toTeamMembershipResponse(removedMembership);
+    },
   };
 }

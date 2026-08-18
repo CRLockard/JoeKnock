@@ -25,3 +25,9 @@ export function addUserToTeam(teamId, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function removeUserFromTeam(teamId, userId) {
+  return apiFetch(`/teams/${teamId}/users/${userId}`, {
+    method: 'DELETE',
+  });
+}
