@@ -52,6 +52,7 @@ export async function ensureTestMigrations() {
 }
 
 export async function resetRegistrationTables() {
+  await query('DELETE FROM teams');
   await query('DELETE FROM users');
   await query('DELETE FROM organization_settings');
   await query('DELETE FROM organizations');

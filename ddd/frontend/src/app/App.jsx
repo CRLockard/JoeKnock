@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { logout as logoutApi } from '../api/authApi.js';
 import { useAuth } from '../auth/useAuth.js';
@@ -26,9 +27,12 @@ export function App() {
       <header className="app-header">
         <h1>JoeKnock Foundation</h1>
         {auth.isAuthenticated ? (
-          <button type="button" onClick={handleLogout}>
-            Log out
-          </button>
+          <>
+            <Link to="/settings">Settings</Link>
+            <button type="button" onClick={handleLogout}>
+              Log out
+            </button>
+          </>
         ) : null}
       </header>
       <main className="app-main">

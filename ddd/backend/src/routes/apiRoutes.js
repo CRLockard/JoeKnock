@@ -6,18 +6,22 @@ import { buildAuthRoutes } from '../auth/authRoutes.js';
 import { createAuthService } from '../auth/authService.js';
 import { buildOrganizationRoutes } from '../organization/organizationRoutes.js';
 import { createOrganizationService } from '../organization/organizationService.js';
+import { buildTeamsRoutes } from '../teams/teamsRoutes.js';
+import { createTeamsService } from '../teams/teamsService.js';
 import { buildUsersRoutes } from '../users/usersRoutes.js';
 import { createUsersService } from '../users/usersService.js';
 
 export function buildApiRoutes({
   authService,
   organizationService,
+  teamsService,
   usersService,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
   const resolvedOrganizationService =
     organizationService ?? createOrganizationService();
+  const resolvedTeamsService = teamsService ?? createTeamsService();
   const resolvedUsersService = usersService ?? createUsersService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
@@ -33,6 +37,13 @@ export function buildApiRoutes({
     authMiddleware,
     buildUsersRoutes({
       usersService: resolvedUsersService,
+    }),
+  );
+  router.use(
+    '/teams',
+    authMiddleware,
+    buildTeamsRoutes({
+      teamsService: resolvedTeamsService,
     }),
   );
 

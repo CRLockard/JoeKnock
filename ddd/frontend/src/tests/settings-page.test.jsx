@@ -13,10 +13,15 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { getOrganization, updateOrganization } from '../api/organizationApi.js';
+import { createTeam } from '../api/teamsApi.js';
 
 vi.mock('../api/organizationApi.js', () => ({
   getOrganization: vi.fn(),
   updateOrganization: vi.fn(),
+}));
+
+vi.mock('../api/teamsApi.js', () => ({
+  createTeam: vi.fn(),
 }));
 
 function setStoredUser(role) {
@@ -131,6 +136,114 @@ describe('settings page', () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Save organization' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled();
+  });
+
+  it('allows manager to create a team', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    createTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Knoxville',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Organization Settings');
+
+    fireEvent.change(screen.getByLabelText('Team name'), {
+      target: { value: 'North Knoxville' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create team' }));
+
+    await waitFor(() => {
+      expect(createTeam).toHaveBeenCalledWith({ name: 'North Knoxville' });
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Created team North Knoxville.',
+    );
+  });
+
+  it('shows validation error when team name is blank', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Organization Settings');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create team' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Team name is required.',
+    );
+    expect(createTeam).not.toHaveBeenCalled();
+  });
+
+  it('shows API error when team creation fails', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    createTeam.mockRejectedValue(new Error('Invalid request data.'));
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Organization Settings');
+
+    fireEvent.change(screen.getByLabelText('Team name'), {
+      target: { value: 'North Knoxville' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create team' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Invalid request data.',
+    );
+  });
+
+  it('renders representative without team create access', async () => {
+    setStoredUser('rep');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    const teamInput = await screen.findByLabelText('Team name');
+
+    expect(teamInput).toBeDisabled();
+    expect(
+      screen.getByText('Only managers and administrators can create teams.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Create team' }),
     ).not.toBeInTheDocument();
   });
 
