@@ -12,11 +12,63 @@ function toTeamResponse(row) {
   };
 }
 
+function toTeamMemberResponse(row) {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    role: row.role,
+    isActive: row.is_active,
+  };
+}
+
 export function createTeamsService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
 } = {}) {
   return {
+    async listTeams({ organizationId }) {
+      const teams = await runInTransaction(async (client) => {
+        return repository.listTeamsByOrganization(client, { organizationId });
+      });
+
+      return teams.map(toTeamResponse);
+    },
+
+    async getTeam({ teamId, organizationId }) {
+      const result = await runInTransaction(async (client) => {
+        const team = await repository.findTeamByIdAndOrganization(client, {
+          teamId,
+          organizationId,
+        });
+
+        if (!team) {
+          return null;
+        }
+
+        const members = await repository.listTeamMembers(client, {
+          teamId,
+          organizationId,
+        });
+
+        return {
+          team,
+          members,
+        };
+      });
+
+      if (!result) {
+        throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Team not found.');
+      }
+
+      return {
+        ...toTeamResponse(result.team),
+        members: result.members.map(toTeamMemberResponse),
+      };
+    },
+
     async createTeam({ organizationId, name }) {
       const normalizedName = String(name).trim();
 

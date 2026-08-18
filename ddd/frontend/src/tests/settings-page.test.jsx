@@ -13,7 +13,7 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { getOrganization, updateOrganization } from '../api/organizationApi.js';
-import { createTeam } from '../api/teamsApi.js';
+import { createTeam, getTeam, getTeams } from '../api/teamsApi.js';
 
 vi.mock('../api/organizationApi.js', () => ({
   getOrganization: vi.fn(),
@@ -22,6 +22,8 @@ vi.mock('../api/organizationApi.js', () => ({
 
 vi.mock('../api/teamsApi.js', () => ({
   createTeam: vi.fn(),
+  getTeam: vi.fn(),
+  getTeams: vi.fn(),
 }));
 
 function setStoredUser(role) {
@@ -65,6 +67,7 @@ function renderSettings(initialEntries = ['/settings']) {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
+  getTeams.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -111,6 +114,97 @@ describe('settings page', () => {
     );
     expect(screen.getByLabelText('Organization name')).toHaveValue(
       'Renamed Org',
+    );
+  });
+
+  it('loads and renders teams for an authorized manager', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'Alpha Team',
+      },
+      {
+        id: 'team-2',
+        organizationId: 'org-1',
+        name: 'Beta Team',
+      },
+    ]);
+
+    renderSettings(['/settings']);
+
+    expect(await screen.findByText('Alpha Team')).toBeInTheDocument();
+    expect(screen.getByText('Beta Team')).toBeInTheDocument();
+    expect(getTeams).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders teams loading state', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    let resolveTeams;
+    getTeams.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTeams = resolve;
+      }),
+    );
+
+    renderSettings(['/settings']);
+
+    expect(await screen.findByText('Loading teams...')).toBeInTheDocument();
+
+    resolveTeams([]);
+    await screen.findByText('No teams found.');
+  });
+
+  it('renders empty team state correctly', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([]);
+
+    renderSettings(['/settings']);
+
+    expect(await screen.findByText('No teams found.')).toBeInTheDocument();
+  });
+
+  it('renders teams API load error', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockRejectedValue(new Error('Unable to load teams.'));
+
+    renderSettings(['/settings']);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load teams.',
     );
   });
 
@@ -173,6 +267,121 @@ describe('settings page', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Created team North Knoxville.',
+    );
+    expect(screen.getByText('North Knoxville')).toBeInTheDocument();
+  });
+
+  it('loads and renders team members when viewing team detail', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [
+        {
+          id: 'user-1',
+          organizationId: 'org-1',
+          firstName: 'Ana',
+          lastName: 'Able',
+          email: 'ana@example.com',
+          role: 'rep',
+          isActive: true,
+        },
+      ],
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+
+    await waitFor(() => {
+      expect(getTeam).toHaveBeenCalledWith('team-1');
+    });
+
+    expect(
+      await screen.findByText('Ana Able (ana@example.com) - rep'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders empty member state for a team detail view', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [],
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+
+    expect(
+      await screen.findByText('No team members assigned.'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders team detail API error', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getTeam.mockRejectedValue(new Error('Team not found.'));
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Team not found.',
     );
   });
 
@@ -239,6 +448,9 @@ describe('settings page', () => {
     const teamInput = await screen.findByLabelText('Team name');
 
     expect(teamInput).toBeDisabled();
+    expect(
+      screen.getByText('Only managers and administrators can view teams.'),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('Only managers and administrators can create teams.'),
     ).toBeInTheDocument();
