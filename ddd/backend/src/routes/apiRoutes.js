@@ -12,6 +12,8 @@ import { buildUsersRoutes } from '../users/usersRoutes.js';
 import { createUsersService } from '../users/usersService.js';
 import { buildStatusesRoutes } from '../statuses/statusesRoutes.js';
 import { createStatusesService } from '../statuses/statusesService.js';
+import { buildMapRoutes } from '../map/mapRoutes.js';
+import { createMapService } from '../map/mapService.js';
 
 export function buildApiRoutes({
   authService,
@@ -19,6 +21,7 @@ export function buildApiRoutes({
   teamsService,
   usersService,
   statusesService,
+  mapService,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
@@ -27,6 +30,7 @@ export function buildApiRoutes({
   const resolvedTeamsService = teamsService ?? createTeamsService();
   const resolvedUsersService = usersService ?? createUsersService();
   const resolvedStatusesService = statusesService ?? createStatusesService();
+  const resolvedMapService = mapService ?? createMapService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
   router.use(
@@ -55,6 +59,13 @@ export function buildApiRoutes({
     authMiddleware,
     buildStatusesRoutes({
       statusesService: resolvedStatusesService,
+    }),
+  );
+  router.use(
+    '/map',
+    authMiddleware,
+    buildMapRoutes({
+      mapService: resolvedMapService,
     }),
   );
 

@@ -10,7 +10,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider.jsx';
 import { App } from '../app/App.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
-import { MapPage } from '../pages/MapPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { logout } from '../api/authApi.js';
 
@@ -29,7 +28,9 @@ function renderLogoutFlow(initialEntries = ['/map']) {
               path="map"
               element={
                 <ProtectedRoute>
-                  <MapPage />
+                  <section>
+                    <h2>Map</h2>
+                  </section>
                 </ProtectedRoute>
               }
             />

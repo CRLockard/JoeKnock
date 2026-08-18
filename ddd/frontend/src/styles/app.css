@@ -28,3 +28,69 @@ body {
 .app-main {
   padding: 1.25rem;
 }
+
+.map-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.map-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.map-page-header h2 {
+  margin: 0;
+}
+
+.map-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.map-follow-status {
+  font-size: 0.95rem;
+}
+
+.map-feedback {
+  min-height: 1.25rem;
+}
+
+.map-feedback p {
+  margin: 0.2rem 0;
+}
+
+.map-canvas {
+  width: 100%;
+  border: 1px solid #d1d7df;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #e5edf7;
+}
+
+.map-container {
+  width: 100%;
+  height: min(72vh, 720px);
+  min-height: 420px;
+}
+
+@media (max-width: 900px) {
+  .app-main {
+    padding: 0.75rem;
+  }
+
+  .map-page-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .map-container {
+    min-height: 360px;
+    height: 62vh;
+  }
+}
