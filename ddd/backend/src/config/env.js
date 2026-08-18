@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-dotenv.config();
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirPath = path.dirname(currentFilePath);
+const repositoryRootPath = path.resolve(currentDirPath, '../../../../');
+const repositoryEnvPath = path.resolve(repositoryRootPath, '.env');
+
+dotenv.config({ path: repositoryEnvPath });
 
 function must(value, key) {
   if (!value || String(value).trim().length === 0) {
