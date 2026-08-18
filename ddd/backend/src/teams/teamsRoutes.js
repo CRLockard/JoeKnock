@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { AppError } from '../common/errors.js';
 import { createTeamsService } from './teamsService.js';
-import { createTeamValidators, getTeamValidators } from './teamsValidation.js';
+import {
+  addTeamUserValidators,
+  createTeamValidators,
+  getTeamValidators,
+} from './teamsValidation.js';
 import { validate } from '../validation/validate.js';
 
 function requireRoles(allowedRoles) {
@@ -56,6 +60,26 @@ export function buildTeamsRoutes({ teamsService = createTeamsService() } = {}) {
         });
 
         return res.status(200).json(team);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
+  router.post(
+    '/:id/users',
+    requireRoles(['manager', 'admin']),
+    addTeamUserValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const membership = await teamsService.addUserToTeam({
+          organizationId: req.auth.organizationId,
+          teamId: req.params.id,
+          userId: req.body.userId,
+        });
+
+        return res.status(201).json(membership);
       } catch (error) {
         return next(error);
       }

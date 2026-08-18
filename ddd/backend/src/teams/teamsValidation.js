@@ -5,3 +5,8 @@ export const createTeamValidators = [
 ];
 
 export const getTeamValidators = [param('id').isUUID()];
+
+export const addTeamUserValidators = [
+  param('id').isUUID(),
+  body('userId').isUUID(),
+];

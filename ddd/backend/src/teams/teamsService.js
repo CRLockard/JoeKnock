@@ -24,6 +24,19 @@ function toTeamMemberResponse(row) {
   };
 }
 
+function toTeamMembershipResponse(row) {
+  return {
+    organizationId: row.organization_id,
+    teamId: row.team_id,
+    userId: row.user_id,
+    createdAt: row.created_at,
+  };
+}
+
+function isUniqueViolation(error) {
+  return error && error.code === '23505';
+}
+
 export function createTeamsService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
@@ -88,6 +101,56 @@ export function createTeamsService({
       }
 
       return toTeamResponse(team);
+    },
+
+    async addUserToTeam({ organizationId, teamId, userId }) {
+      try {
+        const membership = await runInTransaction(async (client) => {
+          const team = await repository.findTeamByIdAndOrganization(client, {
+            teamId,
+            organizationId,
+          });
+
+          if (!team) {
+            throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Team not found.');
+          }
+
+          const user = await repository.findUserByIdAndOrganization(client, {
+            userId,
+            organizationId,
+          });
+
+          if (!user) {
+            throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
+          }
+
+          return repository.addUserToTeam(client, {
+            organizationId,
+            teamId,
+            userId,
+          });
+        });
+
+        if (!membership) {
+          throw new AppError(
+            500,
+            'INTERNAL_SERVER_ERROR',
+            'Unable to add user to team.',
+          );
+        }
+
+        return toTeamMembershipResponse(membership);
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new AppError(
+            409,
+            'CONFLICT',
+            'User is already a member of this team.',
+          );
+        }
+
+        throw error;
+      }
     },
   };
 }

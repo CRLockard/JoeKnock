@@ -18,3 +18,10 @@ export function createTeam(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function addUserToTeam(teamId, payload) {
+  return apiFetch(`/teams/${teamId}/users`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

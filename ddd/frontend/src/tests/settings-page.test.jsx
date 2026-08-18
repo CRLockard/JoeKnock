@@ -13,7 +13,13 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
 import { getOrganization, updateOrganization } from '../api/organizationApi.js';
-import { createTeam, getTeam, getTeams } from '../api/teamsApi.js';
+import { getUsers } from '../api/usersApi.js';
+import {
+  addUserToTeam,
+  createTeam,
+  getTeam,
+  getTeams,
+} from '../api/teamsApi.js';
 
 vi.mock('../api/organizationApi.js', () => ({
   getOrganization: vi.fn(),
@@ -21,9 +27,14 @@ vi.mock('../api/organizationApi.js', () => ({
 }));
 
 vi.mock('../api/teamsApi.js', () => ({
+  addUserToTeam: vi.fn(),
   createTeam: vi.fn(),
   getTeam: vi.fn(),
   getTeams: vi.fn(),
+}));
+
+vi.mock('../api/usersApi.js', () => ({
+  getUsers: vi.fn(),
 }));
 
 function setStoredUser(role) {
@@ -68,6 +79,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
   getTeams.mockResolvedValue([]);
+  getUsers.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -139,6 +151,8 @@ describe('settings page', () => {
         name: 'Beta Team',
       },
     ]);
+
+    getUsers.mockResolvedValue([]);
 
     renderSettings(['/settings']);
 
@@ -306,6 +320,18 @@ describe('settings page', () => {
       ],
     });
 
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        organizationId: 'org-1',
+        firstName: 'Ben',
+        lastName: 'Baker',
+        email: 'ben@example.com',
+        role: 'rep',
+        isActive: true,
+      },
+    ]);
+
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
@@ -318,6 +344,198 @@ describe('settings page', () => {
     expect(
       await screen.findByText('Ana Able (ana@example.com) - rep'),
     ).toBeInTheDocument();
+
+    expect(screen.getByLabelText('Team member')).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', {
+        name: 'Ben Baker (ben@example.com)',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('adds a selected user to a team and refreshes team detail', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        organizationId: 'org-1',
+        firstName: 'Ben',
+        lastName: 'Baker',
+        email: 'ben@example.com',
+        role: 'rep',
+        isActive: true,
+      },
+    ]);
+
+    getTeam
+      .mockResolvedValueOnce({
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+        members: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+        members: [
+          {
+            id: 'user-2',
+            organizationId: 'org-1',
+            firstName: 'Ben',
+            lastName: 'Baker',
+            email: 'ben@example.com',
+            role: 'rep',
+            isActive: true,
+          },
+        ],
+      });
+
+    addUserToTeam.mockResolvedValue({
+      organizationId: 'org-1',
+      teamId: 'team-1',
+      userId: 'user-2',
+      createdAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+
+    await screen.findByText('No team members assigned.');
+
+    fireEvent.change(screen.getByLabelText('Team member'), {
+      target: { value: 'user-2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
+
+    await waitFor(() => {
+      expect(addUserToTeam).toHaveBeenCalledWith('team-1', {
+        userId: 'user-2',
+      });
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Team member added successfully.',
+    );
+
+    expect(
+      await screen.findByText('Ben Baker (ben@example.com) - rep'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows validation error when team member selection is blank', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([]);
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [],
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('No team members assigned.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'User selection is required.',
+    );
+    expect(addUserToTeam).not.toHaveBeenCalled();
+  });
+
+  it('shows API error when add team member fails', async () => {
+    setStoredUser('manager');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getTeams.mockResolvedValue([
+      {
+        id: 'team-1',
+        organizationId: 'org-1',
+        name: 'North Team',
+      },
+    ]);
+
+    getUsers.mockResolvedValue([
+      {
+        id: 'user-2',
+        organizationId: 'org-1',
+        firstName: 'Ben',
+        lastName: 'Baker',
+        email: 'ben@example.com',
+        role: 'rep',
+        isActive: true,
+      },
+    ]);
+
+    getTeam.mockResolvedValue({
+      id: 'team-1',
+      organizationId: 'org-1',
+      name: 'North Team',
+      members: [],
+    });
+
+    addUserToTeam.mockRejectedValue(
+      new Error('User is already a member of this team.'),
+    );
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('North Team');
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByText('No team members assigned.');
+
+    fireEvent.change(screen.getByLabelText('Team member'), {
+      target: { value: 'user-2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'User is already a member of this team.',
+    );
   });
 
   it('renders empty member state for a team detail view', async () => {
@@ -456,6 +674,9 @@ describe('settings page', () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Create team' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add member' }),
     ).not.toBeInTheDocument();
   });
 

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getOrganization, updateOrganization } from '../api/organizationApi.js';
-import { createTeam, getTeam, getTeams } from '../api/teamsApi.js';
+import { getUsers } from '../api/usersApi.js';
+import {
+  addUserToTeam,
+  createTeam,
+  getTeam,
+  getTeams,
+} from '../api/teamsApi.js';
 import { useAuth } from '../auth/useAuth.js';
 
 export function SettingsPage() {
@@ -9,18 +15,25 @@ export function SettingsPage() {
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teams, setTeams] = useState([]);
+  const [organizationUsers, setOrganizationUsers] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [teamError, setTeamError] = useState('');
   const [teamSuccessMessage, setTeamSuccessMessage] = useState('');
   const [teamsError, setTeamsError] = useState('');
+  const [usersError, setUsersError] = useState('');
   const [teamDetailError, setTeamDetailError] = useState('');
+  const [addMemberError, setAddMemberError] = useState('');
+  const [addMemberSuccessMessage, setAddMemberSuccessMessage] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [isTeamsLoading, setIsTeamsLoading] = useState(true);
+  const [isUsersLoading, setIsUsersLoading] = useState(true);
   const [isTeamDetailLoading, setIsTeamDetailLoading] = useState(false);
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   const isAdmin = auth.user?.role === 'admin';
   const canViewTeams = isAdmin || auth.user?.role === 'manager';
@@ -64,8 +77,14 @@ export function SettingsPage() {
       setTeams([]);
       setSelectedTeam(null);
       setTeamsError('');
+      setUsersError('');
       setTeamDetailError('');
+      setAddMemberError('');
+      setAddMemberSuccessMessage('');
+      setOrganizationUsers([]);
+      setSelectedUserId('');
       setIsTeamsLoading(false);
+      setIsUsersLoading(false);
       setIsTeamDetailLoading(false);
       return;
     }
@@ -98,6 +117,45 @@ export function SettingsPage() {
     }
 
     loadTeams();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canViewTeams]);
+
+  useEffect(() => {
+    if (!canViewTeams) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadOrganizationUsers() {
+      setUsersError('');
+      setIsUsersLoading(true);
+
+      try {
+        const response = await getUsers();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setOrganizationUsers(response);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        setUsersError(loadError.message || 'Unable to load users.');
+      } finally {
+        if (isMounted) {
+          setIsUsersLoading(false);
+        }
+      }
+    }
+
+    loadOrganizationUsers();
 
     return () => {
       isMounted = false;
@@ -166,6 +224,9 @@ export function SettingsPage() {
   }
 
   async function handleViewTeam(teamId) {
+    setAddMemberError('');
+    setAddMemberSuccessMessage('');
+    setSelectedUserId('');
     setTeamDetailError('');
     setSelectedTeam(null);
     setIsTeamDetailLoading(true);
@@ -180,6 +241,43 @@ export function SettingsPage() {
     }
   }
 
+  async function handleAddMember(event) {
+    event.preventDefault();
+    setAddMemberError('');
+    setAddMemberSuccessMessage('');
+
+    if (!canViewTeams) {
+      setAddMemberError(
+        'Only managers and administrators can add users to teams.',
+      );
+      return;
+    }
+
+    if (!selectedTeam) {
+      setAddMemberError('Select a team before adding a member.');
+      return;
+    }
+
+    if (!selectedUserId) {
+      setAddMemberError('User selection is required.');
+      return;
+    }
+
+    setIsAddingMember(true);
+
+    try {
+      await addUserToTeam(selectedTeam.id, { userId: selectedUserId });
+      const refreshedTeam = await getTeam(selectedTeam.id);
+      setSelectedTeam(refreshedTeam);
+      setSelectedUserId('');
+      setAddMemberSuccessMessage('Team member added successfully.');
+    } catch (addError) {
+      setAddMemberError(addError.message || 'Unable to add team member.');
+    } finally {
+      setIsAddingMember(false);
+    }
+  }
+
   return (
     <section>
       <h2>Organization Settings</h2>
@@ -189,7 +287,12 @@ export function SettingsPage() {
       {teamError ? <p role="alert">{teamError}</p> : null}
       {teamSuccessMessage ? <p role="status">{teamSuccessMessage}</p> : null}
       {teamsError ? <p role="alert">{teamsError}</p> : null}
+      {usersError ? <p role="alert">{usersError}</p> : null}
       {teamDetailError ? <p role="alert">{teamDetailError}</p> : null}
+      {addMemberError ? <p role="alert">{addMemberError}</p> : null}
+      {addMemberSuccessMessage ? (
+        <p role="status">{addMemberSuccessMessage}</p>
+      ) : null}
 
       {!isLoading && organization ? (
         <>
@@ -248,6 +351,7 @@ export function SettingsPage() {
             ) : null}
 
             {canViewTeams && isTeamsLoading ? <p>Loading teams...</p> : null}
+            {canViewTeams && isUsersLoading ? <p>Loading users...</p> : null}
 
             {canViewTeams && !isTeamsLoading && teams.length === 0 ? (
               <p>No teams found.</p>
@@ -290,6 +394,31 @@ export function SettingsPage() {
                     ))}
                   </ul>
                 )}
+
+                <form onSubmit={handleAddMember} aria-label="add team member">
+                  <label htmlFor="team-member-user">Team member</label>
+                  <select
+                    id="team-member-user"
+                    name="teamMemberUser"
+                    value={selectedUserId}
+                    onChange={(event) => setSelectedUserId(event.target.value)}
+                    disabled={isAddingMember || isUsersLoading}
+                  >
+                    <option value="">Select a user</option>
+                    {organizationUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="submit"
+                    disabled={isAddingMember || isUsersLoading}
+                  >
+                    {isAddingMember ? 'Adding member...' : 'Add member'}
+                  </button>
+                </form>
               </section>
             ) : null}
           </section>

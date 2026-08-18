@@ -18,6 +18,19 @@ const TEAM_BY_ID_AND_ORGANIZATION_SQL = `
   LIMIT 1
 `;
 
+const USER_BY_ID_AND_ORGANIZATION_SQL = `
+  SELECT id, organization_id
+  FROM users
+  WHERE id = $1 AND organization_id = $2
+  LIMIT 1
+`;
+
+const TEAM_USER_INSERT_SQL = `
+  INSERT INTO team_users (organization_id, team_id, user_id)
+  VALUES ($1, $2, $3)
+  RETURNING organization_id, team_id, user_id, created_at
+`;
+
 const TEAM_MEMBERS_SQL = `
   SELECT
     u.id,
@@ -58,11 +71,30 @@ export const teamsRepository = {
     return result.rows[0] ?? null;
   },
 
+  async findUserByIdAndOrganization(client, { userId, organizationId }) {
+    const result = await client.query(USER_BY_ID_AND_ORGANIZATION_SQL, [
+      userId,
+      organizationId,
+    ]);
+
+    return result.rows[0] ?? null;
+  },
+
   async listTeamMembers(client, { teamId, organizationId }) {
     const result = await client.query(TEAM_MEMBERS_SQL, [
       teamId,
       organizationId,
     ]);
     return result.rows;
+  },
+
+  async addUserToTeam(client, { organizationId, teamId, userId }) {
+    const result = await client.query(TEAM_USER_INSERT_SQL, [
+      organizationId,
+      teamId,
+      userId,
+    ]);
+
+    return result.rows[0] ?? null;
   },
 };
