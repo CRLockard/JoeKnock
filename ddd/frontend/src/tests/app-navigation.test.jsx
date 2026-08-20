@@ -8,7 +8,7 @@ vi.mock('../api/authApi.js', () => ({
   logout: vi.fn().mockResolvedValue({ message: 'Logged out successfully.' }),
 }));
 
-function setStoredSession() {
+function setStoredSession(role = 'manager') {
   localStorage.setItem('joeknock.jwt', 'token-123');
   localStorage.setItem(
     'joeknock.user',
@@ -18,7 +18,7 @@ function setStoredSession() {
       firstName: 'Corey',
       lastName: 'Lopez',
       email: 'corey@example.com',
-      role: 'manager',
+      role,
       isActive: true,
     }),
   );
@@ -80,5 +80,57 @@ describe('app navigation', () => {
     const settingsLink = await screen.findByRole('link', { name: 'Settings' });
 
     expect(settingsLink).toHaveAttribute('href', '/settings');
+  });
+
+  it('renders Reports link for manager users', async () => {
+    setStoredSession('manager');
+
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    const reportsLink = await screen.findByRole('link', {
+      name: 'Reports',
+    });
+    expect(reportsLink).toHaveAttribute('href', '/reports/activity');
+  });
+
+  it('renders Reports link for admin users', async () => {
+    setStoredSession('admin');
+
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    const reportsLink = await screen.findByRole('link', {
+      name: 'Reports',
+    });
+    expect(reportsLink).toHaveAttribute('href', '/reports/activity');
+  });
+
+  it('does not render Reports link for rep users', async () => {
+    setStoredSession('rep');
+
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    await screen.findByRole('link', { name: 'Settings' });
+
+    expect(
+      screen.queryByRole('link', { name: 'Reports' }),
+    ).not.toBeInTheDocument();
   });
 });

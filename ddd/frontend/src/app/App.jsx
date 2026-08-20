@@ -29,6 +29,9 @@ export function App() {
         {auth.isAuthenticated ? (
           <>
             <Link to="/settings">Settings</Link>
+            {auth.user?.role === 'manager' || auth.user?.role === 'admin' ? (
+              <Link to="/reports/activity">Reports</Link>
+            ) : null}
             <button type="button" onClick={handleLogout}>
               Log out
             </button>

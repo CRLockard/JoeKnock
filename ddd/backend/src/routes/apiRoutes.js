@@ -18,6 +18,8 @@ import { buildPropertiesRoutes } from '../properties/propertiesRoutes.js';
 import { createPropertiesService } from '../properties/propertiesService.js';
 import { buildInteractionsRoutes } from '../interactions/interactionsRoutes.js';
 import { createInteractionsService } from '../interactions/interactionsService.js';
+import { buildReportsRoutes } from '../reports/reportsRoutes.js';
+import { createReportsService } from '../reports/reportsService.js';
 
 export function buildApiRoutes({
   authService,
@@ -28,6 +30,7 @@ export function buildApiRoutes({
   mapService,
   propertiesService,
   interactionsService,
+  reportsService,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
@@ -41,6 +44,7 @@ export function buildApiRoutes({
     propertiesService ?? createPropertiesService();
   const resolvedInteractionsService =
     interactionsService ?? createInteractionsService();
+  const resolvedReportsService = reportsService ?? createReportsService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
   router.use(
@@ -91,6 +95,13 @@ export function buildApiRoutes({
     authMiddleware,
     buildInteractionsRoutes({
       interactionsService: resolvedInteractionsService,
+    }),
+  );
+  router.use(
+    '/reports',
+    authMiddleware,
+    buildReportsRoutes({
+      reportsService: resolvedReportsService,
     }),
   );
 

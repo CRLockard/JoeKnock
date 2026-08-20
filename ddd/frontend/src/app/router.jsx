@@ -6,6 +6,7 @@ import { MapPage } from '../pages/MapPage.jsx';
 import { ProfilePage } from '../pages/ProfilePage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { UsersPage } from '../pages/UsersPage.jsx';
+import { ActivityReportPage } from '../pages/ActivityReportPage.jsx';
 
 export const router = createBrowserRouter([
   {
@@ -43,6 +44,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <UsersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'reports/activity',
+        element: (
+          <ProtectedRoute>
+            <ActivityReportPage />
           </ProtectedRoute>
         ),
       },
