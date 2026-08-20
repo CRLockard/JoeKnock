@@ -6,11 +6,41 @@ import {
   resolvePropertyValidators,
 } from './propertiesValidation.js';
 import { validate } from '../validation/validate.js';
+import { createInteractionsService } from '../interactions/interactionsService.js';
+import { createInteractionValidators } from '../interactions/interactionsValidation.js';
 
 export function buildPropertiesRoutes({
   propertiesService = createPropertiesService(),
+  interactionsService = createInteractionsService(),
 } = {}) {
   const router = Router();
+
+  router.post(
+    '/:propertyId/interactions',
+    createInteractionValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const snapshot = await interactionsService.createInteractionForProperty(
+          {
+            organizationId: req.auth.organizationId,
+            userId: req.auth.userId,
+            propertyId: req.params.propertyId,
+            statusId: req.body.statusId,
+            contactName: req.body.contactName,
+            contactPhone: req.body.contactPhone,
+            contactEmail: req.body.contactEmail,
+            notes: req.body.notes,
+            clientRequestId: req.body.clientRequestId,
+          },
+        );
+
+        return res.status(201).json(snapshot);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
 
   router.get(
     '/:id',

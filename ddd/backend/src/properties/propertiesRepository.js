@@ -60,6 +60,7 @@ const CURRENT_VISIBLE_PROPERTY_INTERACTIONS_SQL = `
       AND tu.user_id = $2
   )
   SELECT
+    i.id AS interaction_id,
     i.interaction_group_id,
     i.user_id,
     i.status_id,

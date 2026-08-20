@@ -61,4 +61,29 @@ describe('property read APIs', () => {
       },
     );
   });
+
+  it('creates a property interaction through backend endpoint', async () => {
+    const { createPropertyInteraction } =
+      await import('../api/propertiesApi.js');
+
+    const payload = {
+      statusId: 'status-1',
+      notes: 'Homeowner asked for follow-up.',
+      contactName: 'Taylor Homeowner',
+      contactPhone: '555-555-0100',
+      contactEmail: 'taylor@example.com',
+    };
+
+    apiFetch.mockResolvedValueOnce({ interactionId: 'interaction-1' });
+
+    await createPropertyInteraction('property-1', payload);
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/properties/property-1/interactions',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  });
 });

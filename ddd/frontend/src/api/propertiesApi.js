@@ -18,3 +18,10 @@ export function getPropertyInteractions(propertyId) {
     method: 'GET',
   });
 }
+
+export function createPropertyInteraction(propertyId, payload) {
+  return apiFetch(`/properties/${propertyId}/interactions`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

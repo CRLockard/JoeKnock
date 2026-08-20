@@ -49,6 +49,7 @@ function toIsoTimestamp(value) {
 
 function toCurrentInteractionResponse(row) {
   return {
+    interactionId: row.interaction_id,
     interactionGroupId: row.interaction_group_id,
     userId: row.user_id,
     statusId: row.status_id,
