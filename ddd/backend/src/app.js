@@ -30,6 +30,7 @@ export function createApp({
   propertiesService,
   interactionsService,
   reportsService,
+  exportsService,
 } = {}) {
   const app = express();
 
@@ -78,6 +79,7 @@ export function createApp({
       propertiesService,
       interactionsService,
       reportsService,
+      exportsService,
     }),
   );
 

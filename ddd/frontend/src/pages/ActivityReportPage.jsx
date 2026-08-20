@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { exportPropertiesCsv } from '../api/exportsApi.js';
 import { getActivityReport } from '../api/reportsApi.js';
 import { getStatuses } from '../api/statusesApi.js';
 import { getTeams } from '../api/teamsApi.js';
@@ -43,8 +44,10 @@ export function ActivityReportPage() {
   const [report, setReport] = useState(() => emptyReport());
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [optionsError, setOptionsError] = useState('');
   const [reportError, setReportError] = useState('');
+  const [exportError, setExportError] = useState('');
 
   const canViewReports =
     auth.user?.role === 'manager' || auth.user?.role === 'admin';
@@ -112,6 +115,35 @@ export function ActivityReportPage() {
       setReportError(error.message || 'Unable to load activity report.');
     } finally {
       setIsLoadingReport(false);
+    }
+  }
+
+  async function handleExportCsv() {
+    setExportError('');
+    setIsExporting(true);
+
+    try {
+      const response = await exportPropertiesCsv({
+        dateFrom,
+        dateTo,
+        userId: userId || undefined,
+        teamId: teamId || undefined,
+        statusId: statusId || undefined,
+      });
+
+      const downloadUrl = window.URL.createObjectURL(response.blob);
+      const link = document.createElement('a');
+
+      link.href = downloadUrl;
+      link.download = response.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setExportError(error.message || 'Unable to export activity CSV.');
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -205,10 +237,14 @@ export function ActivityReportPage() {
         <button type="submit" disabled={isLoadingReport}>
           {isLoadingReport ? 'Loading report...' : 'Run report'}
         </button>
+        <button type="button" onClick={handleExportCsv} disabled={isExporting}>
+          {isExporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </form>
 
       {optionsError ? <p role="alert">{optionsError}</p> : null}
       {reportError ? <p role="alert">{reportError}</p> : null}
+      {exportError ? <p role="alert">{exportError}</p> : null}
 
       <div aria-live="polite">
         <p>Total knocks: {report.summary.totalKnocks}</p>
