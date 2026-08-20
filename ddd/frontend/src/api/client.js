@@ -1,6 +1,37 @@
 import { config } from '../config/env.js';
 import { loadSession } from '../auth/authStorage.js';
 
+let authFailureHandler = null;
+let authRecoveryPromise = null;
+
+export function setAuthFailureHandler(handler) {
+  authFailureHandler = handler;
+}
+
+function shouldRecoverAuthentication({ response, body, session }) {
+  if (!session?.token) {
+    return false;
+  }
+
+  return response.status === 401 || body?.error?.code === 'UNAUTHENTICATED';
+}
+
+async function recoverAuthentication() {
+  if (!authFailureHandler) {
+    return;
+  }
+
+  if (!authRecoveryPromise) {
+    authRecoveryPromise = Promise.resolve()
+      .then(() => authFailureHandler())
+      .finally(() => {
+        authRecoveryPromise = null;
+      });
+  }
+
+  await authRecoveryPromise;
+}
+
 export async function apiFetch(path, options = {}) {
   const session = loadSession();
   const headers = new Headers(options.headers ?? {});
@@ -21,6 +52,10 @@ export async function apiFetch(path, options = {}) {
   const body = hasJson ? await response.json() : null;
 
   if (!response.ok) {
+    if (shouldRecoverAuthentication({ response, body, session })) {
+      await recoverAuthentication();
+    }
+
     const message = body?.error?.message ?? 'Request failed';
     const error = new Error(message);
     error.status = response.status;

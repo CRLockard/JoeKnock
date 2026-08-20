@@ -1,4 +1,5 @@
-import { createContext, useMemo, useState } from 'react';
+import { createContext, useEffect, useMemo, useState } from 'react';
+import { setAuthFailureHandler } from '../api/client.js';
 import { clearSession, loadSession, saveSession } from './authStorage.js';
 
 export const AuthContext = createContext(null);
@@ -6,6 +7,17 @@ export const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const initial = loadSession();
   const [session, setSession] = useState(initial);
+
+  useEffect(() => {
+    setAuthFailureHandler(() => {
+      clearSession();
+      setSession(null);
+    });
+
+    return () => {
+      setAuthFailureHandler(null);
+    };
+  }, []);
 
   const value = useMemo(
     () => ({
