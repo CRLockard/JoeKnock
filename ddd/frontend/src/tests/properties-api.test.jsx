@@ -27,3 +27,38 @@ describe('resolvePropertyLocation', () => {
     });
   });
 });
+
+describe('property read APIs', () => {
+  it('loads a property by id through backend /properties/:id endpoint', async () => {
+    const { getPropertyById } = await import('../api/propertiesApi.js');
+
+    apiFetch.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      addressLine1: '123 Main St',
+    });
+
+    await getPropertyById('property-1');
+
+    expect(apiFetch).toHaveBeenCalledWith('/properties/property-1', {
+      method: 'GET',
+    });
+  });
+
+  it('loads current interactions by property id through backend endpoint', async () => {
+    const { getPropertyInteractions } = await import('../api/propertiesApi.js');
+
+    apiFetch.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    await getPropertyInteractions('property-1');
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/properties/property-1/interactions',
+      {
+        method: 'GET',
+      },
+    );
+  });
+});

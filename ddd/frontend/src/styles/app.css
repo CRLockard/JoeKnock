@@ -79,6 +79,39 @@ body {
   min-height: 420px;
 }
 
+.map-property-panel {
+  border: 1px solid #c9d3e2;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.map-property-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.map-property-panel-header h3 {
+  margin: 0;
+}
+
+.map-property-address,
+.map-property-meta,
+.map-property-interactions p {
+  margin: 0.45rem 0;
+}
+
+.map-property-interactions h4 {
+  margin: 0.55rem 0 0.35rem;
+}
+
+.map-property-interactions ul {
+  margin: 0.2rem 0 0.4rem;
+  padding-left: 1.1rem;
+}
+
 @media (max-width: 900px) {
   .app-main {
     padding: 0.75rem;

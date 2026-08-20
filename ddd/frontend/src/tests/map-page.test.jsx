@@ -2,14 +2,18 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MapPage } from '../pages/MapPage.jsx';
 import { getMapProperties } from '../api/mapApi.js';
-import { resolvePropertyLocation } from '../api/propertiesApi.js';
+import {
+  getPropertyById,
+  getPropertyInteractions,
+} from '../api/propertiesApi.js';
 
 vi.mock('../api/mapApi.js', () => ({
   getMapProperties: vi.fn(),
 }));
 
 vi.mock('../api/propertiesApi.js', () => ({
-  resolvePropertyLocation: vi.fn(),
+  getPropertyById: vi.fn(),
+  getPropertyInteractions: vi.fn(),
 }));
 
 const mockState = vi.hoisted(() => ({
@@ -44,8 +48,14 @@ vi.mock('react-leaflet', async () => {
       </div>
     ),
     TileLayer: () => <div data-testid="tile-layer" />,
-    Marker: ({ children }) => (
-      <div data-testid="property-marker">{children}</div>
+    Marker: ({ children, eventHandlers }) => (
+      <button
+        type="button"
+        data-testid="property-marker"
+        onClick={() => eventHandlers?.click?.()}
+      >
+        {children}
+      </button>
     ),
     Popup: ({ children }) => <div>{children}</div>,
     CircleMarker: ({ children }) => (
@@ -103,13 +113,26 @@ beforeEach(() => {
   mockState.latestMapHandlers = null;
   mockState.setViewMock.mockReset();
   getMapProperties.mockResolvedValue([]);
-  resolvePropertyLocation.mockResolvedValue({
-    property: {
-      propertyId: 'property-resolved',
-      latitude: 35.5,
-      longitude: -84.11,
-    },
-    created: false,
+  getPropertyById.mockResolvedValue({
+    propertyId: 'property-1',
+    addressLine1: '123 Main St',
+    addressLine2: null,
+    city: 'Knoxville',
+    state: 'TN',
+    postalCode: '37901',
+    country: 'US',
+    latitude: 35.51,
+    longitude: -84.11,
+  });
+  getPropertyInteractions.mockResolvedValue({
+    propertyId: 'property-1',
+    interactions: [
+      {
+        interactionGroupId: 'group-1',
+        statusName: 'Interested',
+        notes: 'Wants a follow-up call.',
+      },
+    ],
   });
 });
 
@@ -179,48 +202,75 @@ describe('MapPage', () => {
     );
   });
 
-  it('resolves a selected map coordinate through backend properties API', async () => {
+  it('loads selected property details and current interactions from marker click', async () => {
     mockGeolocationSuccess();
+    getMapProperties.mockResolvedValue([
+      { propertyId: 'property-1', latitude: 35.51, longitude: -84.11 },
+    ]);
 
     render(<MapPage />);
 
+    const marker = await screen.findByTestId('property-marker');
+
     await act(async () => {
-      await mockState.latestMapHandlers.click({
-        latlng: { lat: 35.51234567, lng: -84.11345678 },
-      });
+      marker.click();
     });
 
-    expect(resolvePropertyLocation).toHaveBeenCalledWith({
-      latitude: 35.512346,
-      longitude: -84.113457,
-    });
+    expect(getPropertyById).toHaveBeenCalledWith('property-1');
+    expect(getPropertyInteractions).toHaveBeenCalledWith('property-1');
 
-    const statusMessages = await screen.findAllByRole('status');
     expect(
-      statusMessages.some((message) =>
-        (message.textContent ?? '').includes('property-resolved'),
-      ),
-    ).toBe(true);
+      await screen.findByRole('heading', { name: 'Selected Property' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Current Interaction State')).toBeInTheDocument();
+    expect(screen.getByText('Interested')).toBeInTheDocument();
+    expect(screen.getByText(/Wants a follow-up call\./)).toBeInTheDocument();
   });
 
-  it('shows unresolvable message when backend cannot resolve selected location', async () => {
+  it('allows canceling selected property and returns to free map mode', async () => {
     mockGeolocationSuccess();
-    resolvePropertyLocation.mockRejectedValueOnce(
-      Object.assign(new Error('Unresolvable'), {
-        code: 'PROPERTY_LOCATION_UNRESOLVABLE',
-      }),
+    getMapProperties.mockResolvedValue([
+      { propertyId: 'property-1', latitude: 35.51, longitude: -84.11 },
+    ]);
+
+    render(<MapPage />);
+
+    const marker = await screen.findByTestId('property-marker');
+
+    await act(async () => {
+      marker.click();
+    });
+
+    const cancelButton = await screen.findByRole('button', { name: 'Cancel' });
+
+    await act(async () => {
+      cancelButton.click();
+    });
+
+    expect(
+      screen.queryByRole('heading', { name: 'Selected Property' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows an error when property detail loading fails for selected marker', async () => {
+    mockGeolocationSuccess();
+    getMapProperties.mockResolvedValue([
+      { propertyId: 'property-1', latitude: 35.51, longitude: -84.11 },
+    ]);
+    getPropertyById.mockRejectedValueOnce(
+      new Error('Unable to load property.'),
     );
 
     render(<MapPage />);
 
+    const marker = await screen.findByTestId('property-marker');
+
     await act(async () => {
-      await mockState.latestMapHandlers.click({
-        latlng: { lat: 35.6123, lng: -84.2123 },
-      });
+      marker.click();
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This location could not be resolved to a valid property address.',
+      'Unable to load property.',
     );
   });
 });

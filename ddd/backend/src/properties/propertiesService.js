@@ -25,6 +25,43 @@ function toPropertyResponse(row) {
   };
 }
 
+function toPropertyDetailResponse(row) {
+  return {
+    propertyId: row.id,
+    addressLine1: row.address_line_1,
+    addressLine2: row.address_line_2,
+    city: row.city,
+    state: row.state,
+    postalCode: row.postal_code,
+    country: row.country,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+  };
+}
+
+function toIsoTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function toCurrentInteractionResponse(row) {
+  return {
+    interactionGroupId: row.interaction_group_id,
+    userId: row.user_id,
+    statusId: row.status_id,
+    statusName: row.status_name,
+    initialInteractionAt: toIsoTimestamp(row.initial_interaction_at),
+    changedAt: toIsoTimestamp(row.changed_at),
+    contactName: row.contact_name,
+    contactPhone: row.contact_phone,
+    contactEmail: row.contact_email,
+    notes: row.notes,
+  };
+}
+
 function toUnresolvableError() {
   return new AppError(
     422,
@@ -49,6 +86,63 @@ export function createPropertiesService({
   runInTransaction = withTransaction,
 } = {}) {
   return {
+    async getPropertyById({ organizationId, propertyId }) {
+      const property = await runInTransaction(async (client) => {
+        return repository.findById(client, { organizationId, propertyId });
+      });
+
+      if (!property) {
+        throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Property not found.');
+      }
+
+      return toPropertyDetailResponse(property);
+    },
+
+    async listCurrentPropertyInteractions({
+      organizationId,
+      userId,
+      role,
+      propertyId,
+    }) {
+      const result = await runInTransaction(async (client) => {
+        const property = await repository.findById(client, {
+          organizationId,
+          propertyId,
+        });
+
+        if (!property) {
+          throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Property not found.');
+        }
+
+        const repVisibility = await repository.getRepVisibility(client, {
+          organizationId,
+        });
+
+        if (!repVisibility) {
+          throw new AppError(
+            404,
+            'RESOURCE_NOT_FOUND',
+            'Organization settings not found.',
+          );
+        }
+
+        const rows = await repository.listCurrentVisibleInteractions(client, {
+          organizationId,
+          userId,
+          role,
+          repVisibility,
+          propertyId,
+        });
+
+        return rows;
+      });
+
+      return {
+        propertyId,
+        interactions: result.map(toCurrentInteractionResponse),
+      };
+    },
+
     async resolveProperty({ organizationId, latitude, longitude, requestId }) {
       let resolved;
 

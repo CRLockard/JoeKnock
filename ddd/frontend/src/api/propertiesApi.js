@@ -6,3 +6,15 @@ export function resolvePropertyLocation({ latitude, longitude }) {
     body: JSON.stringify({ latitude, longitude }),
   });
 }
+
+export function getPropertyById(propertyId) {
+  return apiFetch(`/properties/${propertyId}`, {
+    method: 'GET',
+  });
+}
+
+export function getPropertyInteractions(propertyId) {
+  return apiFetch(`/properties/${propertyId}/interactions`, {
+    method: 'GET',
+  });
+}

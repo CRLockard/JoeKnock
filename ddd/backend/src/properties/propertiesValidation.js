@@ -1,4 +1,4 @@
-import { body } from 'express-validator';
+import { body, param } from 'express-validator';
 
 const MUTABLE_FIELDS = ['latitude', 'longitude'];
 
@@ -40,4 +40,12 @@ export const resolvePropertyValidators = [
     .isFloat({ min: -180, max: 180 })
     .withMessage('longitude must be between -180 and 180.')
     .toFloat(),
+];
+
+export const getPropertyValidators = [
+  param('id').isUUID().withMessage('id must be a valid UUID.'),
+];
+
+export const getPropertyInteractionsValidators = [
+  param('propertyId').isUUID().withMessage('propertyId must be a valid UUID.'),
 ];
