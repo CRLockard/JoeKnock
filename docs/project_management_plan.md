@@ -111,33 +111,25 @@ If implementation reveals that additional work is required:
 
 # 3. Engineering Phases
 
-The MVP will be implemented through the following phases:
+The remaining MVP implementation work is sequenced through the following phases:
 
 ```text
-Phase 1 — Project Foundation
+Phase 1 — Access Policy Completion (US-034, US-035, US-036)
         ↓
-Phase 2 — Database Foundation
+Phase 2 — Property Detail and Map Selection (US-027, US-028, US-040)
         ↓
-Phase 3 — Authentication Foundation
+Phase 3 — Interaction Snapshot Core (US-029, US-031, US-032, US-048)
         ↓
-Phase 4 — Organization & User Management
+Phase 4 — In-Map Capture and Resilience (US-041, US-030, US-043, US-044)
         ↓
-Phase 5 — Team Management & Visibility
+Phase 5 — Activity Reporting (US-037, US-038, US-039)
         ↓
-Phase 6 — Property & Geocoding Infrastructure
-        ↓
-Phase 7 — Interaction Engine
-        ↓
-Phase 8 — Reporting & Export
-        ↓
-Phase 9 — Frontend Application Foundation
-        ↓
-Phase 10 — Map & Field Workflow
-        ↓
-Phase 11 — End-to-End Integration
-        ↓
-Phase 12 — Security, Hardening & MVP Validation
+Phase 6 — CSV Export (US-047)
 ```
+
+Deferred tickets remain outside this phase sequence unless MVP scope is explicitly changed: US-022, US-024, US-025, US-033.
+
+For remaining MVP work, this phase index is authoritative.
 
 Some work within a phase may be performed in parallel in a larger team.
 

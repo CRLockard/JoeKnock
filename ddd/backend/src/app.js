@@ -27,6 +27,7 @@ export function createApp({
   usersService,
   statusesService,
   mapService,
+  propertiesService,
 } = {}) {
   const app = express();
 
@@ -72,6 +73,7 @@ export function createApp({
       usersService,
       statusesService,
       mapService,
+      propertiesService,
     }),
   );
 

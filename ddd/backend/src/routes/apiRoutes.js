@@ -14,6 +14,8 @@ import { buildStatusesRoutes } from '../statuses/statusesRoutes.js';
 import { createStatusesService } from '../statuses/statusesService.js';
 import { buildMapRoutes } from '../map/mapRoutes.js';
 import { createMapService } from '../map/mapService.js';
+import { buildPropertiesRoutes } from '../properties/propertiesRoutes.js';
+import { createPropertiesService } from '../properties/propertiesService.js';
 
 export function buildApiRoutes({
   authService,
@@ -22,6 +24,7 @@ export function buildApiRoutes({
   usersService,
   statusesService,
   mapService,
+  propertiesService,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
@@ -31,6 +34,8 @@ export function buildApiRoutes({
   const resolvedUsersService = usersService ?? createUsersService();
   const resolvedStatusesService = statusesService ?? createStatusesService();
   const resolvedMapService = mapService ?? createMapService();
+  const resolvedPropertiesService =
+    propertiesService ?? createPropertiesService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
   router.use(
@@ -66,6 +71,13 @@ export function buildApiRoutes({
     authMiddleware,
     buildMapRoutes({
       mapService: resolvedMapService,
+    }),
+  );
+  router.use(
+    '/properties',
+    authMiddleware,
+    buildPropertiesRoutes({
+      propertiesService: resolvedPropertiesService,
     }),
   );
 

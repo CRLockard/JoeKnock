@@ -10,6 +10,8 @@ Priority: P0
 
 MVP: Yes
 
+Implementation Phase: Phase 1 - Access Policy Completion
+
 Dependencies:
 
 - #5 manage organization information/settings readiness.
@@ -40,9 +42,9 @@ Deliver the approved user-story outcome for Issue #34 with endpoint, authorizati
 ## 4.1 Included
 
 - Representatives can see only their own most recent/current interactions.
-- Managers/admins continue to follow their role-based visibility rules.  For `team`:
-- Representatives can see the most recent/current interactions where the interaction owner is on one of their teams, according to finalized team visibility rules.  For `organization`:
-- Representatives, managers, and administrators can see all current/most recent interactions within their organization boundary.  Additional rules:
+- Managers/admins continue to follow their role-based visibility rules. For `team`:
+- Representatives can see the most recent/current interactions where the interaction owner is on one of their teams, according to finalized team visibility rules. For `organization`:
+- Representatives, managers, and administrators can see all current/most recent interactions within their organization boundary. Additional rules:
 - Manager/admin edits do not transfer ownership.
 - The original representative remains the interaction owner and retains visibility of their interaction.
 - Organization boundaries always apply.
@@ -112,9 +114,9 @@ Authentication, authorization, request payload validation, and response/error be
 # 9. Business Rules
 
 - Representatives can see only their own most recent/current interactions.
-- Managers/admins continue to follow their role-based visibility rules.  For `team`:
-- Representatives can see the most recent/current interactions where the interaction owner is on one of their teams, according to finalized team visibility rules.  For `organization`:
-- Representatives, managers, and administrators can see all current/most recent interactions within their organization boundary.  Additional rules:
+- Managers/admins continue to follow their role-based visibility rules. For `team`:
+- Representatives can see the most recent/current interactions where the interaction owner is on one of their teams, according to finalized team visibility rules. For `organization`:
+- Representatives, managers, and administrators can see all current/most recent interactions within their organization boundary. Additional rules:
 - Manager/admin edits do not transfer ownership.
 - The original representative remains the interaction owner and retains visibility of their interaction.
 - Organization boundaries always apply.
@@ -131,13 +133,13 @@ Authentication, authorization, request payload validation, and response/error be
 
 # 11. Error Handling
 
-| Condition | Expected Behavior |
-| --- | --- |
-| Validation failure | 400 validation error envelope with actionable detail. |
-| Missing/invalid auth | 401 unauthenticated error envelope for protected endpoints. |
-| Unauthorized role | 403 forbidden error envelope. |
-| Cross-organization access | Denied per contract (not-found/forbidden as documented). |
-| Unexpected backend failure | 500 internal error envelope without sensitive leakage. |
+| Condition                  | Expected Behavior                                           |
+| -------------------------- | ----------------------------------------------------------- |
+| Validation failure         | 400 validation error envelope with actionable detail.       |
+| Missing/invalid auth       | 401 unauthenticated error envelope for protected endpoints. |
+| Unauthorized role          | 403 forbidden error envelope.                               |
+| Cross-organization access  | Denied per contract (not-found/forbidden as documented).    |
+| Unexpected backend failure | 500 internal error envelope without sensitive leakage.      |
 
 # 12. Test Requirements
 
@@ -201,11 +203,11 @@ then cross-organization access is denied.
 
 ## Expected Modified Files
 
-- ddd/backend/src/<domain>/*
-- ddd/frontend/src/pages/<feature>*.jsx
-- ddd/frontend/src/api/*
-- ddd/backend/tests/integration/*
-- ddd/frontend/src/tests/*
+- ddd/backend/src/<domain>/\*
+- ddd/frontend/src/pages/<feature>\*.jsx
+- ddd/frontend/src/api/\*
+- ddd/backend/tests/integration/\*
+- ddd/frontend/src/tests/\*
 
 ## Potential New Files
 
@@ -220,6 +222,10 @@ then cross-organization access is denied.
 
 - #5 manage organization information/settings readiness.
 - #10-#13 teams foundation.
+
+## Phase Dependency
+
+- Phase 1 anchor ticket for cross-domain visibility policy.
 
 ## Required Architecture
 

@@ -2,9 +2,14 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MapPage } from '../pages/MapPage.jsx';
 import { getMapProperties } from '../api/mapApi.js';
+import { resolvePropertyLocation } from '../api/propertiesApi.js';
 
 vi.mock('../api/mapApi.js', () => ({
   getMapProperties: vi.fn(),
+}));
+
+vi.mock('../api/propertiesApi.js', () => ({
+  resolvePropertyLocation: vi.fn(),
 }));
 
 const mockState = vi.hoisted(() => ({
@@ -98,6 +103,14 @@ beforeEach(() => {
   mockState.latestMapHandlers = null;
   mockState.setViewMock.mockReset();
   getMapProperties.mockResolvedValue([]);
+  resolvePropertyLocation.mockResolvedValue({
+    property: {
+      propertyId: 'property-resolved',
+      latitude: 35.5,
+      longitude: -84.11,
+    },
+    created: false,
+  });
 });
 
 afterEach(() => {
@@ -163,6 +176,51 @@ describe('MapPage', () => {
 
     expect(mockState.setViewMock.mock.calls.length).toBe(
       setViewCallsBeforeInteraction,
+    );
+  });
+
+  it('resolves a selected map coordinate through backend properties API', async () => {
+    mockGeolocationSuccess();
+
+    render(<MapPage />);
+
+    await act(async () => {
+      await mockState.latestMapHandlers.click({
+        latlng: { lat: 35.51234567, lng: -84.11345678 },
+      });
+    });
+
+    expect(resolvePropertyLocation).toHaveBeenCalledWith({
+      latitude: 35.512346,
+      longitude: -84.113457,
+    });
+
+    const statusMessages = await screen.findAllByRole('status');
+    expect(
+      statusMessages.some((message) =>
+        (message.textContent ?? '').includes('property-resolved'),
+      ),
+    ).toBe(true);
+  });
+
+  it('shows unresolvable message when backend cannot resolve selected location', async () => {
+    mockGeolocationSuccess();
+    resolvePropertyLocation.mockRejectedValueOnce(
+      Object.assign(new Error('Unresolvable'), {
+        code: 'PROPERTY_LOCATION_UNRESOLVABLE',
+      }),
+    );
+
+    render(<MapPage />);
+
+    await act(async () => {
+      await mockState.latestMapHandlers.click({
+        latlng: { lat: 35.6123, lng: -84.2123 },
+      });
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This location could not be resolved to a valid property address.',
     );
   });
 });

@@ -10,11 +10,12 @@ Priority: P0
 
 MVP: Yes
 
+Implementation Phase: Phase 3 - Interaction Snapshot Core
+
 Dependencies:
 
 - #29 record new interaction.
 - #31 update interaction.
-- #37 reporting semantics.
 
 Related Documentation:
 
@@ -44,7 +45,7 @@ Deliver the approved user-story outcome for Issue #48 with endpoint, authorizati
 - Historical interaction business data is immutable after snapshot creation.
 - `is_current` transitions are controlled and only used to move current-state designation.
 - Create and update interaction flows enforce the invariant at database/service boundaries as appropriate.
-- Latest/current snapshot selection is deterministic:   1. `changed_at DESC`   2. `id DESC` as tie-break when `changed_at` is equal
+- Latest/current snapshot selection is deterministic: 1. `changed_at DESC` 2. `id DESC` as tie-break when `changed_at` is equal
 - `initial_interaction_at` remains stable across revisions.
 - `changed_at` changes for each new revision snapshot.
 - Revisions do not create additional knocks.
@@ -110,7 +111,7 @@ Authentication, authorization, request payload validation, and response/error be
 - Historical interaction business data is immutable after snapshot creation.
 - `is_current` transitions are controlled and only used to move current-state designation.
 - Create and update interaction flows enforce the invariant at database/service boundaries as appropriate.
-- Latest/current snapshot selection is deterministic:   1. `changed_at DESC`   2. `id DESC` as tie-break when `changed_at` is equal
+- Latest/current snapshot selection is deterministic: 1. `changed_at DESC` 2. `id DESC` as tie-break when `changed_at` is equal
 - `initial_interaction_at` remains stable across revisions.
 - `changed_at` changes for each new revision snapshot.
 - Revisions do not create additional knocks.
@@ -132,13 +133,13 @@ Authentication, authorization, request payload validation, and response/error be
 
 # 11. Error Handling
 
-| Condition | Expected Behavior |
-| --- | --- |
-| Validation failure | 400 validation error envelope with actionable detail. |
-| Missing/invalid auth | 401 unauthenticated error envelope for protected endpoints. |
-| Unauthorized role | 403 forbidden error envelope. |
-| Cross-organization access | Denied per contract (not-found/forbidden as documented). |
-| Unexpected backend failure | 500 internal error envelope without sensitive leakage. |
+| Condition                  | Expected Behavior                                           |
+| -------------------------- | ----------------------------------------------------------- |
+| Validation failure         | 400 validation error envelope with actionable detail.       |
+| Missing/invalid auth       | 401 unauthenticated error envelope for protected endpoints. |
+| Unauthorized role          | 403 forbidden error envelope.                               |
+| Cross-organization access  | Denied per contract (not-found/forbidden as documented).    |
+| Unexpected backend failure | 500 internal error envelope without sensitive leakage.      |
 
 # 12. Test Requirements
 
@@ -203,11 +204,11 @@ then cross-organization access is denied.
 
 ## Expected Modified Files
 
-- ddd/backend/src/<domain>/*
-- ddd/frontend/src/pages/<feature>*.jsx
-- ddd/frontend/src/api/*
-- ddd/backend/tests/integration/*
-- ddd/frontend/src/tests/*
+- ddd/backend/src/<domain>/\*
+- ddd/frontend/src/pages/<feature>\*.jsx
+- ddd/frontend/src/api/\*
+- ddd/backend/tests/integration/\*
+- ddd/frontend/src/tests/\*
 
 ## Potential New Files
 
@@ -222,7 +223,10 @@ then cross-organization access is denied.
 
 - #29 record new interaction.
 - #31 update interaction.
-- #37 reporting semantics.
+
+## Phase Dependency
+
+- Phase 1 access policy completion (#34, #35, #36).
 
 ## Required Architecture
 

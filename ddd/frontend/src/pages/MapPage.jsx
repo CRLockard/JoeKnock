@@ -12,6 +12,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { getMapProperties } from '../api/mapApi.js';
+import { resolvePropertyLocation } from '../api/propertiesApi.js';
 import 'leaflet/dist/leaflet.css';
 
 const DEFAULT_CENTER = [35.95, -84.0];
@@ -61,6 +62,7 @@ function MapEventBridge({
   currentPosition,
   onBoundsChange,
   onManualMapInteraction,
+  onMapSelect,
 }) {
   const map = useMapEvents({
     moveend() {
@@ -71,6 +73,16 @@ function MapEventBridge({
     },
     zoomstart() {
       onManualMapInteraction();
+    },
+    click(event) {
+      if (!event?.latlng) {
+        return;
+      }
+
+      onMapSelect({
+        latitude: Number(event.latlng.lat.toFixed(6)),
+        longitude: Number(event.latlng.lng.toFixed(6)),
+      });
     },
   });
 
@@ -98,6 +110,9 @@ export function MapPage() {
   const [locationError, setLocationError] = useState('');
   const [locating, setLocating] = useState(true);
   const [followLocation, setFollowLocation] = useState(true);
+  const [resolutionLoading, setResolutionLoading] = useState(false);
+  const [resolutionError, setResolutionError] = useState('');
+  const [resolvedProperty, setResolvedProperty] = useState(null);
 
   const latestRequestRef = useRef(0);
 
@@ -182,6 +197,29 @@ export function MapPage() {
     });
   }, []);
 
+  const handleMapSelect = useCallback(async ({ latitude, longitude }) => {
+    setResolutionLoading(true);
+    setResolutionError('');
+    setResolvedProperty(null);
+
+    try {
+      const result = await resolvePropertyLocation({ latitude, longitude });
+      setResolvedProperty(result);
+    } catch (error) {
+      if (error?.code === 'PROPERTY_LOCATION_UNRESOLVABLE') {
+        setResolutionError(
+          'This location could not be resolved to a valid property address.',
+        );
+      } else {
+        setResolutionError(
+          error?.message || 'Unable to resolve this map location right now.',
+        );
+      }
+    } finally {
+      setResolutionLoading(false);
+    }
+  }, []);
+
   return (
     <section className="map-page" aria-label="Map workspace">
       <header className="map-page-header">
@@ -207,6 +245,15 @@ export function MapPage() {
         {markersError ? <p role="alert">{markersError}</p> : null}
         {locating ? <p>Detecting current location...</p> : null}
         {locationError ? <p role="alert">{locationError}</p> : null}
+        {resolutionLoading ? <p>Resolving selected location...</p> : null}
+        {resolutionError ? <p role="alert">{resolutionError}</p> : null}
+        {resolvedProperty ? (
+          <p role="status">
+            Property resolved (
+            {resolvedProperty.created ? 'created' : 'existing'}) :{' '}
+            {resolvedProperty.property.propertyId}
+          </p>
+        ) : null}
       </div>
 
       <div className="map-canvas" role="region" aria-label="Canvassing map">
@@ -226,6 +273,7 @@ export function MapPage() {
             currentPosition={currentPosition}
             onBoundsChange={loadMarkers}
             onManualMapInteraction={handleManualInteraction}
+            onMapSelect={handleMapSelect}
           />
 
           {markers.map((marker) => (

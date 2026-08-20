@@ -10,6 +10,8 @@ Priority: P0
 
 MVP: Yes
 
+Implementation Phase: Phase 1 - Access Policy Completion
+
 Dependencies:
 
 - #35 enforce organization isolation.
@@ -44,30 +46,30 @@ Deliver the approved user-story outcome for Issue #36 with endpoint, authorizati
 - Edit their own current interactions.
 - View applicable statuses.
 - Use map functionality.
-- Use geocoding functionality.  Cannot:
+- Use geocoding functionality. Cannot:
 - Edit another representative's interaction.
 - Manage organization users.
 - Manage teams.
 - Manage organization settings.
-- Manage statuses.  ### Manager Can:
+- Manage statuses. ### Manager Can:
 - Perform representative functions.
 - Manage multiple teams.
 - See and edit current interactions belonging to representatives on assigned teams.
 - View team activity.
 - Manage teams.
 - Manage statuses.
-- View activity reports.  Additional manager rule:
+- View activity reports. Additional manager rule:
 - If a manager has no assigned teams, they can see/edit only their own interactions unless organization visibility settings grant broader visibility.
-- Manager edits do not transfer ownership.  ### Administrator Can:
+- Manager edits do not transfer ownership. ### Administrator Can:
 - Perform manager functions.
 - See and edit any current interaction within their organization.
 - Manage organization settings.
 - Manage organization information.
 - Create users.
 - Deactivate users.
-- Manage organization configuration.  Additional admin rule:
+- Manage organization configuration. Additional admin rule:
 - Admin access is not restricted by team assignment.
-- Admin edits do not transfer ownership.  ### Authorization model constraints
+- Admin edits do not transfer ownership. ### Authorization model constraints
 - Visibility determines what a user can see.
 - Edit authorization determines what a user can modify.
 - Visibility and edit authorization are separate checks.
@@ -143,30 +145,30 @@ Authentication, authorization, request payload validation, and response/error be
 - Edit their own current interactions.
 - View applicable statuses.
 - Use map functionality.
-- Use geocoding functionality.  Cannot:
+- Use geocoding functionality. Cannot:
 - Edit another representative's interaction.
 - Manage organization users.
 - Manage teams.
 - Manage organization settings.
-- Manage statuses.  ### Manager Can:
+- Manage statuses. ### Manager Can:
 - Perform representative functions.
 - Manage multiple teams.
 - See and edit current interactions belonging to representatives on assigned teams.
 - View team activity.
 - Manage teams.
 - Manage statuses.
-- View activity reports.  Additional manager rule:
+- View activity reports. Additional manager rule:
 - If a manager has no assigned teams, they can see/edit only their own interactions unless organization visibility settings grant broader visibility.
-- Manager edits do not transfer ownership.  ### Administrator Can:
+- Manager edits do not transfer ownership. ### Administrator Can:
 - Perform manager functions.
 - See and edit any current interaction within their organization.
 - Manage organization settings.
 - Manage organization information.
 - Create users.
 - Deactivate users.
-- Manage organization configuration.  Additional admin rule:
+- Manage organization configuration. Additional admin rule:
 - Admin access is not restricted by team assignment.
-- Admin edits do not transfer ownership.  ### Authorization model constraints
+- Admin edits do not transfer ownership. ### Authorization model constraints
 - Visibility determines what a user can see.
 - Edit authorization determines what a user can modify.
 - Visibility and edit authorization are separate checks.
@@ -184,13 +186,13 @@ Authentication, authorization, request payload validation, and response/error be
 
 # 11. Error Handling
 
-| Condition | Expected Behavior |
-| --- | --- |
-| Validation failure | 400 validation error envelope with actionable detail. |
-| Missing/invalid auth | 401 unauthenticated error envelope for protected endpoints. |
-| Unauthorized role | 403 forbidden error envelope. |
-| Cross-organization access | Denied per contract (not-found/forbidden as documented). |
-| Unexpected backend failure | 500 internal error envelope without sensitive leakage. |
+| Condition                  | Expected Behavior                                           |
+| -------------------------- | ----------------------------------------------------------- |
+| Validation failure         | 400 validation error envelope with actionable detail.       |
+| Missing/invalid auth       | 401 unauthenticated error envelope for protected endpoints. |
+| Unauthorized role          | 403 forbidden error envelope.                               |
+| Cross-organization access  | Denied per contract (not-found/forbidden as documented).    |
+| Unexpected backend failure | 500 internal error envelope without sensitive leakage.      |
 
 # 12. Test Requirements
 
@@ -255,11 +257,11 @@ then cross-organization access is denied.
 
 ## Expected Modified Files
 
-- ddd/backend/src/<domain>/*
-- ddd/frontend/src/pages/<feature>*.jsx
-- ddd/frontend/src/api/*
-- ddd/backend/tests/integration/*
-- ddd/frontend/src/tests/*
+- ddd/backend/src/<domain>/\*
+- ddd/frontend/src/pages/<feature>\*.jsx
+- ddd/frontend/src/api/\*
+- ddd/backend/tests/integration/\*
+- ddd/frontend/src/tests/\*
 
 ## Potential New Files
 
@@ -274,6 +276,10 @@ then cross-organization access is denied.
 
 - #35 enforce organization isolation.
 - #34 visibility constraints.
+
+## Phase Dependency
+
+- Phase 1 completion ticket to finalize role gating used by later phases.
 
 ## Required Architecture
 
