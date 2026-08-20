@@ -16,6 +16,7 @@ import {
   createPropertyInteraction,
   getPropertyById,
   getPropertyInteractions,
+  resolvePropertyLocation,
 } from '../api/propertiesApi.js';
 import { getStatuses } from '../api/statusesApi.js';
 import {
@@ -209,6 +210,7 @@ function MapEventBridge({
   currentPosition,
   onBoundsChange,
   onManualMapInteraction,
+  onMapClick,
 }) {
   const map = useMapEvents({
     moveend() {
@@ -219,6 +221,15 @@ function MapEventBridge({
     },
     zoomstart() {
       onManualMapInteraction();
+    },
+    click(event) {
+      onManualMapInteraction();
+
+      if (!event?.latlng) {
+        return;
+      }
+
+      onMapClick(event.latlng);
     },
   });
 
@@ -388,6 +399,36 @@ export function MapPage() {
       setSelectionLoading(false);
     }
   }, []);
+
+  const handleMapLocationSelect = useCallback(
+    async ({ lat, lng }) => {
+      setSelectionError('');
+
+      try {
+        const resolved = await resolvePropertyLocation({
+          latitude: lat,
+          longitude: lng,
+        });
+
+        const propertyId = resolved?.property?.propertyId;
+
+        if (!propertyId) {
+          setSelectionError(
+            'Unable to resolve that location to a property right now.',
+          );
+          return;
+        }
+
+        await handleMarkerSelect(propertyId);
+      } catch (error) {
+        setSelectionError(
+          error?.message ||
+            'Unable to resolve that location to a property right now.',
+        );
+      }
+    },
+    [handleMarkerSelect],
+  );
 
   useEffect(() => {
     if (!selectedPropertyId) {
@@ -1202,6 +1243,7 @@ export function MapPage() {
             currentPosition={currentPosition}
             onBoundsChange={loadMarkers}
             onManualMapInteraction={handleManualInteraction}
+            onMapClick={handleMapLocationSelect}
           />
 
           {markers.map((marker) => (

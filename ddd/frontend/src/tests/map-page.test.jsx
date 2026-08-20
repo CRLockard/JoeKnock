@@ -13,6 +13,7 @@ import {
   createPropertyInteraction,
   getPropertyById,
   getPropertyInteractions,
+  resolvePropertyLocation,
 } from '../api/propertiesApi.js';
 import { getStatuses } from '../api/statusesApi.js';
 import {
@@ -29,6 +30,7 @@ vi.mock('../api/propertiesApi.js', () => ({
   createPropertyInteraction: vi.fn(),
   getPropertyById: vi.fn(),
   getPropertyInteractions: vi.fn(),
+  resolvePropertyLocation: vi.fn(),
 }));
 
 vi.mock('../api/statusesApi.js', () => ({
@@ -188,6 +190,21 @@ beforeEach(() => {
     longitude: -84.11,
   });
 
+  resolvePropertyLocation.mockResolvedValue({
+    created: false,
+    property: {
+      propertyId: 'property-1',
+      addressLine1: '123 Main St',
+      addressLine2: null,
+      city: 'Knoxville',
+      state: 'TN',
+      postalCode: '37901',
+      country: 'US',
+      latitude: 35.51,
+      longitude: -84.11,
+    },
+  });
+
   getPropertyInteractions.mockResolvedValue({
     propertyId: 'property-1',
     interactions: [
@@ -344,6 +361,36 @@ describe('MapPage', () => {
       screen.getByRole('heading', { name: 'Selected Property' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start interaction' }),
+    ).toBeInTheDocument();
+  });
+
+  it('starts property interaction workflow when selecting a supported map location', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    render(<MapPage />);
+
+    await act(async () => {
+      mockState.latestMapHandlers.click({
+        latlng: { lat: 35.51, lng: -84.11 },
+      });
+    });
+
+    await waitFor(() => {
+      expect(resolvePropertyLocation).toHaveBeenCalledWith({
+        latitude: 35.51,
+        longitude: -84.11,
+      });
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Selected Property' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Start interaction' }),
     ).toBeInTheDocument();

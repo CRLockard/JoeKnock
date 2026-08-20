@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import {
+  MemoryRouter,
+  RouterProvider,
+  createMemoryRouter,
+} from 'react-router-dom';
 import { App } from '../app/App.jsx';
 import { AuthProvider } from '../auth/AuthProvider.jsx';
 
@@ -21,6 +25,34 @@ function setStoredSession(role = 'manager') {
       role,
       isActive: true,
     }),
+  );
+}
+
+function renderShellAtPath(pathname) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/',
+        element: <App />,
+        children: [
+          { path: 'map', element: <h2>Map View</h2> },
+          { path: 'settings', element: <h2>Settings View</h2> },
+          {
+            path: 'reports/activity',
+            element: <h2>Reports View</h2>,
+          },
+        ],
+      },
+    ],
+    {
+      initialEntries: [pathname],
+    },
+  );
+
+  render(
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>,
   );
 }
 
@@ -49,6 +81,10 @@ describe('app navigation', () => {
     const settingsLink = await screen.findByRole('link', { name: 'Settings' });
 
     expect(settingsLink).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
+      'href',
+      '/map',
+    );
     expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
   });
 
@@ -132,5 +168,27 @@ describe('app navigation', () => {
     expect(
       screen.queryByRole('link', { name: 'Reports' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('provides a map route link from Settings using existing router paths', async () => {
+    setStoredSession('manager');
+    renderShellAtPath('/settings');
+
+    expect(await screen.findByRole('heading', { name: 'Settings View' }));
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
+      'href',
+      '/map',
+    );
+  });
+
+  it('provides a map route link from Reports using existing router paths', async () => {
+    setStoredSession('manager');
+    renderShellAtPath('/reports/activity');
+
+    expect(await screen.findByRole('heading', { name: 'Reports View' }));
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
+      'href',
+      '/map',
+    );
   });
 });

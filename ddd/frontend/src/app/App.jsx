@@ -28,6 +28,7 @@ export function App() {
         <h1>JoeKnock Foundation</h1>
         {auth.isAuthenticated ? (
           <>
+            <Link to="/map">Map</Link>
             <Link to="/settings">Settings</Link>
             {auth.user?.role === 'manager' || auth.user?.role === 'admin' ? (
               <Link to="/reports/activity">Reports</Link>

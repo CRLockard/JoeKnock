@@ -70,7 +70,9 @@ describe('logout flow', () => {
 
     const rendered = renderLogoutFlow(['/map']);
 
-    expect(await screen.findByText('Map')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Map' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
@@ -106,7 +108,9 @@ describe('logout flow', () => {
 
     renderLogoutFlow(['/map']);
 
-    expect(await screen.findByText('Map')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Map' }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     await waitFor(() => {
