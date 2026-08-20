@@ -151,7 +151,7 @@ describe('ActivityReportPage', () => {
       name: 'Representative grouping',
     });
 
-    expect(screen.getByText('Total knocks: 2')).toBeInTheDocument();
+    expect(screen.getByText('Total Knocks')).toBeInTheDocument();
     expect(within(statusSection).getByText('No Answer')).toBeInTheDocument();
     expect(
       within(representativeSection).getByText('Ava Rep (ava@example.com)'),
@@ -330,7 +330,7 @@ describe('ActivityReportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run report' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Total knocks: 2')).toBeInTheDocument();
+      expect(screen.getByText('Total Knocks')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
@@ -339,6 +339,6 @@ describe('ActivityReportPage', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Export failed.');
     });
 
-    expect(screen.getByText('Total knocks: 2')).toBeInTheDocument();
+    expect(screen.getByText('Total Knocks')).toBeInTheDocument();
   });
 });

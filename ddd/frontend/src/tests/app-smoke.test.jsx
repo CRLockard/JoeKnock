@@ -24,7 +24,11 @@ describe('frontend scaffold smoke', () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByText('JoeKnock Foundation')).toBeInTheDocument();
-    expect(await screen.findByText('Login')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'JoeKnock' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Login' }),
+    ).toBeInTheDocument();
   });
 });

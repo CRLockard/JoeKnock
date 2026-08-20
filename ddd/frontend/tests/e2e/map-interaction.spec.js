@@ -95,12 +95,32 @@ test('selecting a map marker opens property workflow and interaction entry', asy
 
   const marker = page.locator('.leaflet-marker-icon').first();
   await expect(marker).toBeVisible();
+  await expect(page.locator('.map-locate-button')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  await expect(page.getByRole('link', { name: 'Map' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close navigation overlay' }).click();
+
+  await page.getByRole('button', { name: /Rae Rep/i }).click();
+  await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.locator('.map-locate-button')).toBeVisible();
+  await page.evaluate(() => {
+    document.body.style.zoom = '1.15';
+  });
+  await expect(page.locator('.map-locate-button')).toBeVisible();
+  await page.evaluate(() => {
+    document.body.style.zoom = '1';
+  });
+
   await marker.click();
 
   await expect(
     page.getByRole('heading', { name: 'Selected Property' }),
   ).toBeVisible();
-  await expect(page.getByText('123 Main St')).toBeVisible();
+  await expect(page.locator('.map-property-address')).toContainText(
+    '123 Main St',
+  );
 
   await page.getByRole('button', { name: 'Start interaction' }).click();
 

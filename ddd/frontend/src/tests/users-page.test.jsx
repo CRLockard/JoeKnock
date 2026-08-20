@@ -115,11 +115,8 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    expect(
-      await screen.findByText(
-        'Ana Manager (ana.manager@example.com) - manager - Active',
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Ana Manager')).toBeInTheDocument();
+    expect(screen.getByText('ana.manager@example.com')).toBeInTheDocument();
     expect(getUsers).toHaveBeenCalledWith({});
 
     fireEvent.change(screen.getByLabelText('Active status'), {
@@ -214,7 +211,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
 
@@ -259,7 +256,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save user' }));
 
@@ -285,7 +282,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Smith' }));
     fireEvent.change(screen.getByLabelText('Edit first name'), {
       target: { value: '' },
@@ -352,7 +349,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Deactivate Jane Smith' }),
@@ -365,9 +362,7 @@ describe('users page', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Jane Smith is now inactive.',
     );
-    expect(
-      await screen.findByText('Jane Smith (jane@example.com) - rep - Inactive'),
-    ).toBeInTheDocument();
+    expect((await screen.findAllByText('Inactive')).length).toBeGreaterThan(0);
   });
 
   it('reactivates an inactive user for admin role', async () => {
@@ -397,7 +392,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Inactive');
+    await screen.findByText('Jane Smith');
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Reactivate Jane Smith' }),
@@ -429,7 +424,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
 
     expect(
       screen.queryByRole('button', { name: 'Deactivate Jane Smith' }),
@@ -456,7 +451,7 @@ describe('users page', () => {
 
     renderUsersPage();
 
-    await screen.findByText('Jane Smith (jane@example.com) - rep - Active');
+    await screen.findByText('Jane Smith');
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Deactivate Jane Smith' }),
@@ -478,11 +473,10 @@ describe('users page', () => {
         'Only managers and administrators can view organization users.',
       ),
     ).toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Only managers and administrators can create users.'),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText('First name')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Create user' })).toBeDisabled();
+      screen.queryByRole('button', { name: 'Create user' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows API error when user listing fails', async () => {

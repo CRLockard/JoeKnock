@@ -6,6 +6,8 @@ import {
   updateUser,
 } from '../api/usersApi.js';
 import { useAuth } from '../auth/useAuth.js';
+import { SettingsWorkspace } from '../components/SettingsWorkspace.jsx';
+import { StatusBadge } from '../components/StatusBadge.jsx';
 
 const DEFAULT_FORM = {
   firstName: '',
@@ -261,204 +263,326 @@ export function UsersPage() {
   }
 
   return (
-    <section>
-      <h2>User Management</h2>
-
-      {usersError ? <p role="alert">{usersError}</p> : null}
-      {editError ? <p role="alert">{editError}</p> : null}
-      {editSuccessMessage ? <p role="status">{editSuccessMessage}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {successMessage ? <p role="status">{successMessage}</p> : null}
-
-      {!canManageUsers ? (
-        <p>Only managers and administrators can view organization users.</p>
+    <SettingsWorkspace
+      title="Users"
+      description="Manage organization members, roles, and active status."
+      activeSection="users"
+    >
+      {usersError ? (
+        <p role="alert" className="feedback feedback--error">
+          {usersError}
+        </p>
+      ) : null}
+      {editError ? (
+        <p role="alert" className="feedback feedback--error">
+          {editError}
+        </p>
+      ) : null}
+      {editSuccessMessage ? (
+        <p role="status" className="feedback feedback--success">
+          {editSuccessMessage}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="feedback feedback--error">
+          {error}
+        </p>
+      ) : null}
+      {successMessage ? (
+        <p role="status" className="feedback feedback--success">
+          {successMessage}
+        </p>
       ) : null}
 
       {!canManageUsers ? (
-        <p>Only managers and administrators can create users.</p>
-      ) : null}
-
-      {canManageUsers ? (
-        <section aria-label="organization users">
-          <h3>Organization Users</h3>
-
-          <label htmlFor="active-filter">Active status</label>
-          <select
-            id="active-filter"
-            name="activeFilter"
-            value={activeFilter}
-            onChange={(event) => setActiveFilter(event.target.value)}
-            disabled={isUsersLoading}
+        <div className="panel">
+          <p>Only managers and administrators can view organization users.</p>
+        </div>
+      ) : (
+        <div className="workspace-grid workspace-grid--users">
+          <section
+            aria-label="organization users"
+            className="panel panel--table"
           >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+            <div className="panel__header panel__header--stacked">
+              <div>
+                <h3>Organization Users</h3>
+                <p>Review active users, roles, and team-ready assignments.</p>
+              </div>
+            </div>
 
-          <label htmlFor="role-filter">Role filter</label>
-          <select
-            id="role-filter"
-            name="roleFilter"
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
-            disabled={isUsersLoading}
-          >
-            <option value="all">All roles</option>
-            <option value="admin">Administrator</option>
-            <option value="manager">Manager</option>
-            <option value="rep">Representative</option>
-          </select>
-
-          {isUsersLoading ? <p>Loading users...</p> : null}
-
-          {!isUsersLoading && users.length === 0 ? (
-            <p>No users found for selected filters.</p>
-          ) : null}
-
-          {!isUsersLoading && users.length > 0 ? (
-            <ul>
-              {users.map((user) => (
-                <li key={user.id}>
-                  {user.firstName} {user.lastName} ({user.email}) - {user.role}{' '}
-                  - {user.isActive ? 'Active' : 'Inactive'}
-                  <button
-                    type="button"
-                    onClick={() => startEditingUser(user)}
-                    disabled={isEditSubmitting || isSetActiveSubmitting}
-                  >
-                    Edit {user.firstName} {user.lastName}
-                  </button>
-                  {canSetActive ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSetUserActive(user, !user.isActive)}
-                      disabled={isSetActiveSubmitting || isEditSubmitting}
-                    >
-                      {isSetActiveSubmitting && setActiveUserId === user.id
-                        ? user.isActive
-                          ? 'Deactivating...'
-                          : 'Reactivating...'
-                        : user.isActive
-                          ? `Deactivate ${user.firstName} ${user.lastName}`
-                          : `Reactivate ${user.firstName} ${user.lastName}`}
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {editingUserId ? (
-            <form onSubmit={handleEditSubmit} aria-label="edit user form">
-              <h4>Edit User</h4>
-
-              <label htmlFor="edit-first-name">Edit first name</label>
-              <input
-                id="edit-first-name"
-                name="firstName"
-                type="text"
-                value={editForm.firstName}
-                onChange={handleEditChange}
-                disabled={isEditSubmitting}
-              />
-
-              <label htmlFor="edit-last-name">Edit last name</label>
-              <input
-                id="edit-last-name"
-                name="lastName"
-                type="text"
-                value={editForm.lastName}
-                onChange={handleEditChange}
-                disabled={isEditSubmitting}
-              />
-
-              <label htmlFor="edit-role">Edit role</label>
-              <select
-                id="edit-role"
-                name="role"
-                value={editForm.role}
-                onChange={handleEditChange}
-                disabled={isEditSubmitting}
+            <div className="filters-inline">
+              <label
+                className="form-field form-field--compact"
+                htmlFor="active-filter"
               >
-                <option value="rep">Representative</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Administrator</option>
-              </select>
+                <span>Active status</span>
+                <select
+                  id="active-filter"
+                  name="activeFilter"
+                  value={activeFilter}
+                  onChange={(event) => setActiveFilter(event.target.value)}
+                  disabled={isUsersLoading}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
 
-              <button type="submit" disabled={isEditSubmitting}>
-                {isEditSubmitting ? 'Saving...' : 'Save user'}
-              </button>
+              <label
+                className="form-field form-field--compact"
+                htmlFor="role-filter"
+              >
+                <span>Role filter</span>
+                <select
+                  id="role-filter"
+                  name="roleFilter"
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                  disabled={isUsersLoading}
+                >
+                  <option value="all">All roles</option>
+                  <option value="admin">Administrator</option>
+                  <option value="manager">Manager</option>
+                  <option value="rep">Representative</option>
+                </select>
+              </label>
+            </div>
+
+            {isUsersLoading ? (
+              <p className="feedback">Loading users...</p>
+            ) : null}
+
+            {!isUsersLoading && users.length === 0 ? (
+              <p className="feedback">No users found for selected filters.</p>
+            ) : null}
+
+            {!isUsersLoading && users.length > 0 ? (
+              <div className="table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Active</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id}>
+                        <td>
+                          <strong>{`${user.firstName} ${user.lastName}`}</strong>
+                        </td>
+                        <td>
+                          <StatusBadge tone="info">{user.role}</StatusBadge>
+                        </td>
+                        <td>{user.email}</td>
+                        <td>
+                          <StatusBadge
+                            tone={user.isActive ? 'success' : 'muted'}
+                          >
+                            {user.isActive ? 'Active' : 'Inactive'}
+                          </StatusBadge>
+                        </td>
+                        <td>
+                          <div className="table-actions">
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => startEditingUser(user)}
+                              disabled={
+                                isEditSubmitting || isSetActiveSubmitting
+                              }
+                            >
+                              Edit {user.firstName} {user.lastName}
+                            </button>
+                            {canSetActive ? (
+                              <button
+                                type="button"
+                                className="button button--ghost"
+                                onClick={() =>
+                                  handleSetUserActive(user, !user.isActive)
+                                }
+                                disabled={
+                                  isSetActiveSubmitting || isEditSubmitting
+                                }
+                              >
+                                {isSetActiveSubmitting &&
+                                setActiveUserId === user.id
+                                  ? user.isActive
+                                    ? 'Deactivating...'
+                                    : 'Reactivating...'
+                                  : user.isActive
+                                    ? `Deactivate ${user.firstName} ${user.lastName}`
+                                    : `Reactivate ${user.firstName} ${user.lastName}`}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
+
+          <aside className="workspace-side-panel">
+            <form
+              onSubmit={handleSubmit}
+              aria-label="create user form"
+              className="panel stack-form"
+            >
+              <div className="panel__header">
+                <h3>Add User</h3>
+              </div>
+
+              <label className="form-field" htmlFor="firstName">
+                <span>First name</span>
+                <input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  value={form.firstName}
+                  onChange={handleChange}
+                  disabled={!canManageUsers || isSubmitting}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="lastName">
+                <span>Last name</span>
+                <input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  value={form.lastName}
+                  onChange={handleChange}
+                  disabled={!canManageUsers || isSubmitting}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="email">
+                <span>Email</span>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  disabled={!canManageUsers || isSubmitting}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="password">
+                <span>Password</span>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  disabled={!canManageUsers || isSubmitting}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="role">
+                <span>Role</span>
+                <select
+                  id="role"
+                  name="role"
+                  value={form.role}
+                  onChange={handleChange}
+                  disabled={!canManageUsers || isSubmitting}
+                >
+                  <option value="rep">Representative</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </label>
 
               <button
-                type="button"
-                onClick={stopEditingUser}
-                disabled={isEditSubmitting}
+                type="submit"
+                className="button button--primary"
+                disabled={!canManageUsers || isSubmitting}
               >
-                Cancel
+                {isSubmitting ? 'Creating user...' : 'Create user'}
               </button>
             </form>
-          ) : null}
-        </section>
-      ) : null}
 
-      <form onSubmit={handleSubmit} aria-label="create user form">
-        <label htmlFor="firstName">First name</label>
-        <input
-          id="firstName"
-          name="firstName"
-          type="text"
-          value={form.firstName}
-          onChange={handleChange}
-          disabled={!canManageUsers || isSubmitting}
-        />
+            {editingUserId ? (
+              <form
+                onSubmit={handleEditSubmit}
+                aria-label="edit user form"
+                className="panel stack-form"
+              >
+                <div className="panel__header">
+                  <h3>Edit User</h3>
+                </div>
 
-        <label htmlFor="lastName">Last name</label>
-        <input
-          id="lastName"
-          name="lastName"
-          type="text"
-          value={form.lastName}
-          onChange={handleChange}
-          disabled={!canManageUsers || isSubmitting}
-        />
+                <label className="form-field" htmlFor="edit-first-name">
+                  <span>Edit first name</span>
+                  <input
+                    id="edit-first-name"
+                    name="firstName"
+                    type="text"
+                    value={editForm.firstName}
+                    onChange={handleEditChange}
+                    disabled={isEditSubmitting}
+                  />
+                </label>
 
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          value={form.email}
-          onChange={handleChange}
-          disabled={!canManageUsers || isSubmitting}
-        />
+                <label className="form-field" htmlFor="edit-last-name">
+                  <span>Edit last name</span>
+                  <input
+                    id="edit-last-name"
+                    name="lastName"
+                    type="text"
+                    value={editForm.lastName}
+                    onChange={handleEditChange}
+                    disabled={isEditSubmitting}
+                  />
+                </label>
 
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          value={form.password}
-          onChange={handleChange}
-          disabled={!canManageUsers || isSubmitting}
-        />
+                <label className="form-field" htmlFor="edit-role">
+                  <span>Edit role</span>
+                  <select
+                    id="edit-role"
+                    name="role"
+                    value={editForm.role}
+                    onChange={handleEditChange}
+                    disabled={isEditSubmitting}
+                  >
+                    <option value="rep">Representative</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </label>
 
-        <label htmlFor="role">Role</label>
-        <select
-          id="role"
-          name="role"
-          value={form.role}
-          onChange={handleChange}
-          disabled={!canManageUsers || isSubmitting}
-        >
-          <option value="rep">Representative</option>
-          <option value="manager">Manager</option>
-          <option value="admin">Administrator</option>
-        </select>
-
-        <button type="submit" disabled={!canManageUsers || isSubmitting}>
-          {isSubmitting ? 'Creating user...' : 'Create user'}
-        </button>
-      </form>
-    </section>
+                <div className="form-actions">
+                  <button
+                    type="submit"
+                    className="button button--primary"
+                    disabled={isEditSubmitting}
+                  >
+                    {isEditSubmitting ? 'Saving...' : 'Save user'}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={stopEditingUser}
+                    disabled={isEditSubmitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : null}
+          </aside>
+        </div>
+      )}
+    </SettingsWorkspace>
   );
 }

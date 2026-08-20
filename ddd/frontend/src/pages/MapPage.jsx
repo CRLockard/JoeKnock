@@ -765,9 +765,65 @@ export function MapPage() {
 
   return (
     <section className="map-page" aria-label="Map workspace">
-      <header className="map-page-header">
-        <h2>Map</h2>
-        <div className="map-page-controls">
+      <h2 className="visually-hidden">Map</h2>
+
+      <div className="map-stage">
+        <div className="map-stage__feedback" aria-live="polite">
+          {markersLoading ? (
+            <p className="feedback">Loading map markers...</p>
+          ) : null}
+          {markersError ? (
+            <p role="alert" className="feedback feedback--error">
+              {markersError}
+            </p>
+          ) : null}
+          {locating ? (
+            <p className="feedback">Detecting current location...</p>
+          ) : null}
+          {locationError ? (
+            <p role="alert" className="feedback feedback--error">
+              {locationError}
+            </p>
+          ) : null}
+          {selectionLoading ? (
+            <p className="feedback">Loading property details...</p>
+          ) : null}
+          {selectionError ? (
+            <p role="alert" className="feedback feedback--error">
+              {selectionError}
+            </p>
+          ) : null}
+          {selectedPropertyId ? (
+            <p role="status" className="feedback feedback--success">
+              Map selection is locked to the selected property.
+            </p>
+          ) : null}
+          {statusesLoading && selectedPropertyId ? (
+            <p className="feedback">Loading statuses...</p>
+          ) : null}
+          {statusesError ? (
+            <p role="alert" className="feedback feedback--error">
+              {statusesError}
+            </p>
+          ) : null}
+          {panelError ? (
+            <p role="alert" className="feedback feedback--error">
+              {panelError}
+            </p>
+          ) : null}
+          {snapshotError ? (
+            <p role="alert" className="feedback feedback--error">
+              {snapshotError}
+            </p>
+          ) : null}
+          {panelSuccessMessage ? (
+            <p role="status" className="feedback feedback--success">
+              {panelSuccessMessage}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="map-stage__controls">
           <span className="map-follow-status" role="status">
             {followLocation
               ? 'Follow mode is on.'
@@ -775,510 +831,538 @@ export function MapPage() {
           </span>
           <button
             type="button"
+            className="map-locate-button"
             onClick={() => setFollowLocation(true)}
             disabled={!currentPosition || followLocation}
           >
             Follow my location
           </button>
         </div>
-      </header>
 
-      <div className="map-feedback" aria-live="polite">
-        {markersLoading ? <p>Loading map markers...</p> : null}
-        {markersError ? <p role="alert">{markersError}</p> : null}
-        {locating ? <p>Detecting current location...</p> : null}
-        {locationError ? <p role="alert">{locationError}</p> : null}
-        {selectionLoading ? <p>Loading property details...</p> : null}
-        {selectionError ? <p role="alert">{selectionError}</p> : null}
-        {selectedPropertyId ? (
-          <p role="status">Map selection is locked to the selected property.</p>
-        ) : null}
-        {statusesLoading && selectedPropertyId ? (
-          <p>Loading statuses...</p>
-        ) : null}
-        {statusesError ? <p role="alert">{statusesError}</p> : null}
-        {panelError ? <p role="alert">{panelError}</p> : null}
-        {snapshotError ? <p role="alert">{snapshotError}</p> : null}
-        {panelSuccessMessage ? (
-          <p role="status">{panelSuccessMessage}</p>
-        ) : null}
-      </div>
+        <div className="map-canvas" role="region" aria-label="Canvassing map">
+          <MapContainer
+            center={mapCenter}
+            zoom={DEFAULT_ZOOM}
+            minZoom={4}
+            className="map-container"
+          >
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-      {selectedProperty ? (
-        <section
-          className="map-property-panel"
-          aria-label="Selected property panel"
-        >
-          <header className="map-property-panel-header">
-            <h3>Selected Property</h3>
-            <button type="button" onClick={handleCancelSelection}>
-              Cancel
-            </button>
-          </header>
-          <p className="map-property-address">
-            {selectedProperty.addressLine1}
-            {selectedProperty.addressLine2
-              ? `, ${selectedProperty.addressLine2}`
-              : ''}
-            {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
-          </p>
-          <p className="map-property-meta">
-            Property ID: {selectedProperty.propertyId}
-          </p>
+            <MapEventBridge
+              followLocation={followLocation}
+              currentPosition={currentPosition}
+              onBoundsChange={loadMarkers}
+              onManualMapInteraction={handleManualInteraction}
+              onMapClick={handleMapLocationSelect}
+            />
 
-          <div className="map-property-interactions" aria-live="polite">
-            <h4>Current Interaction State</h4>
-            {panelMode === 'summary' ? (
-              <>
-                {selectedInteractions.length === 0 ? (
-                  <p>No current interactions are visible for this property.</p>
-                ) : (
-                  <ul>
-                    {selectedInteractions.map((interaction) => {
-                      const key =
-                        interaction.interactionId ||
-                        interaction.interactionGroupId;
-
-                      return (
-                        <li key={key} className="map-interaction-summary-item">
-                          <div>
-                            <strong>{interaction.statusName}</strong>
-                            {interaction.notes ? ` - ${interaction.notes}` : ''}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!interaction.interactionId) {
-                                setSnapshotError(
-                                  'Snapshot details are unavailable for this interaction.',
-                                );
-                                return;
-                              }
-
-                              void loadSnapshotDetails(
-                                interaction.interactionId,
-                              );
-                            }}
-                            disabled={snapshotLoading}
-                          >
-                            View snapshot
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                <div className="map-panel-actions">
-                  <button
-                    type="button"
-                    onClick={handleStartInteraction}
-                    disabled={
-                      isCreating || isUpdating || hasOwnCurrentInteraction
-                    }
-                  >
-                    Start interaction
-                  </button>
-                  {hasOwnCurrentInteraction ? (
-                    <p>
-                      You already have a current interaction for this property.
-                      Open it from the list above to edit.
-                    </p>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-
-            {panelMode === 'create' ? (
-              <form
-                className="map-interaction-form"
-                onSubmit={handleCreateInteraction}
+            {markers.map((marker) => (
+              <Marker
+                key={marker.propertyId}
+                position={[marker.latitude, marker.longitude]}
+                icon={propertyMarkerIcon}
+                eventHandlers={{
+                  click: () => {
+                    void handleMarkerSelect(marker.propertyId);
+                  },
+                }}
               >
-                <h5>Record Interaction</h5>
-                <label>
-                  Status
-                  <select
-                    value={createForm.statusId}
-                    onChange={(event) => {
-                      setCreateForm((current) => ({
-                        ...current,
-                        statusId: event.target.value,
-                      }));
-                    }}
-                    disabled={isCreating || statusesLoading}
-                    required
-                  >
-                    <option value="">Select a status</option>
-                    {statuses.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                  {createFieldErrors.statusId ? (
-                    <p role="alert">{createFieldErrors.statusId}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Contact name
-                  <input
-                    type="text"
-                    value={createForm.contactName}
-                    maxLength={255}
-                    onChange={(event) => {
-                      setCreateForm((current) => ({
-                        ...current,
-                        contactName: event.target.value,
-                      }));
-                    }}
-                    disabled={isCreating}
-                  />
-                  {createFieldErrors.contactName ? (
-                    <p role="alert">{createFieldErrors.contactName}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Contact phone
-                  <input
-                    type="text"
-                    value={createForm.contactPhone}
-                    maxLength={50}
-                    onChange={(event) => {
-                      setCreateForm((current) => ({
-                        ...current,
-                        contactPhone: event.target.value,
-                      }));
-                    }}
-                    disabled={isCreating}
-                  />
-                  {createFieldErrors.contactPhone ? (
-                    <p role="alert">{createFieldErrors.contactPhone}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Contact email
-                  <input
-                    type="email"
-                    value={createForm.contactEmail}
-                    maxLength={255}
-                    onChange={(event) => {
-                      setCreateForm((current) => ({
-                        ...current,
-                        contactEmail: event.target.value,
-                      }));
-                    }}
-                    disabled={isCreating}
-                  />
-                  {createFieldErrors.contactEmail ? (
-                    <p role="alert">{createFieldErrors.contactEmail}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Notes
-                  <textarea
-                    value={createForm.notes}
-                    onChange={(event) => {
-                      setCreateForm((current) => ({
-                        ...current,
-                        notes: event.target.value,
-                      }));
-                    }}
-                    disabled={isCreating}
-                    rows={3}
-                  />
-                  {createFieldErrors.notes ? (
-                    <p role="alert">{createFieldErrors.notes}</p>
-                  ) : null}
-                </label>
-                <div className="map-panel-actions">
-                  <button
-                    type="submit"
-                    disabled={isCreating || statusesLoading}
-                  >
-                    {isCreating ? 'Saving interaction...' : 'Save interaction'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPanelMode('summary');
-                      setPanelError('');
-                      setCreateFieldErrors({});
-                    }}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDiscardCreateDraft}
-                    disabled={isCreating}
-                  >
-                    Discard draft
-                  </button>
-                </div>
-              </form>
-            ) : null}
+                <Popup>
+                  {selectedPropertyId === marker.propertyId
+                    ? 'Selected property marker'
+                    : 'Property marker'}
+                </Popup>
+              </Marker>
+            ))}
 
-            {panelMode === 'detail' ? (
-              <div className="map-interaction-detail" aria-live="polite">
-                <h5>Interaction Snapshot</h5>
-                {snapshotLoading ? (
-                  <p>Loading interaction snapshot...</p>
-                ) : null}
-                {activeSnapshot ? (
-                  <>
+            {currentPosition ? (
+              <CircleMarker
+                center={currentPosition}
+                radius={9}
+                pathOptions={{
+                  color: '#0f2f5f',
+                  fillColor: '#2a7de1',
+                  fillOpacity: 0.85,
+                }}
+              >
+                <Popup>Your current location</Popup>
+              </CircleMarker>
+            ) : null}
+          </MapContainer>
+        </div>
+
+        {selectedProperty ? (
+          <section
+            className="map-property-panel map-property-panel--overlay"
+            aria-label="Selected property panel"
+          >
+            <header className="map-property-panel-header">
+              <h3>Selected Property</h3>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleCancelSelection}
+              >
+                Cancel
+              </button>
+            </header>
+            <p className="map-property-address">
+              {selectedProperty.addressLine1}
+              {selectedProperty.addressLine2
+                ? `, ${selectedProperty.addressLine2}`
+                : ''}
+              {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
+            </p>
+            <p className="map-property-meta">
+              Property ID: {selectedProperty.propertyId}
+            </p>
+
+            <div className="map-property-interactions" aria-live="polite">
+              <h4>Current Interaction State</h4>
+              {panelMode === 'summary' ? (
+                <>
+                  {selectedInteractions.length === 0 ? (
                     <p>
-                      <strong>Status:</strong> {activeSnapshot.statusName}
+                      No current interactions are visible for this property.
                     </p>
-                    <p>
-                      <strong>Representative:</strong>{' '}
-                      {activeSnapshot.representative?.firstName}{' '}
-                      {activeSnapshot.representative?.lastName}
-                      {activeSnapshot.representative?.email
-                        ? ` (${activeSnapshot.representative.email})`
-                        : ''}
-                    </p>
-                    <p>
-                      <strong>Property:</strong> {selectedProperty.addressLine1}
-                      {selectedProperty.addressLine2
-                        ? `, ${selectedProperty.addressLine2}`
-                        : ''}
-                      {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
-                    </p>
-                    <p>
-                      <strong>First Knock:</strong>{' '}
-                      {formatDateTime(activeSnapshot.initialInteractionAt)}
-                    </p>
-                    <p>
-                      <strong>Last Updated:</strong>{' '}
-                      {formatDateTime(activeSnapshot.changedAt)}
-                    </p>
-                    {activeSnapshot.contactName ? (
-                      <p>
-                        <strong>Contact Name:</strong>{' '}
-                        {activeSnapshot.contactName}
-                      </p>
-                    ) : null}
-                    {activeSnapshot.contactPhone ? (
-                      <p>
-                        <strong>Contact Phone:</strong>{' '}
-                        {activeSnapshot.contactPhone}
-                      </p>
-                    ) : null}
-                    {activeSnapshot.contactEmail ? (
-                      <p>
-                        <strong>Contact Email:</strong>{' '}
-                        {activeSnapshot.contactEmail}
-                      </p>
-                    ) : null}
-                    {activeSnapshot.notes ? (
-                      <p>
-                        <strong>Notes:</strong> {activeSnapshot.notes}
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
-                <div className="map-panel-actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPanelMode('summary');
-                      setSnapshotError('');
-                    }}
-                  >
-                    Back to property
-                  </button>
-                  {canEditCurrentSnapshot ? (
+                  ) : (
+                    <ul className="map-summary-list">
+                      {selectedInteractions.map((interaction) => {
+                        const key =
+                          interaction.interactionId ||
+                          interaction.interactionGroupId;
+
+                        return (
+                          <li
+                            key={key}
+                            className="map-interaction-summary-item"
+                          >
+                            <div>
+                              <strong>{interaction.statusName}</strong>
+                              {interaction.notes
+                                ? ` - ${interaction.notes}`
+                                : ''}
+                            </div>
+                            <button
+                              type="button"
+                              className="button button--ghost"
+                              onClick={() => {
+                                if (!interaction.interactionId) {
+                                  setSnapshotError(
+                                    'Snapshot details are unavailable for this interaction.',
+                                  );
+                                  return;
+                                }
+
+                                void loadSnapshotDetails(
+                                  interaction.interactionId,
+                                );
+                              }}
+                              disabled={snapshotLoading}
+                            >
+                              View snapshot
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="map-panel-actions">
                     <button
                       type="button"
-                      onClick={handleStartEdit}
-                      disabled={!activeSnapshot || statusesLoading}
+                      className="button button--primary"
+                      onClick={handleStartInteraction}
+                      disabled={
+                        isCreating || isUpdating || hasOwnCurrentInteraction
+                      }
                     >
-                      Edit interaction
+                      Start interaction
                     </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
+                    {hasOwnCurrentInteraction ? (
+                      <p>
+                        You already have a current interaction for this
+                        property. Open it from the list above to edit.
+                      </p>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
 
-            {panelMode === 'edit' ? (
-              <form
-                className="map-interaction-form"
-                onSubmit={handleUpdateInteraction}
-              >
-                <h5>Edit Interaction Snapshot</h5>
-                <label>
-                  Status
-                  <select
-                    value={editForm.statusId}
-                    onChange={(event) => {
-                      setEditForm((current) => ({
-                        ...current,
-                        statusId: event.target.value,
-                      }));
-                    }}
-                    disabled={isUpdating || statusesLoading}
-                    required
-                  >
-                    <option value="">Select a status</option>
-                    {statuses.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                  {editFieldErrors.statusId ? (
-                    <p role="alert">{editFieldErrors.statusId}</p>
+              {panelMode === 'create' ? (
+                <form
+                  className="map-interaction-form"
+                  onSubmit={handleCreateInteraction}
+                >
+                  <h5>Record Interaction</h5>
+                  <div className="map-interaction-form__grid">
+                    <label className="form-field form-field--inverse">
+                      <span>Status</span>
+                      <select
+                        value={createForm.statusId}
+                        onChange={(event) => {
+                          setCreateForm((current) => ({
+                            ...current,
+                            statusId: event.target.value,
+                          }));
+                        }}
+                        disabled={isCreating || statusesLoading}
+                        required
+                      >
+                        <option value="">Select a status</option>
+                        {statuses.map((status) => (
+                          <option key={status.id} value={status.id}>
+                            {status.name}
+                          </option>
+                        ))}
+                      </select>
+                      {createFieldErrors.statusId ? (
+                        <p role="alert">{createFieldErrors.statusId}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact phone</span>
+                      <input
+                        type="text"
+                        value={createForm.contactPhone}
+                        maxLength={50}
+                        onChange={(event) => {
+                          setCreateForm((current) => ({
+                            ...current,
+                            contactPhone: event.target.value,
+                          }));
+                        }}
+                        disabled={isCreating}
+                      />
+                      {createFieldErrors.contactPhone ? (
+                        <p role="alert">{createFieldErrors.contactPhone}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact name</span>
+                      <input
+                        type="text"
+                        value={createForm.contactName}
+                        maxLength={255}
+                        onChange={(event) => {
+                          setCreateForm((current) => ({
+                            ...current,
+                            contactName: event.target.value,
+                          }));
+                        }}
+                        disabled={isCreating}
+                      />
+                      {createFieldErrors.contactName ? (
+                        <p role="alert">{createFieldErrors.contactName}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact email</span>
+                      <input
+                        type="email"
+                        value={createForm.contactEmail}
+                        maxLength={255}
+                        onChange={(event) => {
+                          setCreateForm((current) => ({
+                            ...current,
+                            contactEmail: event.target.value,
+                          }));
+                        }}
+                        disabled={isCreating}
+                      />
+                      {createFieldErrors.contactEmail ? (
+                        <p role="alert">{createFieldErrors.contactEmail}</p>
+                      ) : null}
+                    </label>
+                  </div>
+                  <label className="form-field form-field--inverse">
+                    <span>Notes</span>
+                    <textarea
+                      value={createForm.notes}
+                      onChange={(event) => {
+                        setCreateForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }));
+                      }}
+                      disabled={isCreating}
+                      rows={4}
+                    />
+                    {createFieldErrors.notes ? (
+                      <p role="alert">{createFieldErrors.notes}</p>
+                    ) : null}
+                  </label>
+                  <div className="map-panel-actions">
+                    <button
+                      type="submit"
+                      className="button button--primary"
+                      disabled={isCreating || statusesLoading}
+                    >
+                      {isCreating
+                        ? 'Saving interaction...'
+                        : 'Save interaction'}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={() => {
+                        setPanelMode('summary');
+                        setPanelError('');
+                        setCreateFieldErrors({});
+                      }}
+                      disabled={isCreating}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={handleDiscardCreateDraft}
+                      disabled={isCreating}
+                    >
+                      Discard draft
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {panelMode === 'detail' ? (
+                <div className="map-interaction-detail" aria-live="polite">
+                  <h5>Interaction Snapshot</h5>
+                  {snapshotLoading ? (
+                    <p>Loading interaction snapshot...</p>
                   ) : null}
-                </label>
-                <label>
-                  Contact name
-                  <input
-                    type="text"
-                    value={editForm.contactName}
-                    maxLength={255}
-                    onChange={(event) => {
-                      setEditForm((current) => ({
-                        ...current,
-                        contactName: event.target.value,
-                      }));
-                    }}
-                    disabled={isUpdating}
-                  />
-                  {editFieldErrors.contactName ? (
-                    <p role="alert">{editFieldErrors.contactName}</p>
+                  {activeSnapshot ? (
+                    <>
+                      <p>
+                        <strong>Status:</strong> {activeSnapshot.statusName}
+                      </p>
+                      <p>
+                        <strong>Representative:</strong>{' '}
+                        {activeSnapshot.representative?.firstName}{' '}
+                        {activeSnapshot.representative?.lastName}
+                        {activeSnapshot.representative?.email
+                          ? ` (${activeSnapshot.representative.email})`
+                          : ''}
+                      </p>
+                      <p>
+                        <strong>Property:</strong>{' '}
+                        {selectedProperty.addressLine1}
+                        {selectedProperty.addressLine2
+                          ? `, ${selectedProperty.addressLine2}`
+                          : ''}
+                        {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
+                      </p>
+                      <p>
+                        <strong>First Knock:</strong>{' '}
+                        {formatDateTime(activeSnapshot.initialInteractionAt)}
+                      </p>
+                      <p>
+                        <strong>Last Updated:</strong>{' '}
+                        {formatDateTime(activeSnapshot.changedAt)}
+                      </p>
+                      {activeSnapshot.contactName ? (
+                        <p>
+                          <strong>Contact Name:</strong>{' '}
+                          {activeSnapshot.contactName}
+                        </p>
+                      ) : null}
+                      {activeSnapshot.contactPhone ? (
+                        <p>
+                          <strong>Contact Phone:</strong>{' '}
+                          {activeSnapshot.contactPhone}
+                        </p>
+                      ) : null}
+                      {activeSnapshot.contactEmail ? (
+                        <p>
+                          <strong>Contact Email:</strong>{' '}
+                          {activeSnapshot.contactEmail}
+                        </p>
+                      ) : null}
+                      {activeSnapshot.notes ? (
+                        <p>
+                          <strong>Notes:</strong> {activeSnapshot.notes}
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
-                </label>
-                <label>
-                  Contact phone
-                  <input
-                    type="text"
-                    value={editForm.contactPhone}
-                    maxLength={50}
-                    onChange={(event) => {
-                      setEditForm((current) => ({
-                        ...current,
-                        contactPhone: event.target.value,
-                      }));
-                    }}
-                    disabled={isUpdating}
-                  />
-                  {editFieldErrors.contactPhone ? (
-                    <p role="alert">{editFieldErrors.contactPhone}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Contact email
-                  <input
-                    type="email"
-                    value={editForm.contactEmail}
-                    maxLength={255}
-                    onChange={(event) => {
-                      setEditForm((current) => ({
-                        ...current,
-                        contactEmail: event.target.value,
-                      }));
-                    }}
-                    disabled={isUpdating}
-                  />
-                  {editFieldErrors.contactEmail ? (
-                    <p role="alert">{editFieldErrors.contactEmail}</p>
-                  ) : null}
-                </label>
-                <label>
-                  Notes
-                  <textarea
-                    value={editForm.notes}
-                    onChange={(event) => {
-                      setEditForm((current) => ({
-                        ...current,
-                        notes: event.target.value,
-                      }));
-                    }}
-                    disabled={isUpdating}
-                    rows={3}
-                  />
-                  {editFieldErrors.notes ? (
-                    <p role="alert">{editFieldErrors.notes}</p>
-                  ) : null}
-                </label>
-                <div className="map-panel-actions">
-                  <button
-                    type="submit"
-                    disabled={isUpdating || statusesLoading}
-                  >
-                    {isUpdating ? 'Saving changes...' : 'Save as new snapshot'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPanelMode('detail');
-                      setPanelError('');
-                    }}
-                    disabled={isUpdating}
-                  >
-                    Cancel
-                  </button>
+                  <div className="map-panel-actions">
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={() => {
+                        setPanelMode('summary');
+                        setSnapshotError('');
+                      }}
+                    >
+                      Back to property
+                    </button>
+                    {canEditCurrentSnapshot ? (
+                      <button
+                        type="button"
+                        className="button button--primary"
+                        onClick={handleStartEdit}
+                        disabled={!activeSnapshot || statusesLoading}
+                      >
+                        Edit interaction
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </form>
-            ) : null}
+              ) : null}
+
+              {panelMode === 'edit' ? (
+                <form
+                  className="map-interaction-form"
+                  onSubmit={handleUpdateInteraction}
+                >
+                  <h5>Edit Interaction Snapshot</h5>
+                  <div className="map-interaction-form__grid">
+                    <label className="form-field form-field--inverse">
+                      <span>Status</span>
+                      <select
+                        value={editForm.statusId}
+                        onChange={(event) => {
+                          setEditForm((current) => ({
+                            ...current,
+                            statusId: event.target.value,
+                          }));
+                        }}
+                        disabled={isUpdating || statusesLoading}
+                        required
+                      >
+                        <option value="">Select a status</option>
+                        {statuses.map((status) => (
+                          <option key={status.id} value={status.id}>
+                            {status.name}
+                          </option>
+                        ))}
+                      </select>
+                      {editFieldErrors.statusId ? (
+                        <p role="alert">{editFieldErrors.statusId}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact phone</span>
+                      <input
+                        type="text"
+                        value={editForm.contactPhone}
+                        maxLength={50}
+                        onChange={(event) => {
+                          setEditForm((current) => ({
+                            ...current,
+                            contactPhone: event.target.value,
+                          }));
+                        }}
+                        disabled={isUpdating}
+                      />
+                      {editFieldErrors.contactPhone ? (
+                        <p role="alert">{editFieldErrors.contactPhone}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact name</span>
+                      <input
+                        type="text"
+                        value={editForm.contactName}
+                        maxLength={255}
+                        onChange={(event) => {
+                          setEditForm((current) => ({
+                            ...current,
+                            contactName: event.target.value,
+                          }));
+                        }}
+                        disabled={isUpdating}
+                      />
+                      {editFieldErrors.contactName ? (
+                        <p role="alert">{editFieldErrors.contactName}</p>
+                      ) : null}
+                    </label>
+                    <label className="form-field form-field--inverse">
+                      <span>Contact email</span>
+                      <input
+                        type="email"
+                        value={editForm.contactEmail}
+                        maxLength={255}
+                        onChange={(event) => {
+                          setEditForm((current) => ({
+                            ...current,
+                            contactEmail: event.target.value,
+                          }));
+                        }}
+                        disabled={isUpdating}
+                      />
+                      {editFieldErrors.contactEmail ? (
+                        <p role="alert">{editFieldErrors.contactEmail}</p>
+                      ) : null}
+                    </label>
+                  </div>
+                  <label className="form-field form-field--inverse">
+                    <span>Notes</span>
+                    <textarea
+                      value={editForm.notes}
+                      onChange={(event) => {
+                        setEditForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }));
+                      }}
+                      disabled={isUpdating}
+                      rows={4}
+                    />
+                    {editFieldErrors.notes ? (
+                      <p role="alert">{editFieldErrors.notes}</p>
+                    ) : null}
+                  </label>
+                  <div className="map-panel-actions">
+                    <button
+                      type="submit"
+                      className="button button--primary"
+                      disabled={isUpdating || statusesLoading}
+                    >
+                      {isUpdating
+                        ? 'Saving changes...'
+                        : 'Save as new snapshot'}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={() => {
+                        setPanelMode('detail');
+                        setPanelError('');
+                      }}
+                      disabled={isUpdating}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        <div className="map-bottom-bar">
+          <div className="map-bottom-bar__group">
+            <span className="map-bottom-bar__label">Map Status</span>
+            <strong>
+              {followLocation
+                ? 'Following current location'
+                : 'Manual map exploration'}
+            </strong>
           </div>
-        </section>
-      ) : null}
-
-      <div className="map-canvas" role="region" aria-label="Canvassing map">
-        <MapContainer
-          center={mapCenter}
-          zoom={DEFAULT_ZOOM}
-          minZoom={4}
-          className="map-container"
-        >
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <MapEventBridge
-            followLocation={followLocation}
-            currentPosition={currentPosition}
-            onBoundsChange={loadMarkers}
-            onManualMapInteraction={handleManualInteraction}
-            onMapClick={handleMapLocationSelect}
-          />
-
-          {markers.map((marker) => (
-            <Marker
-              key={marker.propertyId}
-              position={[marker.latitude, marker.longitude]}
-              icon={propertyMarkerIcon}
-              eventHandlers={{
-                click: () => {
-                  void handleMarkerSelect(marker.propertyId);
-                },
-              }}
-            >
-              <Popup>
-                {selectedPropertyId === marker.propertyId
-                  ? 'Selected property marker'
-                  : 'Property marker'}
-              </Popup>
-            </Marker>
-          ))}
-
-          {currentPosition ? (
-            <CircleMarker
-              center={currentPosition}
-              radius={9}
-              pathOptions={{
-                color: '#0f2f5f',
-                fillColor: '#2a7de1',
-                fillOpacity: 0.85,
-              }}
-            >
-              <Popup>Your current location</Popup>
-            </CircleMarker>
-          ) : null}
-        </MapContainer>
+          <div className="map-bottom-bar__group">
+            <span className="map-bottom-bar__label">Selection</span>
+            <strong>
+              {selectedProperty
+                ? selectedProperty.addressLine1
+                : 'Click a marker or supported map location'}
+            </strong>
+          </div>
+        </div>
       </div>
     </section>
   );

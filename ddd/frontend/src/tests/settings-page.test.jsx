@@ -12,7 +12,12 @@ import { App } from '../app/App.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { ProtectedRoute } from '../auth/ProtectedRoute.jsx';
-import { getOrganization, updateOrganization } from '../api/organizationApi.js';
+import {
+  getOrganization,
+  getOrganizationSettings,
+  updateOrganization,
+  updateOrganizationSettings,
+} from '../api/organizationApi.js';
 import {
   createStatus,
   getStatuses,
@@ -30,7 +35,9 @@ import {
 
 vi.mock('../api/organizationApi.js', () => ({
   getOrganization: vi.fn(),
+  getOrganizationSettings: vi.fn(),
   updateOrganization: vi.fn(),
+  updateOrganizationSettings: vi.fn(),
 }));
 
 vi.mock('../api/teamsApi.js', () => ({
@@ -97,6 +104,18 @@ beforeEach(() => {
   getTeams.mockResolvedValue([]);
   getUsers.mockResolvedValue([]);
   getStatuses.mockResolvedValue([]);
+  getOrganizationSettings.mockResolvedValue({
+    id: 'settings-1',
+    organizationId: 'org-1',
+    repVisibility: 'own',
+    timezone: 'UTC',
+  });
+  updateOrganizationSettings.mockResolvedValue({
+    id: 'settings-1',
+    organizationId: 'org-1',
+    repVisibility: 'team',
+    timezone: 'America/New_York',
+  });
 });
 
 afterEach(() => {
@@ -631,7 +650,9 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'North Team View details' }),
+    );
 
     await waitFor(() => {
       expect(getTeam).toHaveBeenCalledWith('team-1');
@@ -726,7 +747,9 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'North Team View details' }),
+    );
     await screen.findByText('Ana Able (ana@example.com) - rep');
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
@@ -785,7 +808,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
     await screen.findByText('Ana Able (ana@example.com) - rep');
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
@@ -840,7 +863,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
     await screen.findByText('Ana Able (ana@example.com) - rep');
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
@@ -905,7 +928,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
     await screen.findByText('Ana Able (ana@example.com) - rep');
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Ana Able' }));
@@ -979,7 +1002,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
 
     await screen.findByText('No team members assigned.');
 
@@ -1032,7 +1055,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
     await screen.findByText('No team members assigned.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
@@ -1087,7 +1110,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
     await screen.findByText('No team members assigned.');
 
     fireEvent.change(screen.getByLabelText('Team member'), {
@@ -1128,7 +1151,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
 
     expect(
       await screen.findByText('No team members assigned.'),
@@ -1158,7 +1181,7 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     await screen.findByText('North Team');
-    fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+    fireEvent.click(screen.getByRole('button', { name: /View details/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Team not found.',

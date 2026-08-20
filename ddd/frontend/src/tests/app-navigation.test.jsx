@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import {
   MemoryRouter,
   RouterProvider,
@@ -67,7 +67,7 @@ describe('app navigation', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders Settings link for authenticated users', async () => {
+  it('renders drawer and account controls for authenticated users', async () => {
     setStoredSession();
 
     render(
@@ -78,17 +78,16 @@ describe('app navigation', () => {
       </AuthProvider>,
     );
 
-    const settingsLink = await screen.findByRole('link', { name: 'Settings' });
-
-    expect(settingsLink).toHaveAttribute('href', '/settings');
-    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
-      'href',
-      '/map',
-    );
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+    expect(await screen.findByText('JoeKnock')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Corey Lopez/i }),
+    ).toBeInTheDocument();
   });
 
-  it('does not render Settings link for unauthenticated users', () => {
+  it('does not render authenticated drawer controls for unauthenticated users', () => {
     render(
       <AuthProvider>
         <MemoryRouter>
@@ -98,11 +97,11 @@ describe('app navigation', () => {
     );
 
     expect(
-      screen.queryByRole('link', { name: 'Settings' }),
+      screen.queryByRole('button', { name: 'Open navigation menu' }),
     ).not.toBeInTheDocument();
   });
 
-  it('points the authenticated shell link to the settings route', async () => {
+  it('opens the user menu and exposes settings route', async () => {
     setStoredSession();
 
     render(
@@ -113,12 +112,15 @@ describe('app navigation', () => {
       </AuthProvider>,
     );
 
-    const settingsLink = await screen.findByRole('link', { name: 'Settings' });
+    fireEvent.click(screen.getByRole('button', { name: /Corey Lopez/i }));
 
-    expect(settingsLink).toHaveAttribute('href', '/settings');
+    const settingsLink = await screen.findByRole('menuitem', {
+      name: 'Settings',
+    });
+    expect(settingsLink).toHaveAttribute('href', '/settings?section=company');
   });
 
-  it('renders Reports link for manager users', async () => {
+  it('renders Reports link in the drawer for manager users', async () => {
     setStoredSession('manager');
 
     render(
@@ -129,13 +131,17 @@ describe('app navigation', () => {
       </AuthProvider>,
     );
 
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+
     const reportsLink = await screen.findByRole('link', {
       name: 'Reports',
     });
     expect(reportsLink).toHaveAttribute('href', '/reports/activity');
   });
 
-  it('renders Reports link for admin users', async () => {
+  it('renders Reports link in the drawer for admin users', async () => {
     setStoredSession('admin');
 
     render(
@@ -146,13 +152,17 @@ describe('app navigation', () => {
       </AuthProvider>,
     );
 
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+
     const reportsLink = await screen.findByRole('link', {
       name: 'Reports',
     });
     expect(reportsLink).toHaveAttribute('href', '/reports/activity');
   });
 
-  it('does not render Reports link for rep users', async () => {
+  it('does not render Reports link in the drawer for rep users', async () => {
     setStoredSession('rep');
 
     render(
@@ -163,7 +173,9 @@ describe('app navigation', () => {
       </AuthProvider>,
     );
 
-    await screen.findByRole('link', { name: 'Settings' });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
 
     expect(
       screen.queryByRole('link', { name: 'Reports' }),
@@ -175,6 +187,9 @@ describe('app navigation', () => {
     renderShellAtPath('/settings');
 
     expect(await screen.findByRole('heading', { name: 'Settings View' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
     expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
       'href',
       '/map',
@@ -186,9 +201,39 @@ describe('app navigation', () => {
     renderShellAtPath('/reports/activity');
 
     expect(await screen.findByRole('heading', { name: 'Reports View' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
     expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute(
       'href',
       '/map',
     );
+  });
+
+  it('opens and closes the navigation drawer', async () => {
+    setStoredSession('manager');
+
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    const menuButton = await screen.findByRole('button', {
+      name: 'Open navigation menu',
+    });
+
+    fireEvent.click(menuButton);
+    expect(
+      await screen.findByRole('link', { name: 'Map' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Close navigation overlay' }),
+    );
+
+    expect(screen.queryByRole('link', { name: 'Map' })).not.toBeInTheDocument();
   });
 });

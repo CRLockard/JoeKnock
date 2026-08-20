@@ -41,31 +41,53 @@ export function ProfilePage() {
   }, []);
 
   return (
-    <section>
-      <h2>Profile</h2>
-      {isLoading ? <p>Loading profile...</p> : null}
+    <section className="page-shell page-shell--narrow">
+      <header className="page-header">
+        <div>
+          <p className="page-header__eyebrow">Account</p>
+          <h2>Profile</h2>
+          <p className="page-header__description">
+            Review your authenticated account information.
+          </p>
+        </div>
+      </header>
 
-      {error ? <p role="alert">{error}</p> : null}
+      {isLoading ? <p className="feedback">Loading profile...</p> : null}
+      {error ? (
+        <p role="alert" className="feedback feedback--error">
+          {error}
+        </p>
+      ) : null}
 
       {!isLoading && !error && profile ? (
-        <dl>
-          <div>
-            <dt>Name</dt>
-            <dd>{`${profile.firstName} ${profile.lastName}`}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{profile.email}</dd>
-          </div>
-          <div>
-            <dt>Role</dt>
-            <dd>{profile.role}</dd>
-          </div>
-          <div>
-            <dt>Organization</dt>
-            <dd>{profile.organizationId}</dd>
-          </div>
-        </dl>
+        <div className="panel panel--profile">
+          <dl className="detail-list">
+            <div className="detail-list__row">
+              <dt>First Name</dt>
+              <dd>{profile.firstName}</dd>
+            </div>
+            <div className="detail-list__row">
+              <dt>Last Name</dt>
+              <dd>{profile.lastName}</dd>
+            </div>
+            <div className="detail-list__row">
+              <dt>Email</dt>
+              <dd>{profile.email}</dd>
+            </div>
+            <div className="detail-list__row">
+              <dt>Role</dt>
+              <dd>
+                <span className="status-badge status-badge--info">
+                  {profile.role}
+                </span>
+              </dd>
+            </div>
+            <div className="detail-list__row">
+              <dt>Organization</dt>
+              <dd>{profile.organizationId}</dd>
+            </div>
+          </dl>
+        </div>
       ) : null}
     </section>
   );

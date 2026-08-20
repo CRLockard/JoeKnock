@@ -74,7 +74,9 @@ describe('logout flow', () => {
       await screen.findByRole('heading', { name: 'Map' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(screen.getByRole('button', { name: /Corey Lopez/i }));
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logout' }));
 
     await waitFor(() => {
       expect(logout).toHaveBeenCalledTimes(1);
@@ -82,11 +84,15 @@ describe('logout flow', () => {
       expect(localStorage.getItem('joeknock.user')).toBeNull();
     });
 
-    expect(await screen.findByText('Login')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Login' }),
+    ).toBeInTheDocument();
 
     rendered.unmount();
     renderLogoutFlow(['/map']);
-    expect(await screen.findByText('Login')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Login' }),
+    ).toBeInTheDocument();
   });
 
   it('still clears auth state when logout API call fails', async () => {
@@ -111,13 +117,16 @@ describe('logout flow', () => {
     expect(
       await screen.findByRole('heading', { name: 'Map' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(screen.getByRole('button', { name: /Corey Lopez/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Logout' }));
 
     await waitFor(() => {
       expect(localStorage.getItem('joeknock.jwt')).toBeNull();
       expect(localStorage.getItem('joeknock.user')).toBeNull();
     });
 
-    expect(await screen.findByText('Login')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Login' }),
+    ).toBeInTheDocument();
   });
 });

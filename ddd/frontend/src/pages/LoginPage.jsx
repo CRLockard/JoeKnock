@@ -36,37 +36,80 @@ export function LoginPage() {
   }
 
   return (
-    <section>
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit} aria-label="login form">
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          autoComplete="email"
-          required
-        />
+    <section className="login-page">
+      <div className="login-card">
+        <div className="login-card__brand">
+          <div>
+            <h2>JoeKnock</h2>
+            <p className="login-card__tagline">Knock. Click. Go.</p>
+            <p className="login-card__supporting-copy">
+              Field interaction made simple.
+            </p>
+          </div>
+          <div className="login-card__illustration" aria-hidden="true">
+            <div className="login-card__house" />
+            <div className="login-card__pin" />
+          </div>
+        </div>
 
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          autoComplete="current-password"
-          required
-        />
+        <div className="login-card__form-panel">
+          <div className="page-header page-header--compact">
+            <div>
+              <p className="page-header__eyebrow">Welcome Back</p>
+              <h2>Login</h2>
+              <p className="page-header__description">
+                Sign in to your account.
+              </p>
+            </div>
+          </div>
 
-        {error ? <p role="alert">{error}</p> : null}
+          <form
+            onSubmit={handleSubmit}
+            aria-label="login form"
+            className="stack-form"
+          >
+            <label className="form-field" htmlFor="email">
+              <span>Email</span>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+            </label>
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in...' : 'Sign in'}
-        </button>
-      </form>
+            <label className="form-field" htmlFor="password">
+              <span>Password</span>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+
+            {error ? (
+              <p role="alert" className="feedback feedback--error">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              className="button button--primary button--full"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Signing in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
     </section>
   );
 }

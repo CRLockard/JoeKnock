@@ -162,152 +162,206 @@ export function ActivityReportPage() {
     report.byRepresentative.length > 0;
 
   return (
-    <section aria-label="Activity reporting">
-      <h2>Activity Report</h2>
+    <section aria-label="Activity reporting" className="page-shell">
+      <header className="page-header">
+        <div>
+          <p className="page-header__eyebrow">Reports</p>
+          <h2>Activity Report</h2>
+          <p className="page-header__description">
+            Review current property activity and export the filtered results.
+          </p>
+        </div>
+      </header>
 
-      <form onSubmit={handleRunReport} aria-label="activity report filters">
-        <label>
-          Date from
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(event) => setDateFrom(event.target.value)}
-            required
-          />
-        </label>
+      <div className="panel panel--filters">
+        <form
+          onSubmit={handleRunReport}
+          aria-label="activity report filters"
+          className="filters-grid"
+        >
+          <label className="form-field">
+            <span>Date from</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              required
+            />
+          </label>
 
-        <label>
-          Date to
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(event) => setDateTo(event.target.value)}
-            required
-          />
-        </label>
+          <label className="form-field">
+            <span>Date to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              required
+            />
+          </label>
 
-        <label>
-          Representative
-          <select
-            value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-            disabled={isLoadingOptions}
-          >
-            <option value="">All representatives</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {`${user.firstName} ${user.lastName} (${user.email})`}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="form-field">
+            <span>Representative</span>
+            <select
+              value={userId}
+              onChange={(event) => setUserId(event.target.value)}
+              disabled={isLoadingOptions}
+            >
+              <option value="">All representatives</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {`${user.firstName} ${user.lastName} (${user.email})`}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label>
-          Team
-          <select
-            value={teamId}
-            onChange={(event) => setTeamId(event.target.value)}
-            disabled={isLoadingOptions}
-          >
-            <option value="">All teams</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="form-field">
+            <span>Team</span>
+            <select
+              value={teamId}
+              onChange={(event) => setTeamId(event.target.value)}
+              disabled={isLoadingOptions}
+            >
+              <option value="">All teams</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label>
-          Status
-          <select
-            value={statusId}
-            onChange={(event) => setStatusId(event.target.value)}
-            disabled={isLoadingOptions}
-          >
-            <option value="">All statuses</option>
-            {statuses.map((status) => (
-              <option key={status.id} value={status.id}>
-                {status.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="form-field">
+            <span>Status</span>
+            <select
+              value={statusId}
+              onChange={(event) => setStatusId(event.target.value)}
+              disabled={isLoadingOptions}
+            >
+              <option value="">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <button type="submit" disabled={isLoadingReport}>
-          {isLoadingReport ? 'Loading report...' : 'Run report'}
-        </button>
-        <button type="button" onClick={handleExportCsv} disabled={isExporting}>
-          {isExporting ? 'Exporting...' : 'Export CSV'}
-        </button>
-      </form>
+          <div className="filters-grid__actions">
+            <button
+              type="submit"
+              className="button button--primary"
+              disabled={isLoadingReport}
+            >
+              {isLoadingReport ? 'Loading report...' : 'Run report'}
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={handleExportCsv}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          </div>
+        </form>
+      </div>
 
-      {optionsError ? <p role="alert">{optionsError}</p> : null}
-      {reportError ? <p role="alert">{reportError}</p> : null}
-      {exportError ? <p role="alert">{exportError}</p> : null}
-
-      <div aria-live="polite">
-        <p>Total knocks: {report.summary.totalKnocks}</p>
-        <p>
-          Status activity groups in range:{' '}
-          {report.summary.totalStatusActivityGroups}
+      {optionsError ? (
+        <p role="alert" className="feedback feedback--error">
+          {optionsError}
         </p>
-        {report.dateRange.timezone ? (
-          <p>{`Organization timezone: ${report.dateRange.timezone}`}</p>
-        ) : null}
+      ) : null}
+      {reportError ? (
+        <p role="alert" className="feedback feedback--error">
+          {reportError}
+        </p>
+      ) : null}
+      {exportError ? (
+        <p role="alert" className="feedback feedback--error">
+          {exportError}
+        </p>
+      ) : null}
+
+      <div className="summary-grid" aria-live="polite">
+        <div className="summary-card">
+          <span>Total Knocks</span>
+          <strong>{report.summary.totalKnocks}</strong>
+        </div>
+        <div className="summary-card">
+          <span>Status Activity Groups</span>
+          <strong>{report.summary.totalStatusActivityGroups}</strong>
+        </div>
+        <div className="summary-card">
+          <span>Timezone</span>
+          <strong>{report.dateRange.timezone || 'Unavailable'}</strong>
+        </div>
       </div>
 
       {!isLoadingReport && !reportError && !hasData ? (
-        <p>No activity found for the selected filters.</p>
+        <p className="feedback">No activity found for the selected filters.</p>
       ) : null}
 
-      <section aria-label="Status grouping">
-        <h3>By Status</h3>
-        {report.byStatus.length === 0 ? (
-          <p>No status activity found.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Status</th>
-                <th scope="col">Knocks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.byStatus.map((row) => (
-                <tr key={row.statusId}>
-                  <td>{row.statusName}</td>
-                  <td>{row.knocks}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <div className="report-grid">
+        <section aria-label="Status grouping" className="panel panel--table">
+          <div className="panel__header">
+            <h3>By Status</h3>
+          </div>
+          {report.byStatus.length === 0 ? (
+            <p className="feedback">No status activity found.</p>
+          ) : (
+            <div className="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Status</th>
+                    <th scope="col">Knocks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.byStatus.map((row) => (
+                    <tr key={row.statusId}>
+                      <td>{row.statusName}</td>
+                      <td>{row.knocks}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
-      <section aria-label="Representative grouping">
-        <h3>By Representative</h3>
-        {report.byRepresentative.length === 0 ? (
-          <p>No representative activity found.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Representative</th>
-                <th scope="col">Knocks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.byRepresentative.map((row) => (
-                <tr key={row.userId}>
-                  <td>{`${row.firstName} ${row.lastName} (${row.email})`}</td>
-                  <td>{row.knocks}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+        <section
+          aria-label="Representative grouping"
+          className="panel panel--table"
+        >
+          <div className="panel__header">
+            <h3>By Representative</h3>
+          </div>
+          {report.byRepresentative.length === 0 ? (
+            <p className="feedback">No representative activity found.</p>
+          ) : (
+            <div className="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Representative</th>
+                    <th scope="col">Knocks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.byRepresentative.map((row) => (
+                    <tr key={row.userId}>
+                      <td>{`${row.firstName} ${row.lastName} (${row.email})`}</td>
+                      <td>{row.knocks}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </section>
   );
 }

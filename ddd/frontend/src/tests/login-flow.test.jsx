@@ -73,7 +73,7 @@ describe('login flow', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'StrongPass123!' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
 
     await waitFor(() => {
       expect(localStorage.getItem('joeknock.jwt')).toBe('token-123');
@@ -99,7 +99,7 @@ describe('login flow', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'WrongPass123!' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid email or password.',

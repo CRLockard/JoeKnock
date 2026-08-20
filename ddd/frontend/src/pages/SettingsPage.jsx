@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getOrganization, updateOrganization } from '../api/organizationApi.js';
+import { useSearchParams } from 'react-router-dom';
+import {
+  getOrganization,
+  getOrganizationSettings,
+  updateOrganization,
+  updateOrganizationSettings,
+} from '../api/organizationApi.js';
 import {
   createStatus,
   getStatuses,
@@ -15,9 +21,38 @@ import {
   removeUserFromTeam,
 } from '../api/teamsApi.js';
 import { useAuth } from '../auth/useAuth.js';
+import { SettingsWorkspace } from '../components/SettingsWorkspace.jsx';
+import { StatusBadge } from '../components/StatusBadge.jsx';
+
+const REP_VISIBILITY_OPTIONS = [
+  {
+    value: 'own',
+    label: 'Self',
+    description: 'Only my interactions',
+  },
+  {
+    value: 'team',
+    label: 'Team',
+    description: "My team's interactions",
+  },
+  {
+    value: 'organization',
+    label: 'Organization',
+    description: 'All organization interactions',
+  },
+];
+
+const TIMEZONE_OPTIONS = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+];
 
 export function SettingsPage() {
   const auth = useAuth();
+  const [searchParams] = useSearchParams();
   const [organization, setOrganization] = useState(null);
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -59,11 +94,72 @@ export function SettingsPage() {
   const [isCreatingStatus, setIsCreatingStatus] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isDeactivatingStatus, setIsDeactivatingStatus] = useState(false);
+  const [organizationSettings, setOrganizationSettings] = useState(null);
+  const [repVisibility, setRepVisibility] = useState('own');
+  const [timezone, setTimezone] = useState('UTC');
+  const [organizationSettingsError, setOrganizationSettingsError] =
+    useState('');
+  const [
+    organizationSettingsSuccessMessage,
+    setOrganizationSettingsSuccessMessage,
+  ] = useState('');
+  const [isSavingOrganizationSettings, setIsSavingOrganizationSettings] =
+    useState(false);
 
   const isAdmin = auth.user?.role === 'admin';
   const canViewTeams = isAdmin || auth.user?.role === 'manager';
   const canCreateTeams = canViewTeams;
   const canManageStatuses = canViewTeams;
+  const canViewOrganizationSettings = canViewTeams;
+  const activeSection =
+    searchParams.get('section') &&
+    ['company', 'teams', 'statuses', 'visibility'].includes(
+      searchParams.get('section'),
+    )
+      ? searchParams.get('section')
+      : 'all';
+
+  useEffect(() => {
+    if (!canViewOrganizationSettings) {
+      setOrganizationSettings(null);
+      setOrganizationSettingsError('');
+      setOrganizationSettingsSuccessMessage('');
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadOrganizationSettings() {
+      setOrganizationSettingsError('');
+
+      try {
+        const response = await getOrganizationSettings();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setOrganizationSettings(response);
+        setRepVisibility(response.repVisibility);
+        setTimezone(response.timezone);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        setOrganizationSettingsError(
+          loadError.message ||
+            'Unable to load organization visibility settings.',
+        );
+      }
+    }
+
+    void loadOrganizationSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canViewOrganizationSettings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -546,312 +642,665 @@ export function SettingsPage() {
     }
   }
 
+  async function handleOrganizationSettingsSubmit(event) {
+    event.preventDefault();
+    setOrganizationSettingsError('');
+    setOrganizationSettingsSuccessMessage('');
+
+    if (!isAdmin) {
+      setOrganizationSettingsError(
+        'Only administrators can update organization visibility settings.',
+      );
+      return;
+    }
+
+    setIsSavingOrganizationSettings(true);
+
+    try {
+      const updated = await updateOrganizationSettings({
+        rep_visibility: repVisibility,
+        timezone,
+      });
+
+      setOrganizationSettings(updated);
+      setRepVisibility(updated.repVisibility);
+      setTimezone(updated.timezone);
+      setOrganizationSettingsSuccessMessage(
+        'Visibility settings updated successfully.',
+      );
+    } catch (saveError) {
+      setOrganizationSettingsError(
+        saveError.message || 'Unable to update visibility settings.',
+      );
+    } finally {
+      setIsSavingOrganizationSettings(false);
+    }
+  }
+
   return (
-    <section>
-      <h2>Organization Settings</h2>
-      {isLoading ? <p>Loading organization...</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {successMessage ? <p role="status">{successMessage}</p> : null}
-      {teamError ? <p role="alert">{teamError}</p> : null}
-      {teamSuccessMessage ? <p role="status">{teamSuccessMessage}</p> : null}
-      {teamsError ? <p role="alert">{teamsError}</p> : null}
-      {usersError ? <p role="alert">{usersError}</p> : null}
-      {teamDetailError ? <p role="alert">{teamDetailError}</p> : null}
-      {addMemberError ? <p role="alert">{addMemberError}</p> : null}
+    <SettingsWorkspace
+      title="Organization Settings"
+      description="Manage company details, teams, statuses, and visibility rules."
+      activeSection={activeSection === 'all' ? 'company' : activeSection}
+    >
+      {isLoading ? <p className="feedback">Loading organization...</p> : null}
+      {error ? (
+        <p role="alert" className="feedback feedback--error">
+          {error}
+        </p>
+      ) : null}
+      {successMessage ? (
+        <p role="status" className="feedback feedback--success">
+          {successMessage}
+        </p>
+      ) : null}
+      {teamError ? (
+        <p role="alert" className="feedback feedback--error">
+          {teamError}
+        </p>
+      ) : null}
+      {teamSuccessMessage ? (
+        <p role="status" className="feedback feedback--success">
+          {teamSuccessMessage}
+        </p>
+      ) : null}
+      {teamsError ? (
+        <p role="alert" className="feedback feedback--error">
+          {teamsError}
+        </p>
+      ) : null}
+      {usersError ? (
+        <p role="alert" className="feedback feedback--error">
+          {usersError}
+        </p>
+      ) : null}
+      {teamDetailError ? (
+        <p role="alert" className="feedback feedback--error">
+          {teamDetailError}
+        </p>
+      ) : null}
+      {addMemberError ? (
+        <p role="alert" className="feedback feedback--error">
+          {addMemberError}
+        </p>
+      ) : null}
       {addMemberSuccessMessage ? (
-        <p role="status">{addMemberSuccessMessage}</p>
+        <p role="status" className="feedback feedback--success">
+          {addMemberSuccessMessage}
+        </p>
       ) : null}
-      {removeMemberError ? <p role="alert">{removeMemberError}</p> : null}
+      {removeMemberError ? (
+        <p role="alert" className="feedback feedback--error">
+          {removeMemberError}
+        </p>
+      ) : null}
       {removeMemberSuccessMessage ? (
-        <p role="status">{removeMemberSuccessMessage}</p>
+        <p role="status" className="feedback feedback--success">
+          {removeMemberSuccessMessage}
+        </p>
       ) : null}
-      {statusesError ? <p role="alert">{statusesError}</p> : null}
+      {statusesError ? (
+        <p role="alert" className="feedback feedback--error">
+          {statusesError}
+        </p>
+      ) : null}
       {statusesSuccessMessage ? (
-        <p role="status">{statusesSuccessMessage}</p>
+        <p role="status" className="feedback feedback--success">
+          {statusesSuccessMessage}
+        </p>
+      ) : null}
+      {organizationSettingsError ? (
+        <p role="alert" className="feedback feedback--error">
+          {organizationSettingsError}
+        </p>
+      ) : null}
+      {organizationSettingsSuccessMessage ? (
+        <p role="status" className="feedback feedback--success">
+          {organizationSettingsSuccessMessage}
+        </p>
       ) : null}
 
       {!isLoading && organization ? (
         <>
-          <form onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="organization-name">Organization name</label>
-              <input
-                id="organization-name"
-                name="organizationName"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                disabled={!isAdmin || isSaving}
-              />
-            </div>
+          {activeSection === 'all' || activeSection === 'company' ? (
+            <div className="workspace-grid">
+              <form onSubmit={handleSubmit} className="panel stack-form">
+                <div className="panel__header">
+                  <h3>Company Information</h3>
+                </div>
 
-            {isAdmin ? (
-              <button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save organization'}
-              </button>
-            ) : (
-              <p>Only administrators can update organization information.</p>
-            )}
-          </form>
-
-          <section aria-label="create team">
-            <h3>Create Team</h3>
-            <form onSubmit={handleCreateTeam}>
-              <div>
-                <label htmlFor="team-name">Team name</label>
-                <input
-                  id="team-name"
-                  name="teamName"
-                  type="text"
-                  value={teamName}
-                  onChange={(event) => setTeamName(event.target.value)}
-                  disabled={!canCreateTeams || isCreatingTeam}
-                />
-              </div>
-
-              {canCreateTeams ? (
-                <button type="submit" disabled={isCreatingTeam}>
-                  {isCreatingTeam ? 'Creating team...' : 'Create team'}
-                </button>
-              ) : (
-                <p>Only managers and administrators can create teams.</p>
-              )}
-            </form>
-          </section>
-
-          <section aria-label="manage statuses">
-            <h3>Statuses</h3>
-
-            {isStatusesLoading ? <p>Loading statuses...</p> : null}
-
-            {!isStatusesLoading && statuses.length === 0 ? (
-              <p>No active statuses found.</p>
-            ) : null}
-
-            {!isStatusesLoading && statuses.length > 0 ? (
-              <ul>
-                {statuses.map((status) => (
-                  <li key={status.id}>
-                    {status.name} (order: {status.displayOrder})
-                    {status.description ? ` - ${status.description}` : ''}{' '}
-                    {canManageStatuses ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => startEditingStatus(status)}
-                          disabled={isUpdatingStatus || isDeactivatingStatus}
-                        >
-                          Edit {status.name}
-                        </button>{' '}
-                        <button
-                          type="button"
-                          onClick={() => handleDeactivateStatus(status)}
-                          disabled={isDeactivatingStatus || isUpdatingStatus}
-                        >
-                          {isDeactivatingStatus
-                            ? 'Deactivating...'
-                            : `Deactivate ${status.name}`}
-                        </button>
-                      </>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            {canManageStatuses ? (
-              <form onSubmit={handleCreateStatus} aria-label="create status">
-                <h4>Create Status</h4>
-
-                <label htmlFor="status-name">Status name</label>
-                <input
-                  id="status-name"
-                  name="statusName"
-                  type="text"
-                  value={statusName}
-                  onChange={(event) => setStatusName(event.target.value)}
-                  disabled={isCreatingStatus}
-                />
-
-                <label htmlFor="status-description">Status description</label>
-                <input
-                  id="status-description"
-                  name="statusDescription"
-                  type="text"
-                  value={statusDescription}
-                  onChange={(event) => setStatusDescription(event.target.value)}
-                  disabled={isCreatingStatus}
-                />
-
-                <label htmlFor="status-display-order">Display order</label>
-                <input
-                  id="status-display-order"
-                  name="statusDisplayOrder"
-                  type="number"
-                  min="1"
-                  value={statusDisplayOrder}
-                  onChange={(event) =>
-                    setStatusDisplayOrder(event.target.value)
-                  }
-                  disabled={isCreatingStatus}
-                />
-
-                <button type="submit" disabled={isCreatingStatus}>
-                  {isCreatingStatus ? 'Creating status...' : 'Create status'}
-                </button>
-              </form>
-            ) : (
-              <p>Only managers and administrators can manage statuses.</p>
-            )}
-
-            {editingStatusId ? (
-              <form onSubmit={handleUpdateStatus} aria-label="edit status">
-                <h4>Edit Status</h4>
-
-                <label htmlFor="edit-status-name">Edit status name</label>
-                <input
-                  id="edit-status-name"
-                  name="editStatusName"
-                  type="text"
-                  value={editStatusName}
-                  onChange={(event) => setEditStatusName(event.target.value)}
-                  disabled={isUpdatingStatus}
-                />
-
-                <label htmlFor="edit-status-description">
-                  Edit status description
+                <label className="form-field" htmlFor="organization-name">
+                  <span>Organization name</span>
+                  <input
+                    id="organization-name"
+                    name="organizationName"
+                    type="text"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    disabled={!isAdmin || isSaving}
+                  />
                 </label>
-                <input
-                  id="edit-status-description"
-                  name="editStatusDescription"
-                  type="text"
-                  value={editStatusDescription}
-                  onChange={(event) =>
-                    setEditStatusDescription(event.target.value)
-                  }
-                  disabled={isUpdatingStatus}
-                />
 
-                <label htmlFor="edit-status-display-order">
-                  Edit display order
-                </label>
-                <input
-                  id="edit-status-display-order"
-                  name="editStatusDisplayOrder"
-                  type="number"
-                  min="1"
-                  value={editStatusDisplayOrder}
-                  onChange={(event) =>
-                    setEditStatusDisplayOrder(event.target.value)
-                  }
-                  disabled={isUpdatingStatus}
-                />
+                <div className="detail-card-grid">
+                  <div className="detail-card">
+                    <span>Organization ID</span>
+                    <strong>{organization.id}</strong>
+                  </div>
+                  <div className="detail-card">
+                    <span>Current Visibility</span>
+                    <strong>
+                      {organizationSettings?.repVisibility ?? 'Unavailable'}
+                    </strong>
+                  </div>
+                </div>
 
-                <button type="submit" disabled={isUpdatingStatus}>
-                  {isUpdatingStatus ? 'Saving status...' : 'Save status'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={cancelEditingStatus}
-                  disabled={isUpdatingStatus}
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : null}
-          </section>
-
-          <section aria-label="view teams">
-            <h3>Teams</h3>
-
-            {!canViewTeams ? (
-              <p>Only managers and administrators can view teams.</p>
-            ) : null}
-
-            {canViewTeams && isTeamsLoading ? <p>Loading teams...</p> : null}
-            {canViewTeams && isUsersLoading ? <p>Loading users...</p> : null}
-
-            {canViewTeams && !isTeamsLoading && teams.length === 0 ? (
-              <p>No teams found.</p>
-            ) : null}
-
-            {canViewTeams && !isTeamsLoading && teams.length > 0 ? (
-              <ul>
-                {teams.map((team) => (
-                  <li key={team.id}>
-                    <span>{team.name}</span>{' '}
-                    <button
-                      type="button"
-                      onClick={() => handleViewTeam(team.id)}
-                      disabled={isTeamDetailLoading}
-                    >
-                      View details
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            {canViewTeams && isTeamDetailLoading ? (
-              <p>Loading team details...</p>
-            ) : null}
-
-            {selectedTeam ? (
-              <section aria-label="team detail">
-                <h4>{selectedTeam.name}</h4>
-
-                {selectedTeam.members.length === 0 ? (
-                  <p>No team members assigned.</p>
-                ) : (
-                  <ul>
-                    {selectedTeam.members.map((member) => (
-                      <li key={member.id}>
-                        {member.firstName} {member.lastName} ({member.email}) -{' '}
-                        {member.role}{' '}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMember(member)}
-                          disabled={isRemovingMember || isAddingMember}
-                        >
-                          {isRemovingMember
-                            ? 'Removing member...'
-                            : `Remove ${member.firstName} ${member.lastName}`}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <form onSubmit={handleAddMember} aria-label="add team member">
-                  <label htmlFor="team-member-user">Team member</label>
-                  <select
-                    id="team-member-user"
-                    name="teamMemberUser"
-                    value={selectedUserId}
-                    onChange={(event) => setSelectedUserId(event.target.value)}
-                    disabled={isAddingMember || isUsersLoading}
-                  >
-                    <option value="">Select a user</option>
-                    {organizationUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName} ({user.email})
-                      </option>
-                    ))}
-                  </select>
-
+                {isAdmin ? (
                   <button
                     type="submit"
-                    disabled={isAddingMember || isUsersLoading}
+                    className="button button--primary"
+                    disabled={isSaving}
                   >
-                    {isAddingMember ? 'Adding member...' : 'Add member'}
+                    {isSaving ? 'Saving...' : 'Save organization'}
                   </button>
-                </form>
+                ) : (
+                  <p className="feedback">
+                    Only administrators can update organization information.
+                  </p>
+                )}
+              </form>
+            </div>
+          ) : null}
+
+          {activeSection === 'all' || activeSection === 'teams' ? (
+            <div className="workspace-grid workspace-grid--teams">
+              <section aria-label="view teams" className="panel">
+                <div className="panel__header">
+                  <h3>Teams</h3>
+                </div>
+
+                {!canViewTeams ? (
+                  <p className="feedback">
+                    Only managers and administrators can view teams.
+                  </p>
+                ) : null}
+                {canViewTeams && isTeamsLoading ? (
+                  <p className="feedback">Loading teams...</p>
+                ) : null}
+                {canViewTeams && isUsersLoading ? (
+                  <p className="feedback">Loading users...</p>
+                ) : null}
+                {canViewTeams && !isTeamsLoading && teams.length === 0 ? (
+                  <p className="feedback">No teams found.</p>
+                ) : null}
+
+                {canViewTeams && !isTeamsLoading && teams.length > 0 ? (
+                  <div className="team-card-list">
+                    {teams.map((team) => (
+                      <button
+                        key={team.id}
+                        type="button"
+                        className="team-card"
+                        onClick={() => handleViewTeam(team.id)}
+                        disabled={isTeamDetailLoading}
+                      >
+                        <strong>{team.name}</strong>
+                        <span>View details</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </section>
-            ) : null}
-          </section>
+
+              <aside className="workspace-side-panel">
+                <section aria-label="create team" className="panel stack-form">
+                  <div className="panel__header">
+                    <h3>Create Team</h3>
+                  </div>
+                  <form onSubmit={handleCreateTeam} className="stack-form">
+                    <label className="form-field" htmlFor="team-name">
+                      <span>Team name</span>
+                      <input
+                        id="team-name"
+                        name="teamName"
+                        type="text"
+                        value={teamName}
+                        onChange={(event) => setTeamName(event.target.value)}
+                        disabled={!canCreateTeams || isCreatingTeam}
+                      />
+                    </label>
+
+                    {canCreateTeams ? (
+                      <button
+                        type="submit"
+                        className="button button--primary"
+                        disabled={isCreatingTeam}
+                      >
+                        {isCreatingTeam ? 'Creating team...' : 'Create team'}
+                      </button>
+                    ) : (
+                      <p className="feedback">
+                        Only managers and administrators can create teams.
+                      </p>
+                    )}
+                  </form>
+                </section>
+
+                {canViewTeams && isTeamDetailLoading ? (
+                  <p className="feedback">Loading team details...</p>
+                ) : null}
+
+                {selectedTeam ? (
+                  <section
+                    aria-label="team detail"
+                    className="panel stack-form"
+                  >
+                    <div className="panel__header">
+                      <h3>{selectedTeam.name}</h3>
+                      <StatusBadge tone="info">
+                        {selectedTeam.members.length} Members
+                      </StatusBadge>
+                    </div>
+
+                    {selectedTeam.members.length === 0 ? (
+                      <p className="feedback">No team members assigned.</p>
+                    ) : (
+                      <div className="member-list">
+                        {selectedTeam.members.map((member) => (
+                          <div key={member.id} className="member-list__item">
+                            <div>
+                              <strong>
+                                {member.firstName} {member.lastName}
+                              </strong>
+                              <span>
+                                {member.firstName} {member.lastName} (
+                                {member.email}) - {member.role}
+                              </span>
+                            </div>
+                            <div className="member-list__actions">
+                              <StatusBadge tone="info">
+                                {member.role}
+                              </StatusBadge>
+                              <button
+                                type="button"
+                                className="button button--ghost"
+                                onClick={() => handleRemoveMember(member)}
+                                disabled={isRemovingMember || isAddingMember}
+                              >
+                                {isRemovingMember
+                                  ? 'Removing member...'
+                                  : `Remove ${member.firstName} ${member.lastName}`}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={handleAddMember}
+                      aria-label="add team member"
+                      className="stack-form"
+                    >
+                      <label className="form-field" htmlFor="team-member-user">
+                        <span>Team member</span>
+                        <select
+                          id="team-member-user"
+                          name="teamMemberUser"
+                          value={selectedUserId}
+                          onChange={(event) =>
+                            setSelectedUserId(event.target.value)
+                          }
+                          disabled={isAddingMember || isUsersLoading}
+                        >
+                          <option value="">Select a user</option>
+                          {organizationUsers.map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.firstName} {user.lastName} ({user.email})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <button
+                        type="submit"
+                        className="button button--primary"
+                        disabled={isAddingMember || isUsersLoading}
+                      >
+                        {isAddingMember ? 'Adding member...' : 'Add member'}
+                      </button>
+                    </form>
+                  </section>
+                ) : null}
+              </aside>
+            </div>
+          ) : null}
+
+          {activeSection === 'all' || activeSection === 'statuses' ? (
+            <div className="workspace-grid workspace-grid--statuses">
+              <section
+                aria-label="manage statuses"
+                className="panel panel--table"
+              >
+                <div className="panel__header">
+                  <h3>Statuses</h3>
+                </div>
+
+                {isStatusesLoading ? (
+                  <p className="feedback">Loading statuses...</p>
+                ) : null}
+                {!isStatusesLoading && statuses.length === 0 ? (
+                  <p className="feedback">No active statuses found.</p>
+                ) : null}
+
+                {!isStatusesLoading && statuses.length > 0 ? (
+                  <div className="table-shell">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">Order</th>
+                          <th scope="col">Status Name</th>
+                          <th scope="col">Description</th>
+                          <th scope="col">Active</th>
+                          <th scope="col">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statuses.map((status) => (
+                          <tr key={status.id}>
+                            <td>{status.displayOrder}</td>
+                            <td>
+                              {status.name} (order: {status.displayOrder})
+                              {status.description
+                                ? ` - ${status.description}`
+                                : ''}
+                            </td>
+                            <td>{status.description || 'No description'}</td>
+                            <td>
+                              <StatusBadge
+                                tone={
+                                  status.isActive === false
+                                    ? 'muted'
+                                    : 'success'
+                                }
+                              >
+                                {status.isActive === false
+                                  ? 'Inactive'
+                                  : 'Active'}
+                              </StatusBadge>
+                            </td>
+                            <td>
+                              <div className="table-actions">
+                                {canManageStatuses ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="button button--ghost"
+                                      onClick={() => startEditingStatus(status)}
+                                      disabled={
+                                        isUpdatingStatus || isDeactivatingStatus
+                                      }
+                                    >
+                                      Edit {status.name}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button--ghost"
+                                      onClick={() =>
+                                        handleDeactivateStatus(status)
+                                      }
+                                      disabled={
+                                        isDeactivatingStatus || isUpdatingStatus
+                                      }
+                                    >
+                                      {isDeactivatingStatus
+                                        ? 'Deactivating...'
+                                        : `Deactivate ${status.name}`}
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </section>
+
+              <aside className="workspace-side-panel">
+                {canManageStatuses ? (
+                  <form
+                    onSubmit={handleCreateStatus}
+                    aria-label="create status"
+                    className="panel stack-form"
+                  >
+                    <div className="panel__header">
+                      <h3>Add Status</h3>
+                    </div>
+
+                    <label className="form-field" htmlFor="status-name">
+                      <span>Status name</span>
+                      <input
+                        id="status-name"
+                        name="statusName"
+                        type="text"
+                        value={statusName}
+                        onChange={(event) => setStatusName(event.target.value)}
+                        disabled={isCreatingStatus}
+                      />
+                    </label>
+
+                    <label className="form-field" htmlFor="status-description">
+                      <span>Status description</span>
+                      <input
+                        id="status-description"
+                        name="statusDescription"
+                        type="text"
+                        value={statusDescription}
+                        onChange={(event) =>
+                          setStatusDescription(event.target.value)
+                        }
+                        disabled={isCreatingStatus}
+                      />
+                    </label>
+
+                    <label
+                      className="form-field"
+                      htmlFor="status-display-order"
+                    >
+                      <span>Display order</span>
+                      <input
+                        id="status-display-order"
+                        name="statusDisplayOrder"
+                        type="number"
+                        min="1"
+                        value={statusDisplayOrder}
+                        onChange={(event) =>
+                          setStatusDisplayOrder(event.target.value)
+                        }
+                        disabled={isCreatingStatus}
+                      />
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="button button--primary"
+                      disabled={isCreatingStatus}
+                    >
+                      {isCreatingStatus
+                        ? 'Creating status...'
+                        : 'Create status'}
+                    </button>
+                  </form>
+                ) : (
+                  <p className="feedback">
+                    Only managers and administrators can manage statuses.
+                  </p>
+                )}
+
+                {editingStatusId ? (
+                  <form
+                    onSubmit={handleUpdateStatus}
+                    aria-label="edit status"
+                    className="panel stack-form"
+                  >
+                    <div className="panel__header">
+                      <h3>Edit Status</h3>
+                    </div>
+
+                    <label className="form-field" htmlFor="edit-status-name">
+                      <span>Edit status name</span>
+                      <input
+                        id="edit-status-name"
+                        name="editStatusName"
+                        type="text"
+                        value={editStatusName}
+                        onChange={(event) =>
+                          setEditStatusName(event.target.value)
+                        }
+                        disabled={isUpdatingStatus}
+                      />
+                    </label>
+
+                    <label
+                      className="form-field"
+                      htmlFor="edit-status-description"
+                    >
+                      <span>Edit status description</span>
+                      <input
+                        id="edit-status-description"
+                        name="editStatusDescription"
+                        type="text"
+                        value={editStatusDescription}
+                        onChange={(event) =>
+                          setEditStatusDescription(event.target.value)
+                        }
+                        disabled={isUpdatingStatus}
+                      />
+                    </label>
+
+                    <label
+                      className="form-field"
+                      htmlFor="edit-status-display-order"
+                    >
+                      <span>Edit display order</span>
+                      <input
+                        id="edit-status-display-order"
+                        name="editStatusDisplayOrder"
+                        type="number"
+                        min="1"
+                        value={editStatusDisplayOrder}
+                        onChange={(event) =>
+                          setEditStatusDisplayOrder(event.target.value)
+                        }
+                        disabled={isUpdatingStatus}
+                      />
+                    </label>
+
+                    <div className="form-actions">
+                      <button
+                        type="submit"
+                        className="button button--primary"
+                        disabled={isUpdatingStatus}
+                      >
+                        {isUpdatingStatus ? 'Saving status...' : 'Save status'}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={cancelEditingStatus}
+                        disabled={isUpdatingStatus}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </aside>
+            </div>
+          ) : null}
+
+          {activeSection === 'all' || activeSection === 'visibility' ? (
+            <div className="workspace-grid workspace-grid--visibility">
+              <form
+                onSubmit={handleOrganizationSettingsSubmit}
+                className="panel stack-form"
+              >
+                <div className="panel__header">
+                  <h3>Visibility Settings</h3>
+                </div>
+
+                {canViewOrganizationSettings ? (
+                  <>
+                    <fieldset className="radio-group">
+                      <legend>Representative Visibility</legend>
+                      {REP_VISIBILITY_OPTIONS.map((option) => (
+                        <label key={option.value} className="radio-card">
+                          <input
+                            type="radio"
+                            name="repVisibility"
+                            value={option.value}
+                            checked={repVisibility === option.value}
+                            onChange={(event) =>
+                              setRepVisibility(event.target.value)
+                            }
+                            disabled={!isAdmin || isSavingOrganizationSettings}
+                          />
+                          <span>
+                            <strong>{option.label}</strong>
+                            <small>{option.description}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+
+                    <label
+                      className="form-field"
+                      htmlFor="organization-timezone"
+                    >
+                      <span>Timezone</span>
+                      <select
+                        id="organization-timezone"
+                        value={timezone}
+                        onChange={(event) => setTimezone(event.target.value)}
+                        disabled={!isAdmin || isSavingOrganizationSettings}
+                      >
+                        {TIMEZONE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {isAdmin ? (
+                      <button
+                        type="submit"
+                        className="button button--primary"
+                        disabled={isSavingOrganizationSettings}
+                      >
+                        {isSavingOrganizationSettings
+                          ? 'Saving settings...'
+                          : 'Save Changes'}
+                      </button>
+                    ) : (
+                      <p className="feedback">
+                        Only administrators can update visibility settings.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="feedback">
+                    Visibility settings are available to managers and
+                    administrators.
+                  </p>
+                )}
+              </form>
+            </div>
+          ) : null}
         </>
       ) : null}
-    </section>
+    </SettingsWorkspace>
   );
 }

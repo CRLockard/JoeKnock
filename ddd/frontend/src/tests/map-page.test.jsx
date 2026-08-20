@@ -360,7 +360,9 @@ describe('MapPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Selected Property' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/123 Main St/)).length).toBeGreaterThan(
+      0,
+    );
     expect(
       screen.getByRole('button', { name: 'Start interaction' }),
     ).toBeInTheDocument();
