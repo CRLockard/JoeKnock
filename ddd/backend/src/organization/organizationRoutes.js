@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { AppError } from '../common/errors.js';
 import { createOrganizationService } from './organizationService.js';
-import { updateOrganizationValidators } from './organizationValidation.js';
+import {
+  updateOrganizationSettingsValidators,
+  updateOrganizationValidators,
+} from './organizationValidation.js';
 import { validate } from '../validation/validate.js';
 
 function requireRoles(allowedRoles) {
@@ -29,6 +32,42 @@ export function buildOrganizationRoutes({
   organizationService = createOrganizationService(),
 } = {}) {
   const router = Router();
+
+  router.get(
+    '/settings',
+    requireRoles(['manager', 'admin']),
+    async (req, res, next) => {
+      try {
+        const settings = await organizationService.getOrganizationSettings({
+          organizationId: req.auth.organizationId,
+        });
+
+        return res.status(200).json(settings);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
+  router.patch(
+    '/settings',
+    requireRoles(['admin']),
+    updateOrganizationSettingsValidators,
+    validate,
+    async (req, res, next) => {
+      try {
+        const settings = await organizationService.updateOrganizationSettings({
+          organizationId: req.auth.organizationId,
+          repVisibility: req.body.rep_visibility,
+          timezone: req.body.timezone,
+        });
+
+        return res.status(200).json(settings);
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
 
   router.get(
     '/',

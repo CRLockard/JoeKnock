@@ -11,6 +11,17 @@ function toOrganizationResponse(row) {
   };
 }
 
+function toOrganizationSettingsResponse(row) {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    repVisibility: row.rep_visibility,
+    timezone: row.timezone,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function invalidAuthContextError() {
   return new AuthError('Invalid or expired token.');
 }
@@ -30,6 +41,48 @@ export function createOrganizationService({
       }
 
       return toOrganizationResponse(organization);
+    },
+
+    async getOrganizationSettings({ organizationId }) {
+      const settings = await runInTransaction(async (client) => {
+        return repository.findOrganizationSettingsByOrganizationId(client, {
+          organizationId,
+        });
+      });
+
+      if (!settings) {
+        throw new AppError(
+          404,
+          'RESOURCE_NOT_FOUND',
+          'Organization settings not found.',
+        );
+      }
+
+      return toOrganizationSettingsResponse(settings);
+    },
+
+    async updateOrganizationSettings({
+      organizationId,
+      repVisibility,
+      timezone,
+    }) {
+      const updatedSettings = await runInTransaction(async (client) => {
+        return repository.updateOrganizationSettings(client, {
+          organizationId,
+          repVisibility,
+          timezone,
+        });
+      });
+
+      if (!updatedSettings) {
+        throw new AppError(
+          404,
+          'RESOURCE_NOT_FOUND',
+          'Organization settings not found.',
+        );
+      }
+
+      return toOrganizationSettingsResponse(updatedSettings);
     },
 
     async updateOrganization({ organizationId, name }) {

@@ -499,6 +499,191 @@ describeDb('GET /api/map/properties', () => {
     );
   });
 
+  it('limits managers with team visibility and no assigned teams to own interactions', async () => {
+    const organization = await createOrganization({ repVisibility: 'team' });
+    const manager = await createUser({
+      organizationId: organization.id,
+      role: 'manager',
+      label: 'manager',
+    });
+    const teammate = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+      label: 'teammate',
+    });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const managerProperty = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.47,
+      longitude: -84.07,
+      normalizedAddress: 'manager-team-no-assignment',
+    });
+    const teammateProperty = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.48,
+      longitude: -84.08,
+      normalizedAddress: 'teammate-team-no-assignment',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: managerProperty.id,
+      userId: manager.id,
+      changedBy: manager.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'manager-team-no-assignment',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: teammateProperty.id,
+      userId: teammate.id,
+      changedBy: teammate.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'teammate-team-no-assignment',
+    });
+
+    const response = await getMarkers(
+      app,
+      authTokenFor(manager, organization.id),
+      bounds,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].propertyId).toBe(managerProperty.id);
+  });
+
+  it('returns organization-wide current markers for representative when visibility is organization', async () => {
+    const organization = await createOrganization({
+      repVisibility: 'organization',
+    });
+    const representative = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+      label: 'representative',
+    });
+    const otherRep = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+      label: 'other-rep',
+    });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const repProperty = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.57,
+      longitude: -84.21,
+      normalizedAddress: 'rep-org-visibility-a',
+    });
+    const otherRepProperty = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.58,
+      longitude: -84.22,
+      normalizedAddress: 'rep-org-visibility-b',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: repProperty.id,
+      userId: representative.id,
+      changedBy: representative.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'rep-org-visibility-a',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: otherRepProperty.id,
+      userId: otherRep.id,
+      changedBy: otherRep.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'rep-org-visibility-b',
+    });
+
+    const response = await getMarkers(
+      app,
+      authTokenFor(representative, organization.id),
+      bounds,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.map((row) => row.propertyId).sort()).toEqual(
+      [repProperty.id, otherRepProperty.id].sort(),
+    );
+  });
+
+  it('returns organization-wide current markers for manager when visibility is organization', async () => {
+    const organization = await createOrganization({
+      repVisibility: 'organization',
+    });
+    const manager = await createUser({
+      organizationId: organization.id,
+      role: 'manager',
+      label: 'manager',
+    });
+    const repA = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+      label: 'rep-a',
+    });
+    const repB = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+      label: 'rep-b',
+    });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const propertyA = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.59,
+      longitude: -84.23,
+      normalizedAddress: 'manager-org-visibility-a',
+    });
+    const propertyB = await createProperty({
+      organizationId: organization.id,
+      latitude: 35.6,
+      longitude: -84.24,
+      normalizedAddress: 'manager-org-visibility-b',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: propertyA.id,
+      userId: repA.id,
+      changedBy: repA.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'manager-org-visibility-a',
+    });
+
+    await createCurrentInteraction({
+      organizationId: organization.id,
+      propertyId: propertyB.id,
+      userId: repB.id,
+      changedBy: repB.id,
+      statusId: status.id,
+      statusName: status.name,
+      groupLabel: 'manager-org-visibility-b',
+    });
+
+    const response = await getMarkers(
+      app,
+      authTokenFor(manager, organization.id),
+      bounds,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.map((row) => row.propertyId).sort()).toEqual(
+      [propertyA.id, propertyB.id].sort(),
+    );
+  });
+
   it('returns all current organization markers for organization visibility and admin role', async () => {
     const organization = await createOrganization({
       repVisibility: 'organization',
