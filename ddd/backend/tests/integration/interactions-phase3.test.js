@@ -320,6 +320,70 @@ describeDb('Phase 3 interactions core endpoints', () => {
     expect(rows.rows[0].count).toBe(1);
   });
 
+  it('POST /api/properties/:propertyId/interactions validates malformed property id with standardized envelope', async () => {
+    const organization = await createOrganization({ repVisibility: 'own' });
+    const representative = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+    });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const response = await request(app)
+      .post('/api/properties/not-a-uuid/interactions')
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({ statusId: status.id });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'propertyId',
+          message: 'propertyId must be a valid UUID.',
+        }),
+      ]),
+    );
+  });
+
+  it('POST /api/properties/:propertyId/interactions rejects invalid payload and does not persist interaction rows', async () => {
+    const organization = await createOrganization({ repVisibility: 'own' });
+    const representative = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+    });
+    const property = await createProperty({ organizationId: organization.id });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const response = await request(app)
+      .post(`/api/properties/${property.id}/interactions`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({
+        statusId: status.id,
+        unsupportedField: 'not allowed',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: '',
+          message:
+            'Unsupported fields for interaction request: unsupportedField.',
+        }),
+      ]),
+    );
+
+    const count = await query(
+      `SELECT COUNT(*)::int AS count
+       FROM interactions
+       WHERE organization_id = $1 AND user_id = $2 AND property_id = $3`,
+      [organization.id, representative.id, property.id],
+    );
+
+    expect(count.rows[0].count).toBe(0);
+  });
+
   it('POST /api/interactions/:id creates a new immutable snapshot and keeps same interaction_group_id', async () => {
     const organization = await createOrganization({ repVisibility: 'own' });
     const representative = await createUser({
@@ -376,6 +440,80 @@ describeDb('Phase 3 interactions core endpoints', () => {
     expect(rows.rows[0].initial_interaction_at).toEqual(
       rows.rows[1].initial_interaction_at,
     );
+  });
+
+  it('POST /api/interactions/:id rejects invalid revision payload without creating a new snapshot', async () => {
+    const organization = await createOrganization({ repVisibility: 'own' });
+    const representative = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+    });
+    const property = await createProperty({ organizationId: organization.id });
+    const status = await createStatus({ organizationId: organization.id });
+
+    const created = await request(app)
+      .post(`/api/properties/${property.id}/interactions`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({ statusId: status.id, notes: 'Initial note.' });
+
+    expect(created.status).toBe(201);
+
+    const emptyPayload = await request(app)
+      .post(`/api/interactions/${created.body.interactionId}`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({});
+
+    expect(emptyPayload.status).toBe(400);
+    expect(emptyPayload.body.error.code).toBe('VALIDATION_ERROR');
+    expect(emptyPayload.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: '',
+          message: 'At least one updatable field is required.',
+        }),
+      ]),
+    );
+
+    const badStatusId = await request(app)
+      .post(`/api/interactions/${created.body.interactionId}`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({ statusId: 'not-a-uuid' });
+
+    expect(badStatusId.status).toBe(400);
+    expect(badStatusId.body.error.code).toBe('VALIDATION_ERROR');
+    expect(badStatusId.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'statusId',
+          message: 'statusId must be a valid UUID when provided.',
+        }),
+      ]),
+    );
+
+    const badInteractionId = await request(app)
+      .post('/api/interactions/not-a-uuid')
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({ notes: 'should not matter' });
+
+    expect(badInteractionId.status).toBe(400);
+    expect(badInteractionId.body.error.code).toBe('VALIDATION_ERROR');
+    expect(badInteractionId.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'id',
+          message: 'id must be a valid UUID.',
+        }),
+      ]),
+    );
+
+    const count = await query(
+      `SELECT COUNT(*)::int AS count
+       FROM interactions
+       WHERE organization_id = $1 AND interaction_group_id = $2`,
+      [organization.id, created.body.interactionGroupId],
+    );
+
+    expect(count.rows[0].count).toBe(1);
   });
 
   it('POST /api/interactions/:id enforces edit permissions and keeps ownership on manager edit', async () => {

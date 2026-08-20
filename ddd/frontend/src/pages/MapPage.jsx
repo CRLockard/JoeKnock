@@ -23,6 +23,11 @@ import {
   updateInteractionSnapshot,
 } from '../api/interactionsApi.js';
 import { useAuth } from '../auth/useAuth.js';
+import {
+  clearInteractionDraft,
+  loadInteractionDraft,
+  saveInteractionDraft,
+} from '../features/interactions/interactionDraftStorage.js';
 import 'leaflet/dist/leaflet.css';
 
 const DEFAULT_CENTER = [35.95, -84.0];
@@ -82,6 +87,65 @@ function normalizeOptionalValue(value) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function hasDraftContent(form) {
+  return Boolean(
+    form.statusId ||
+    normalizeOptionalValue(form.contactName) ||
+    normalizeOptionalValue(form.contactPhone) ||
+    normalizeOptionalValue(form.contactEmail) ||
+    normalizeOptionalValue(form.notes),
+  );
+}
+
+function createClientRequestId() {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+
+  const randomHex = (length) =>
+    Array.from({ length }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join('');
+
+  return `${randomHex(8)}-${randomHex(4)}-4${randomHex(3)}-8${randomHex(3)}-${randomHex(12)}`;
+}
+
+function toValidationDetails(error) {
+  if (!Array.isArray(error?.details)) {
+    return [];
+  }
+
+  return error.details.filter(
+    (item) =>
+      item &&
+      typeof item.field === 'string' &&
+      typeof item.message === 'string',
+  );
+}
+
+function toFieldErrorMap(details) {
+  const fieldErrors = {};
+
+  for (const detail of details) {
+    if (detail.field && !fieldErrors[detail.field]) {
+      fieldErrors[detail.field] = detail.message;
+    }
+  }
+
+  return fieldErrors;
+}
+
+function toDraftScope(authUser, propertyId) {
+  return {
+    userId: authUser?.id,
+    organizationId: authUser?.organizationId,
+    propertyId,
+  };
+}
+
 function formatInteractionError(error, fallbackMessage) {
   if (!error) {
     return fallbackMessage;
@@ -96,9 +160,20 @@ function formatInteractionError(error, fallbackMessage) {
   }
 
   if (error.status === 400) {
+    const firstDetail = toValidationDetails(error)[0]?.message;
     return (
-      error.message || 'Please check the interaction fields and try again.'
+      firstDetail ||
+      error.message ||
+      'Please check the interaction fields and try again.'
     );
+  }
+
+  if (!error.status) {
+    return 'Connection failed while submitting your interaction. Your draft is still saved locally. Please check connectivity and retry.';
+  }
+
+  if (error.status >= 500) {
+    return 'The server could not complete this save right now. Your entered values are still available so you can retry.';
   }
 
   return error.message || fallbackMessage;
@@ -192,12 +267,17 @@ export function MapPage() {
 
   const [createForm, setCreateForm] = useState(() => emptyInteractionForm());
   const [editForm, setEditForm] = useState(() => emptyInteractionForm());
+  const [createFieldErrors, setCreateFieldErrors] = useState({});
+  const [editFieldErrors, setEditFieldErrors] = useState({});
+  const [createRequestId, setCreateRequestId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const latestRequestRef = useRef(0);
+  const latestBoundsRef = useRef(null);
 
   const loadMarkers = useCallback(async (bounds) => {
+    latestBoundsRef.current = bounds;
     const requestId = latestRequestRef.current + 1;
     latestRequestRef.current = requestId;
 
@@ -357,6 +437,25 @@ export function MapPage() {
     setSelectedInteractions(interactionsPayload?.interactions ?? []);
   }, []);
 
+  useEffect(() => {
+    if (panelMode !== 'create' || !selectedPropertyId) {
+      return;
+    }
+
+    const draftScope = toDraftScope(auth.user, selectedPropertyId);
+
+    if (!hasDraftContent(createForm)) {
+      clearInteractionDraft(draftScope);
+      return;
+    }
+
+    saveInteractionDraft(draftScope, {
+      ...createForm,
+      clientRequestId: createRequestId,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [auth.user, createForm, createRequestId, panelMode, selectedPropertyId]);
+
   const loadSnapshotDetails = useCallback(async (interactionId) => {
     setPanelError('');
     setPanelSuccessMessage('');
@@ -382,12 +481,43 @@ export function MapPage() {
   }, []);
 
   const handleStartInteraction = useCallback(() => {
+    const draftScope = toDraftScope(auth.user, selectedPropertyId);
+    const draft = selectedPropertyId ? loadInteractionDraft(draftScope) : null;
+
+    if (draft) {
+      setCreateForm({
+        statusId: draft.statusId ?? '',
+        contactName: draft.contactName ?? '',
+        contactPhone: draft.contactPhone ?? '',
+        contactEmail: draft.contactEmail ?? '',
+        notes: draft.notes ?? '',
+      });
+      setCreateRequestId(draft.clientRequestId ?? createClientRequestId());
+      setPanelSuccessMessage('Restored saved draft for this property.');
+    } else {
+      setCreateForm(emptyInteractionForm());
+      setCreateRequestId(createClientRequestId());
+    }
+
+    setCreateFieldErrors({});
     setPanelMode('create');
     setPanelError('');
-    setPanelSuccessMessage('');
     setSnapshotError('');
     setActiveSnapshot(null);
-  }, []);
+  }, [auth.user, selectedPropertyId]);
+
+  const handleDiscardCreateDraft = useCallback(() => {
+    if (!selectedPropertyId) {
+      return;
+    }
+
+    clearInteractionDraft(toDraftScope(auth.user, selectedPropertyId));
+    setCreateForm(emptyInteractionForm());
+    setCreateRequestId(createClientRequestId());
+    setCreateFieldErrors({});
+    setPanelError('');
+    setPanelSuccessMessage('Draft discarded.');
+  }, [auth.user, selectedPropertyId]);
 
   const handleCreateInteraction = useCallback(
     async (event) => {
@@ -405,9 +535,17 @@ export function MapPage() {
       setIsCreating(true);
       setPanelError('');
       setPanelSuccessMessage('');
+      setCreateFieldErrors({});
+
+      const requestId = createRequestId ?? createClientRequestId();
+
+      if (!createRequestId) {
+        setCreateRequestId(requestId);
+      }
 
       const payload = {
         statusId: createForm.statusId,
+        clientRequestId: requestId,
       };
 
       const contactName = normalizeOptionalValue(createForm.contactName);
@@ -432,16 +570,23 @@ export function MapPage() {
       }
 
       try {
-        const createdSnapshot = await createPropertyInteraction(
-          selectedPropertyId,
-          payload,
-        );
+        await createPropertyInteraction(selectedPropertyId, payload);
 
         await refreshCurrentInteractions(selectedPropertyId);
-        setActiveSnapshot(createdSnapshot);
-        setPanelMode('detail');
+
+        if (latestBoundsRef.current) {
+          await loadMarkers(latestBoundsRef.current);
+        }
+
+        clearInteractionDraft(toDraftScope(auth.user, selectedPropertyId));
+        setCreateForm(emptyInteractionForm());
+        setCreateRequestId(null);
+        setActiveSnapshot(null);
+        setPanelMode('summary');
         setPanelSuccessMessage('Interaction recorded successfully.');
       } catch (error) {
+        const details = toValidationDetails(error);
+        setCreateFieldErrors(toFieldErrorMap(details));
         setPanelError(
           formatInteractionError(
             error,
@@ -452,7 +597,14 @@ export function MapPage() {
         setIsCreating(false);
       }
     },
-    [createForm, refreshCurrentInteractions, selectedPropertyId],
+    [
+      auth.user,
+      createForm,
+      createRequestId,
+      loadMarkers,
+      refreshCurrentInteractions,
+      selectedPropertyId,
+    ],
   );
 
   const handleStartEdit = useCallback(() => {
@@ -469,6 +621,7 @@ export function MapPage() {
     });
     setPanelError('');
     setPanelSuccessMessage('');
+    setEditFieldErrors({});
     setPanelMode('edit');
   }, [activeSnapshot]);
 
@@ -488,6 +641,7 @@ export function MapPage() {
       setIsUpdating(true);
       setPanelError('');
       setPanelSuccessMessage('');
+      setEditFieldErrors({});
 
       const payload = {
         statusId: editForm.statusId,
@@ -511,6 +665,8 @@ export function MapPage() {
         setPanelMode('detail');
         setPanelSuccessMessage('Interaction updated successfully.');
       } catch (error) {
+        const details = toValidationDetails(error);
+        setEditFieldErrors(toFieldErrorMap(details));
         setPanelError(
           formatInteractionError(
             error,
@@ -541,6 +697,9 @@ export function MapPage() {
     setActiveSnapshot(null);
     setCreateForm(emptyInteractionForm());
     setEditForm(emptyInteractionForm());
+    setCreateFieldErrors({});
+    setEditFieldErrors({});
+    setCreateRequestId(null);
     setIsCreating(false);
     setIsUpdating(false);
   }, []);
@@ -715,6 +874,9 @@ export function MapPage() {
                       </option>
                     ))}
                   </select>
+                  {createFieldErrors.statusId ? (
+                    <p role="alert">{createFieldErrors.statusId}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact name
@@ -730,6 +892,9 @@ export function MapPage() {
                     }}
                     disabled={isCreating}
                   />
+                  {createFieldErrors.contactName ? (
+                    <p role="alert">{createFieldErrors.contactName}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact phone
@@ -745,6 +910,9 @@ export function MapPage() {
                     }}
                     disabled={isCreating}
                   />
+                  {createFieldErrors.contactPhone ? (
+                    <p role="alert">{createFieldErrors.contactPhone}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact email
@@ -760,6 +928,9 @@ export function MapPage() {
                     }}
                     disabled={isCreating}
                   />
+                  {createFieldErrors.contactEmail ? (
+                    <p role="alert">{createFieldErrors.contactEmail}</p>
+                  ) : null}
                 </label>
                 <label>
                   Notes
@@ -774,6 +945,9 @@ export function MapPage() {
                     disabled={isCreating}
                     rows={3}
                   />
+                  {createFieldErrors.notes ? (
+                    <p role="alert">{createFieldErrors.notes}</p>
+                  ) : null}
                 </label>
                 <div className="map-panel-actions">
                   <button
@@ -787,10 +961,18 @@ export function MapPage() {
                     onClick={() => {
                       setPanelMode('summary');
                       setPanelError('');
+                      setCreateFieldErrors({});
                     }}
                     disabled={isCreating}
                   >
                     Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardCreateDraft}
+                    disabled={isCreating}
+                  >
+                    Discard draft
                   </button>
                 </div>
               </form>
@@ -904,6 +1086,9 @@ export function MapPage() {
                       </option>
                     ))}
                   </select>
+                  {editFieldErrors.statusId ? (
+                    <p role="alert">{editFieldErrors.statusId}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact name
@@ -919,6 +1104,9 @@ export function MapPage() {
                     }}
                     disabled={isUpdating}
                   />
+                  {editFieldErrors.contactName ? (
+                    <p role="alert">{editFieldErrors.contactName}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact phone
@@ -934,6 +1122,9 @@ export function MapPage() {
                     }}
                     disabled={isUpdating}
                   />
+                  {editFieldErrors.contactPhone ? (
+                    <p role="alert">{editFieldErrors.contactPhone}</p>
+                  ) : null}
                 </label>
                 <label>
                   Contact email
@@ -949,6 +1140,9 @@ export function MapPage() {
                     }}
                     disabled={isUpdating}
                   />
+                  {editFieldErrors.contactEmail ? (
+                    <p role="alert">{editFieldErrors.contactEmail}</p>
+                  ) : null}
                 </label>
                 <label>
                   Notes
@@ -963,6 +1157,9 @@ export function MapPage() {
                     disabled={isUpdating}
                     rows={3}
                   />
+                  {editFieldErrors.notes ? (
+                    <p role="alert">{editFieldErrors.notes}</p>
+                  ) : null}
                 </label>
                 <div className="map-panel-actions">
                   <button

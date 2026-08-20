@@ -229,13 +229,16 @@ export function createInteractionsService({
           );
         }
 
-        const requestedSnapshot = await repository.findVisibleSnapshotById(client, {
-          organizationId,
-          actorUserId: userId,
-          actorRole: role,
-          repVisibility,
-          interactionId,
-        });
+        const requestedSnapshot = await repository.findVisibleSnapshotById(
+          client,
+          {
+            organizationId,
+            actorUserId: userId,
+            actorRole: role,
+            repVisibility,
+            interactionId,
+          },
+        );
 
         if (!requestedSnapshot) {
           return null;

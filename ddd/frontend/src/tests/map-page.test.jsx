@@ -19,6 +19,7 @@ import {
   getInteractionSnapshot,
   updateInteractionSnapshot,
 } from '../api/interactionsApi.js';
+import { buildInteractionDraftKey } from '../features/interactions/interactionDraftStorage.js';
 
 vi.mock('../api/mapApi.js', () => ({
   getMapProperties: vi.fn(),
@@ -150,6 +151,14 @@ async function selectFirstPropertyMarker() {
   });
 }
 
+async function selectPropertyMarkerByIndex(index) {
+  const markers = await screen.findAllByTestId('property-marker');
+
+  await act(async () => {
+    markers[index].click();
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockState.latestMapHandlers = null;
@@ -158,7 +167,10 @@ beforeEach(() => {
   authState.user = {
     id: 'user-1',
     role: 'rep',
+    organizationId: 'org-1',
   };
+
+  localStorage.clear();
 
   getMapProperties.mockResolvedValue([
     { propertyId: 'property-1', latitude: 35.51, longitude: -84.11 },
@@ -321,6 +333,22 @@ describe('MapPage', () => {
     );
   });
 
+  it('opens selected property panel when a map property marker is chosen', async () => {
+    mockGeolocationSuccess();
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+
+    expect(
+      screen.getByRole('heading', { name: 'Selected Property' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start interaction' }),
+    ).toBeInTheDocument();
+  });
+
   it('renders interaction-entry fields when starting a new interaction from selected property', async () => {
     mockGeolocationSuccess();
     getPropertyInteractions.mockResolvedValueOnce({
@@ -344,7 +372,7 @@ describe('MapPage', () => {
     expect(screen.getByLabelText('Notes')).toBeInTheDocument();
   });
 
-  it('submits a new interaction and transitions to snapshot detail without leaving selected property workflow', async () => {
+  it('submits a new interaction and returns to selected-property summary while keeping map context', async () => {
     mockGeolocationSuccess();
     getPropertyInteractions
       .mockResolvedValueOnce({
@@ -390,6 +418,7 @@ describe('MapPage', () => {
 
     await waitFor(() => {
       expect(createPropertyInteraction).toHaveBeenCalledWith('property-1', {
+        clientRequestId: expect.any(String),
         statusId: 'status-2',
         contactName: 'Taylor Homeowner',
         contactPhone: '555-555-0100',
@@ -402,9 +431,14 @@ describe('MapPage', () => {
       await screen.findByText('Interaction recorded successfully.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Interaction Snapshot' }),
+      screen.getByRole('heading', { name: 'Selected Property' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Property:/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Record Interaction' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Interested/)).toBeInTheDocument();
+    expect(getPropertyInteractions).toHaveBeenCalledTimes(2);
+    expect(getMapProperties).toHaveBeenCalledTimes(2);
   });
 
   it('prevents duplicate submit while interaction create is in progress', async () => {
@@ -653,6 +687,294 @@ describe('MapPage', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Start interaction' }),
+    ).toBeInTheDocument();
+    expect(createPropertyInteraction).not.toHaveBeenCalled();
+  });
+
+  it('restores a saved create draft when form is reopened for the same property', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { value: 'status-2' },
+    });
+    fireEvent.change(screen.getByLabelText('Contact name'), {
+      target: { value: 'Saved Name' },
+    });
+    fireEvent.change(screen.getByLabelText('Notes'), {
+      target: { value: 'Saved note text.' },
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+
+    expect(
+      await screen.findByText('Restored saved draft for this property.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('status-2');
+    expect(screen.getByLabelText('Contact name')).toHaveValue('Saved Name');
+    expect(screen.getByLabelText('Notes')).toHaveValue('Saved note text.');
+  });
+
+  it('isolates drafts between properties', async () => {
+    mockGeolocationSuccess();
+
+    getMapProperties.mockResolvedValue([
+      { propertyId: 'property-1', latitude: 35.51, longitude: -84.11 },
+      { propertyId: 'property-2', latitude: 35.52, longitude: -84.12 },
+    ]);
+
+    getPropertyById.mockImplementation(async (propertyId) => {
+      if (propertyId === 'property-2') {
+        return {
+          propertyId: 'property-2',
+          addressLine1: '900 Elm St',
+          addressLine2: null,
+          city: 'Knoxville',
+          state: 'TN',
+          postalCode: '37902',
+          country: 'US',
+          latitude: 35.52,
+          longitude: -84.12,
+        };
+      }
+
+      return {
+        propertyId: 'property-1',
+        addressLine1: '123 Main St',
+        addressLine2: null,
+        city: 'Knoxville',
+        state: 'TN',
+        postalCode: '37901',
+        country: 'US',
+        latitude: 35.51,
+        longitude: -84.11,
+      };
+    });
+
+    getPropertyInteractions.mockResolvedValue({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    render(<MapPage />);
+
+    await selectPropertyMarkerByIndex(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    fireEvent.change(screen.getByLabelText('Notes'), {
+      target: { value: 'Draft for property one.' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[0]);
+
+    await selectPropertyMarkerByIndex(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+
+    expect(screen.getByLabelText('Notes')).toHaveValue('');
+  });
+
+  it('supports intentional draft discard and removes local draft state', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    fireEvent.change(screen.getByLabelText('Notes'), {
+      target: { value: 'Discard this draft.' },
+    });
+
+    const draftKey = buildInteractionDraftKey({
+      userId: 'user-1',
+      organizationId: 'org-1',
+      propertyId: 'property-1',
+    });
+    expect(localStorage.getItem(draftKey)).toContain('Discard this draft.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+
+    expect(await screen.findByText('Draft discarded.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Notes')).toHaveValue('');
+    expect(localStorage.getItem(draftKey)).toBeNull();
+  });
+
+  it('shows field-level validation feedback and keeps local draft for correction', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions.mockResolvedValueOnce({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    createPropertyInteraction.mockRejectedValueOnce({
+      status: 400,
+      message: 'Invalid request data.',
+      details: [
+        {
+          field: 'contactPhone',
+          message: 'contactPhone must be at most 50 characters.',
+        },
+      ],
+    });
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { value: 'status-2' },
+    });
+    fireEvent.change(screen.getByLabelText('Contact phone'), {
+      target: {
+        value: '555-555-010012345678901234567890123456789012345678901',
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+
+    const validationMessages = await screen.findAllByText(
+      'contactPhone must be at most 50 characters.',
+    );
+    expect(validationMessages.length).toBeGreaterThan(0);
+    expect(
+      screen.getByDisplayValue(
+        '555-555-010012345678901234567890123456789012345678901',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    expect(
+      screen.getByDisplayValue(
+        '555-555-010012345678901234567890123456789012345678901',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('preserves draft on network failure and retries create with same clientRequestId', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [],
+      })
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [
+          {
+            interactionId: 'interaction-new',
+            interactionGroupId: 'group-new',
+            userId: 'user-1',
+            statusName: 'Interested',
+            notes: 'Retry note',
+          },
+        ],
+      });
+
+    createPropertyInteraction
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValueOnce({
+        interactionId: 'interaction-new',
+        interactionGroupId: 'group-new',
+      });
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { value: 'status-2' },
+    });
+    fireEvent.change(screen.getByLabelText('Notes'), {
+      target: { value: 'Retry note' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+
+    expect(
+      await screen.findByText(
+        'Connection failed while submitting your interaction. Your draft is still saved locally. Please check connectivity and retry.',
+      ),
+    ).toBeInTheDocument();
+
+    const firstPayload = createPropertyInteraction.mock.calls[0][1];
+    expect(firstPayload.clientRequestId).toEqual(expect.any(String));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+
+    await waitFor(() => {
+      expect(createPropertyInteraction).toHaveBeenCalledTimes(2);
+    });
+
+    const secondPayload = createPropertyInteraction.mock.calls[1][1];
+    expect(secondPayload.clientRequestId).toBe(firstPayload.clientRequestId);
+
+    expect(
+      await screen.findByText('Interaction recorded successfully.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows role/session/server-specific messages for interaction save failures', async () => {
+    mockGeolocationSuccess();
+    getPropertyInteractions.mockResolvedValue({
+      propertyId: 'property-1',
+      interactions: [],
+    });
+
+    render(<MapPage />);
+
+    await selectFirstPropertyMarker();
+    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { value: 'status-2' },
+    });
+
+    createPropertyInteraction.mockRejectedValueOnce({
+      status: 401,
+      message: 'Missing Authorization header.',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+    expect(
+      await screen.findByText(
+        'Your session has expired. Please sign in again.',
+      ),
+    ).toBeInTheDocument();
+
+    createPropertyInteraction.mockRejectedValueOnce({
+      status: 403,
+      message: 'You do not have permission to perform this action.',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+    expect(
+      await screen.findByText(
+        'You are not authorized to perform that interaction action.',
+      ),
+    ).toBeInTheDocument();
+
+    createPropertyInteraction.mockRejectedValueOnce({
+      status: 500,
+      message: 'An unexpected error occurred.',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
+    expect(
+      await screen.findByText(
+        'The server could not complete this save right now. Your entered values are still available so you can retry.',
+      ),
     ).toBeInTheDocument();
   });
 });
