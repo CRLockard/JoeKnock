@@ -34,6 +34,7 @@ export function buildApiRoutes({
   interactionsService,
   reportsService,
   exportsService,
+  includeTestScaffold = false,
 } = {}) {
   const router = Router();
   const resolvedAuthService = authService ?? createAuthService();
@@ -130,23 +131,25 @@ export function buildApiRoutes({
     }
   });
 
-  router.get('/_scaffold/protected', authMiddleware, (req, res) => {
-    return res.status(200).json({
-      ok: true,
-      auth: req.auth,
-    });
-  });
-
-  router.post(
-    '/_scaffold/validate',
-    body('value').isString().notEmpty(),
-    validate,
-    (req, res) => {
+  if (includeTestScaffold) {
+    router.get('/_scaffold/protected', authMiddleware, (req, res) => {
       return res.status(200).json({
-        value: req.body.value,
+        ok: true,
+        auth: req.auth,
       });
-    },
-  );
+    });
+
+    router.post(
+      '/_scaffold/validate',
+      body('value').isString().notEmpty(),
+      validate,
+      (req, res) => {
+        return res.status(200).json({
+          value: req.body.value,
+        });
+      },
+    );
+  }
 
   return router;
 }

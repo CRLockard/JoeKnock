@@ -1,14 +1,28 @@
 import { AppError } from '../common/errors.js';
 
-const PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  hour12: false,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-});
+const formatterCache = new Map();
+
+function getPartsFormatter(timeZone) {
+  const cacheKey = String(timeZone);
+
+  if (!formatterCache.has(cacheKey)) {
+    formatterCache.set(
+      cacheKey,
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+    );
+  }
+
+  return formatterCache.get(cacheKey);
+}
 
 function parseDateOnly(value) {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -36,8 +50,7 @@ function nextDate({ year, month, day }) {
 }
 
 function partsForInstant(instantMs, timeZone) {
-  void timeZone;
-  const parts = PARTS_FORMATTER.formatToParts(new Date(instantMs));
+  const parts = getPartsFormatter(timeZone).formatToParts(new Date(instantMs));
   const values = {};
 
   for (const part of parts) {

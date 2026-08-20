@@ -80,6 +80,7 @@ export function createApp({
       interactionsService,
       reportsService,
       exportsService,
+      includeTestScaffold: env.isTest,
     }),
   );
 

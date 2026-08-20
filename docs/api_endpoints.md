@@ -14,7 +14,7 @@ The JoeKnock MVP API provides the backend services required for:
 
 The API is designed around a simple organization-scoped model:
 
-```text
+````text
 Organization
     │
     ├── Users
@@ -30,7 +30,7 @@ Organization
            └── Interaction Groups
                   │
                   └── Immutable Snapshots
-```
+    ```
 
 The API enforces:
 
@@ -40,7 +40,6 @@ The API enforces:
 - Representative visibility rules
 - Immutable interaction history
 - Server-controlled ownership and organization relationships
-
 The MVP intentionally avoids unnecessary CRUD and infrastructure endpoints.
 
 ---
@@ -51,13 +50,13 @@ The MVP intentionally avoids unnecessary CRUD and infrastructure endpoints.
 
 ```text
 /api
-```
+````
 
 ## Authentication
 
 Protected endpoints require a valid JWT:
 
-```http
+```text
 Authorization: Bearer <token>
 ```
 
@@ -67,11 +66,10 @@ Clients do not supply `user_id` or `organization_id` for protected operations.
 
 ## HTTP Methods
 
-| Method   | Purpose                                            |
 | -------- | -------------------------------------------------- |
-| `GET`    | Retrieve data                                      |
-| `POST`   | Create a resource or perform an operation          |
-| `PATCH`  | Modify a mutable resource                          |
+| `GET` | Retrieve data |
+| `POST` | Create a resource or perform an operation |
+| `PATCH` | Modify a mutable resource |
 | `DELETE` | Remove a relationship where specifically permitted |
 
 ## Response Format
@@ -393,30 +391,19 @@ Manager/Admin.
 ```text
 ?active=true
 ?role=rep
-?teamId=<uuid>
 ```
+
+`teamId` filtering is intentionally unsupported in the finalized MVP scope.
+
+Rationale:
+
+- Team-filtered user listing is deferred until dedicated follow-up work beyond US-007 scope.
 
 ### Database Interaction
 
 Reads:
 
 - `users`
-- `teams`
-- `team_users`
-
----
-
-## GET `/api/users/:id`
-
-### Purpose
-
-Retrieve a specific organization user.
-
-### Authentication
-
-Manager/Admin.
-
-The API verifies that the requested user belongs to the authenticated user's organization.
 
 ---
 
@@ -570,26 +557,6 @@ The organization is derived from the authenticated user.
 
 ---
 
-## PATCH `/api/teams/:id`
-
-### Purpose
-
-Update team information.
-
-### Authentication
-
-Manager/Admin.
-
-### Possible Fields
-
-```json
-{
-  "name": "North Knoxville Team"
-}
-```
-
----
-
 ## POST `/api/teams/:id/users`
 
 ### Purpose
@@ -651,18 +618,6 @@ Statuses are organization-defined rather than hard-coded.
 ### Purpose
 
 Retrieve active statuses available to the authenticated organization.
-
-### Authentication
-
-Authenticated.
-
----
-
-## GET `/api/statuses/:id`
-
-### Purpose
-
-Retrieve a specific status.
 
 ### Authentication
 
@@ -749,31 +704,6 @@ Properties represent physical addresses being canvassed.
 Properties belong permanently to an organization in the MVP.
 
 Properties cannot be manually edited or deleted.
-
-## GET `/api/properties`
-
-### Purpose
-
-Retrieve properties visible to the authenticated user.
-
-### Authentication
-
-Authenticated.
-
-### Supported Filters
-
-- Geographic/map bounds
-
-### Authorization
-
-The API applies:
-
-- Organization isolation
-- User role
-- Representative visibility
-- Team membership
-
----
 
 ## GET `/api/properties/:id`
 
@@ -1572,7 +1502,6 @@ PATCH  /api/organization/settings
 
 ```text
 GET    /api/users
-GET    /api/users/:id
 POST   /api/users
 PATCH  /api/users/:id
 PATCH  /api/users/:id/active
@@ -1584,7 +1513,6 @@ PATCH  /api/users/:id/active
 GET    /api/teams
 GET    /api/teams/:id
 POST   /api/teams
-PATCH  /api/teams/:id
 POST   /api/teams/:id/users
 DELETE /api/teams/:id/users/:userId
 ```
@@ -1593,7 +1521,6 @@ DELETE /api/teams/:id/users/:userId
 
 ```text
 GET    /api/statuses
-GET    /api/statuses/:id
 POST   /api/statuses
 PATCH  /api/statuses/:id
 PATCH  /api/statuses/:id/active
@@ -1602,7 +1529,6 @@ PATCH  /api/statuses/:id/active
 ## Properties
 
 ```text
-GET    /api/properties
 GET    /api/properties/:id
 POST   /api/properties/resolve
 ```
@@ -1644,15 +1570,15 @@ GET    /api/exports/properties
 | Authentication |         3 |
 | Current User   |         1 |
 | Organization   |         4 |
-| Users          |         5 |
-| Teams          |         6 |
-| Statuses       |         5 |
-| Properties     |         3 |
+| Users          |         4 |
+| Teams          |         5 |
+| Statuses       |         4 |
+| Properties     |         2 |
 | Interactions   |         4 |
 | Map            |         1 |
 | Reporting      |         1 |
 | Exports        |         1 |
-| **Total**      |    **34** |
+| **Total**      |    **30** |
 
 ---
 
@@ -1664,7 +1590,7 @@ GET    /api/exports/properties
 | Current User          | `users`, `teams`, `team_users`                             |
 | Organization          | `organizations`                                            |
 | Organization Settings | `organization_settings`                                    |
-| Users                 | `users`, `team_users`                                      |
+| Users                 | `users`                                                    |
 | Teams                 | `teams`, `team_users`, `users`                             |
 | Statuses              | `statuses`                                                 |
 | Properties            | `properties`                                               |

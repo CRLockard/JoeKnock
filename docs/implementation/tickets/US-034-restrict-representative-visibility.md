@@ -98,8 +98,9 @@ Deliver the approved user-story outcome for Issue #34 with endpoint, authorizati
 
 - GET /api/organization/settings
 - PATCH /api/organization/settings
-- GET /api/properties
 - GET /api/map/properties
+
+Note: GET /api/properties is intentionally not part of the finalized MVP contract.
 
 Authentication, authorization, request payload validation, and response/error behavior must match docs/api_endpoints.md for each listed endpoint.
 
