@@ -28,17 +28,18 @@ const REP_VISIBILITY_OPTIONS = [
   {
     value: 'own',
     label: 'Self',
-    description: 'Only my interactions',
+    description: 'Reps can see only their own interactions.',
   },
   {
     value: 'team',
     label: 'Team',
-    description: "My team's interactions",
+    description:
+      'Reps can see interactions belonging to members of their assigned teams.',
   },
   {
     value: 'organization',
     label: 'Organization',
-    description: 'All organization interactions',
+    description: 'Reps can see all interactions in the organization.',
   },
 ];
 
@@ -76,11 +77,12 @@ export function SettingsPage() {
   const [statusesSuccessMessage, setStatusesSuccessMessage] = useState('');
   const [statusName, setStatusName] = useState('');
   const [statusDescription, setStatusDescription] = useState('');
-  const [statusDisplayOrder, setStatusDisplayOrder] = useState('');
   const [editingStatusId, setEditingStatusId] = useState('');
   const [editStatusName, setEditStatusName] = useState('');
   const [editStatusDescription, setEditStatusDescription] = useState('');
   const [editStatusDisplayOrder, setEditStatusDisplayOrder] = useState('');
+  const [draggedStatusId, setDraggedStatusId] = useState('');
+  const [dragOverStatusId, setDragOverStatusId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -94,6 +96,7 @@ export function SettingsPage() {
   const [isCreatingStatus, setIsCreatingStatus] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isDeactivatingStatus, setIsDeactivatingStatus] = useState(false);
+  const [isReorderingStatuses, setIsReorderingStatuses] = useState(false);
   const [organizationSettings, setOrganizationSettings] = useState(null);
   const [repVisibility, setRepVisibility] = useState('own');
   const [timezone, setTimezone] = useState('UTC');
@@ -107,6 +110,8 @@ export function SettingsPage() {
     useState(false);
 
   const isAdmin = auth.user?.role === 'admin';
+  // Managers share most operational settings work with admins, but only admins
+  // can apply org-wide writes for security-sensitive fields.
   const canViewTeams = isAdmin || auth.user?.role === 'manager';
   const canCreateTeams = canViewTeams;
   const canManageStatuses = canViewTeams;
@@ -140,6 +145,8 @@ export function SettingsPage() {
         }
 
         setOrganizationSettings(response);
+        // Keep editable controls synchronized with server state so users can
+        // switch sections without losing authoritative current values.
         setRepVisibility(response.repVisibility);
         setTimezone(response.timezone);
       } catch (loadError) {
@@ -196,6 +203,8 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!canViewTeams) {
+      // Explicitly reset subordinate workspace state when role gates close to
+      // prevent stale team/user/status data from prior privileged sessions.
       setTeams([]);
       setSelectedTeam(null);
       setTeamsError('');
@@ -250,6 +259,12 @@ export function SettingsPage() {
       isMounted = false;
     };
   }, [canViewTeams]);
+
+  useEffect(() => {
+    if (activeSection !== 'all' && activeSection !== 'statuses') {
+      setStatusesSuccessMessage('');
+    }
+  }, [activeSection]);
 
   useEffect(() => {
     let isMounted = true;
@@ -508,6 +523,17 @@ export function SettingsPage() {
     setStatuses(response);
   }
 
+  async function persistStatusOrder(nextStatuses) {
+    const updates = nextStatuses.map((status, index) => {
+      return updateStatus(status.id, {
+        displayOrder: index + 1,
+      });
+    });
+
+    await Promise.all(updates);
+    await reloadStatuses();
+  }
+
   async function handleCreateStatus(event) {
     event.preventDefault();
     setStatusesError('');
@@ -519,18 +545,9 @@ export function SettingsPage() {
     }
 
     const trimmedName = statusName.trim();
-    const normalizedDisplayOrder = Number(statusDisplayOrder);
 
     if (!trimmedName) {
       setStatusesError('Status name is required.');
-      return;
-    }
-
-    if (
-      !Number.isInteger(normalizedDisplayOrder) ||
-      normalizedDisplayOrder < 1
-    ) {
-      setStatusesError('Display order must be a positive integer.');
       return;
     }
 
@@ -540,18 +557,62 @@ export function SettingsPage() {
       await createStatus({
         name: trimmedName,
         description: statusDescription,
-        displayOrder: normalizedDisplayOrder,
       });
 
       await reloadStatuses();
       setStatusName('');
       setStatusDescription('');
-      setStatusDisplayOrder('');
       setStatusesSuccessMessage('Status created successfully.');
     } catch (createError) {
       setStatusesError(createError.message || 'Unable to create status.');
     } finally {
       setIsCreatingStatus(false);
+    }
+  }
+
+  async function handleStatusDrop(targetStatusId) {
+    if (
+      !canManageStatuses ||
+      !draggedStatusId ||
+      draggedStatusId === targetStatusId
+    ) {
+      setDraggedStatusId('');
+      setDragOverStatusId('');
+      return;
+    }
+
+    const sourceIndex = statuses.findIndex(
+      (status) => status.id === draggedStatusId,
+    );
+    const targetIndex = statuses.findIndex(
+      (status) => status.id === targetStatusId,
+    );
+
+    if (sourceIndex < 0 || targetIndex < 0) {
+      setDraggedStatusId('');
+      setDragOverStatusId('');
+      return;
+    }
+
+    const nextStatuses = [...statuses];
+    const [moved] = nextStatuses.splice(sourceIndex, 1);
+    nextStatuses.splice(targetIndex, 0, moved);
+
+    setStatuses(nextStatuses);
+    setDraggedStatusId('');
+    setDragOverStatusId('');
+    setIsReorderingStatuses(true);
+    setStatusesError('');
+    setStatusesSuccessMessage('');
+
+    try {
+      await persistStatusOrder(nextStatuses);
+      setStatusesSuccessMessage('Status order updated successfully.');
+    } catch (error) {
+      setStatusesError(error.message || 'Unable to update status order.');
+      await reloadStatuses();
+    } finally {
+      setIsReorderingStatuses(false);
     }
   }
 
@@ -745,9 +806,11 @@ export function SettingsPage() {
         </p>
       ) : null}
       {statusesSuccessMessage ? (
-        <p role="status" className="feedback feedback--success">
-          {statusesSuccessMessage}
-        </p>
+        activeSection === 'all' || activeSection === 'statuses' ? (
+          <p role="status" className="feedback feedback--success">
+            {statusesSuccessMessage}
+          </p>
+        ) : null
       ) : null}
       {organizationSettingsError ? (
         <p role="alert" className="feedback feedback--error">
@@ -780,19 +843,6 @@ export function SettingsPage() {
                     disabled={!isAdmin || isSaving}
                   />
                 </label>
-
-                <div className="detail-card-grid">
-                  <div className="detail-card">
-                    <span>Organization ID</span>
-                    <strong>{organization.id}</strong>
-                  </div>
-                  <div className="detail-card">
-                    <span>Current Visibility</span>
-                    <strong>
-                      {organizationSettings?.repVisibility ?? 'Unavailable'}
-                    </strong>
-                  </div>
-                </div>
 
                 {isAdmin ? (
                   <button
@@ -993,10 +1043,15 @@ export function SettingsPage() {
                 ) : null}
 
                 {!isStatusesLoading && statuses.length > 0 ? (
-                  <div className="table-shell">
+                  <>
+                    <p className="feedback status-order-hint">
+                      Drag and drop to reorder statuses
+                    </p>
+                    <div className="table-shell">
                     <table>
                       <thead>
                         <tr>
+                          <th scope="col" aria-label="Drag handle" />
                           <th scope="col">Order</th>
                           <th scope="col">Status Name</th>
                           <th scope="col">Description</th>
@@ -1006,10 +1061,54 @@ export function SettingsPage() {
                       </thead>
                       <tbody>
                         {statuses.map((status) => (
-                          <tr key={status.id}>
+                          <tr
+                            key={status.id}
+                            className={`status-order-row${draggedStatusId === status.id ? ' status-order-row--dragging' : ''}${
+                              dragOverStatusId === status.id
+                                ? ' status-order-row--drop-target'
+                                : ''
+                            }`}
+                            draggable={
+                              canManageStatuses && !isReorderingStatuses
+                            }
+                            onDragStart={() => {
+                              setDraggedStatusId(status.id);
+                              setDragOverStatusId('');
+                            }}
+                            onDragEnd={() => {
+                              setDraggedStatusId('');
+                              setDragOverStatusId('');
+                            }}
+                            onDragOver={(event) => {
+                              if (canManageStatuses) {
+                                event.preventDefault();
+                                setDragOverStatusId(status.id);
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverStatusId === status.id) {
+                                setDragOverStatusId('');
+                              }
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              void handleStatusDrop(status.id);
+                            }}
+                          >
+                            <td>
+                              <span
+                                aria-hidden="true"
+                                className="status-order-handle"
+                              >
+                                ⋮⋮
+                              </span>
+                              <span className="visually-hidden">
+                                Drag to reorder {status.name}
+                              </span>
+                            </td>
                             <td>{status.displayOrder}</td>
                             <td>
-                              {status.name} (order: {status.displayOrder})
+                              {status.name}
                               {status.description
                                 ? ` - ${status.description}`
                                 : ''}
@@ -1037,7 +1136,9 @@ export function SettingsPage() {
                                       className="button button--ghost"
                                       onClick={() => startEditingStatus(status)}
                                       disabled={
-                                        isUpdatingStatus || isDeactivatingStatus
+                                        isUpdatingStatus ||
+                                        isDeactivatingStatus ||
+                                        isReorderingStatuses
                                       }
                                     >
                                       Edit {status.name}
@@ -1049,7 +1150,9 @@ export function SettingsPage() {
                                         handleDeactivateStatus(status)
                                       }
                                       disabled={
-                                        isDeactivatingStatus || isUpdatingStatus
+                                        isDeactivatingStatus ||
+                                        isUpdatingStatus ||
+                                        isReorderingStatuses
                                       }
                                     >
                                       {isDeactivatingStatus
@@ -1064,7 +1167,8 @@ export function SettingsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                    </div>
+                  </>
                 ) : null}
               </section>
 
@@ -1100,24 +1204,6 @@ export function SettingsPage() {
                         value={statusDescription}
                         onChange={(event) =>
                           setStatusDescription(event.target.value)
-                        }
-                        disabled={isCreatingStatus}
-                      />
-                    </label>
-
-                    <label
-                      className="form-field"
-                      htmlFor="status-display-order"
-                    >
-                      <span>Display order</span>
-                      <input
-                        id="status-display-order"
-                        name="statusDisplayOrder"
-                        type="number"
-                        min="1"
-                        value={statusDisplayOrder}
-                        onChange={(event) =>
-                          setStatusDisplayOrder(event.target.value)
                         }
                         disabled={isCreatingStatus}
                       />
@@ -1194,7 +1280,7 @@ export function SettingsPage() {
                         onChange={(event) =>
                           setEditStatusDisplayOrder(event.target.value)
                         }
-                        disabled={isUpdatingStatus}
+                        disabled={isUpdatingStatus || isReorderingStatuses}
                       />
                     </label>
 

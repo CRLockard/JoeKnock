@@ -52,6 +52,8 @@ export function createTeamsService({
 
     async getTeam({ teamId, organizationId }) {
       const result = await runInTransaction(async (client) => {
+        // Team lookup and member list are resolved in one transaction to keep
+        // response internally consistent for a single request snapshot.
         const team = await repository.findTeamByIdAndOrganization(client, {
           teamId,
           organizationId,
@@ -106,6 +108,7 @@ export function createTeamsService({
     async addUserToTeam({ organizationId, teamId, userId }) {
       try {
         const membership = await runInTransaction(async (client) => {
+          // Guard parent/child references within org boundary before insert.
           const team = await repository.findTeamByIdAndOrganization(client, {
             teamId,
             organizationId,

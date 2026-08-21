@@ -12,6 +12,12 @@ const STATUS_INSERT_SQL = `
   RETURNING id, organization_id, name, description, display_order, is_active, created_at, updated_at
 `;
 
+const NEXT_STATUS_DISPLAY_ORDER_SQL = `
+  SELECT COALESCE(MAX(display_order), 0)::int + 1 AS next_display_order
+  FROM statuses
+  WHERE organization_id = $1
+`;
+
 function buildStatusUpdateQuery({
   organizationId,
   statusId,
@@ -37,6 +43,8 @@ function buildStatusUpdateQuery({
     setClauses.push(`display_order = $${values.length}`);
   }
 
+  // Dynamic SET list implements PATCH behavior without string interpolation
+  // of user input values (all values remain parameterized).
   return {
     text: `
       UPDATE statuses
@@ -61,6 +69,14 @@ function buildStatusActiveUpdateQuery({ organizationId, statusId, isActive }) {
 }
 
 export const statusesRepository = {
+  async getNextDisplayOrder(client, { organizationId }) {
+    const result = await client.query(NEXT_STATUS_DISPLAY_ORDER_SQL, [
+      organizationId,
+    ]);
+
+    return result.rows[0]?.next_display_order ?? 1;
+  },
+
   async listActiveStatuses(client, { organizationId }) {
     const result = await client.query(ACTIVE_STATUSES_BY_ORGANIZATION_SQL, [
       organizationId,

@@ -261,7 +261,7 @@ export function MapPage() {
 
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
-  const [selectedInteractions, setSelectedInteractions] = useState([]);
+  const [, setSelectedInteractions] = useState([]);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
   const [statuses, setStatuses] = useState([]);
@@ -273,8 +273,14 @@ export function MapPage() {
   const [panelSuccessMessage, setPanelSuccessMessage] = useState('');
 
   const [activeSnapshot, setActiveSnapshot] = useState(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState('');
+  const [editableDetailFields, setEditableDetailFields] = useState({
+    contactName: false,
+    contactPhone: false,
+    contactEmail: false,
+    notes: false,
+  });
 
   const [createForm, setCreateForm] = useState(() => emptyInteractionForm());
   const [editForm, setEditForm] = useState(() => emptyInteractionForm());
@@ -288,6 +294,8 @@ export function MapPage() {
   const latestBoundsRef = useRef(null);
 
   const loadMarkers = useCallback(async (bounds) => {
+    // Map move/zoom can fire rapidly; track a monotonic request id so stale
+    // responses never overwrite newer marker data.
     latestBoundsRef.current = bounds;
     const requestId = latestRequestRef.current + 1;
     latestRequestRef.current = requestId;
@@ -369,42 +377,170 @@ export function MapPage() {
     });
   }, []);
 
-  const handleMarkerSelect = useCallback(async (propertyId) => {
-    setSelectionLoading(true);
-    setSelectionError('');
-    setSelectedPropertyId(propertyId);
-    setPanelError('');
-    setPanelSuccessMessage('');
-    setSnapshotError('');
-    setActiveSnapshot(null);
-    setPanelMode('summary');
-    setCreateForm(emptyInteractionForm());
-    setEditForm(emptyInteractionForm());
+  const handleStartInteraction = useCallback(
+    (propertyId = selectedPropertyId) => {
+      const draftScope = toDraftScope(auth.user, propertyId);
+      const draft = propertyId ? loadInteractionDraft(draftScope) : null;
 
-    try {
-      const [property, interactionsPayload] = await Promise.all([
-        getPropertyById(propertyId),
-        getPropertyInteractions(propertyId),
-      ]);
+      if (draft) {
+        setCreateForm({
+          statusId: draft.statusId ?? '',
+          contactName: draft.contactName ?? '',
+          contactPhone: draft.contactPhone ?? '',
+          contactEmail: draft.contactEmail ?? '',
+          notes: draft.notes ?? '',
+        });
+        setCreateRequestId(draft.clientRequestId ?? createClientRequestId());
+        setPanelSuccessMessage('Restored saved draft for this property.');
+      } else {
+        setCreateForm(emptyInteractionForm());
+        setCreateRequestId(createClientRequestId());
+      }
 
-      setSelectedProperty(property);
-      setSelectedInteractions(interactionsPayload?.interactions ?? []);
-    } catch (error) {
-      setSelectedProperty(null);
-      setSelectedInteractions([]);
-      setSelectionError(
-        error?.message || 'Unable to load property details right now.',
-      );
-    } finally {
-      setSelectionLoading(false);
-    }
-  }, []);
+      setCreateFieldErrors({});
+      setPanelMode('create');
+      setPanelError('');
+      setSnapshotError('');
+      setActiveSnapshot(null);
+      setEditableDetailFields({
+        contactName: false,
+        contactPhone: false,
+        contactEmail: false,
+        notes: false,
+      });
+    },
+    [auth.user, selectedPropertyId],
+  );
+
+  const loadSnapshotDetails = useCallback(
+    async (interactionId) => {
+      setPanelError('');
+      setPanelSuccessMessage('');
+      setSnapshotError('');
+      setSnapshotLoading(true);
+
+      try {
+        const snapshot = await getInteractionSnapshot(interactionId);
+        const draftScope = toDraftScope(auth.user, selectedPropertyId);
+        const draft = selectedPropertyId
+          ? loadInteractionDraft(draftScope)
+          : null;
+        const hasMatchingEditDraft =
+          draft?.mode === 'edit' &&
+          draft?.interactionId === snapshot.interactionId;
+
+        setActiveSnapshot(snapshot);
+        setEditForm({
+          statusId: hasMatchingEditDraft
+            ? (draft.statusId ?? snapshot.statusId ?? '')
+            : (snapshot.statusId ?? ''),
+          contactName: hasMatchingEditDraft
+            ? (draft.contactName ?? '')
+            : (snapshot.contactName ?? ''),
+          contactPhone: hasMatchingEditDraft
+            ? (draft.contactPhone ?? '')
+            : (snapshot.contactPhone ?? ''),
+          contactEmail: hasMatchingEditDraft
+            ? (draft.contactEmail ?? '')
+            : (snapshot.contactEmail ?? ''),
+          notes: hasMatchingEditDraft
+            ? (draft.notes ?? '')
+            : (snapshot.notes ?? ''),
+        });
+        setEditFieldErrors({});
+        setEditableDetailFields({
+          contactName: false,
+          contactPhone: false,
+          contactEmail: false,
+          notes: false,
+        });
+        setPanelMode('detail');
+
+        if (hasMatchingEditDraft) {
+          setPanelSuccessMessage('Restored saved draft for this property.');
+        }
+      } catch (error) {
+        setSnapshotError(
+          formatInteractionError(
+            error,
+            'Unable to load interaction snapshot details right now.',
+          ),
+        );
+        setPanelMode('create');
+        setActiveSnapshot(null);
+      } finally {
+        setSnapshotLoading(false);
+      }
+    },
+    [auth.user, selectedPropertyId],
+  );
+
+  const handleMarkerSelect = useCallback(
+    async (propertyId) => {
+      setSelectionLoading(true);
+      setSelectionError('');
+      setSelectedPropertyId(propertyId);
+      setPanelError('');
+      setPanelSuccessMessage('');
+      setSnapshotError('');
+      setActiveSnapshot(null);
+      setPanelMode('create');
+      setCreateForm(emptyInteractionForm());
+      setEditForm(emptyInteractionForm());
+      setEditableDetailFields({
+        contactName: false,
+        contactPhone: false,
+        contactEmail: false,
+        notes: false,
+      });
+
+      try {
+        const [property, interactionsPayload] = await Promise.all([
+          getPropertyById(propertyId),
+          getPropertyInteractions(propertyId),
+        ]);
+
+        const interactions = interactionsPayload?.interactions ?? [];
+
+        setSelectedProperty(property);
+        setSelectedInteractions(interactions);
+
+        if (interactions.length === 0) {
+          handleStartInteraction(propertyId);
+        } else {
+          const targetInteraction = interactions.find(
+            (interaction) => interaction.interactionId,
+          );
+
+          if (targetInteraction?.interactionId) {
+            await loadSnapshotDetails(targetInteraction.interactionId);
+          } else {
+            setSelectionError(
+              'Unable to open current interaction details for this property.',
+            );
+            handleStartInteraction(propertyId);
+          }
+        }
+      } catch (error) {
+        setSelectedProperty(null);
+        setSelectedInteractions([]);
+        setSelectionError(
+          error?.message || 'Unable to load property details right now.',
+        );
+      } finally {
+        setSelectionLoading(false);
+      }
+    },
+    [handleStartInteraction, loadSnapshotDetails],
+  );
 
   const handleMapLocationSelect = useCallback(
     async ({ lat, lng }) => {
       setSelectionError('');
 
       try {
+        // Property resolution is intentionally backend-mediated so geocoding,
+        // normalization, and organization scoping stay server-controlled.
         const resolved = await resolvePropertyLocation({
           latitude: lat,
           longitude: lng,
@@ -490,6 +626,8 @@ export function MapPage() {
       return;
     }
 
+    // Drafts are scoped by authenticated user + organization + property to
+    // prevent cross-property/cross-user leakage of in-progress form data.
     saveInteractionDraft(draftScope, {
       ...createForm,
       clientRequestId: createRequestId,
@@ -497,68 +635,39 @@ export function MapPage() {
     });
   }, [auth.user, createForm, createRequestId, panelMode, selectedPropertyId]);
 
-  const loadSnapshotDetails = useCallback(async (interactionId) => {
-    setPanelError('');
-    setPanelSuccessMessage('');
-    setSnapshotError('');
-    setSnapshotLoading(true);
-
-    try {
-      const snapshot = await getInteractionSnapshot(interactionId);
-      setActiveSnapshot(snapshot);
-      setPanelMode('detail');
-    } catch (error) {
-      setSnapshotError(
-        formatInteractionError(
-          error,
-          'Unable to load interaction snapshot details right now.',
-        ),
-      );
-      setPanelMode('summary');
-      setActiveSnapshot(null);
-    } finally {
-      setSnapshotLoading(false);
-    }
-  }, []);
-
-  const handleStartInteraction = useCallback(() => {
-    const draftScope = toDraftScope(auth.user, selectedPropertyId);
-    const draft = selectedPropertyId ? loadInteractionDraft(draftScope) : null;
-
-    if (draft) {
-      setCreateForm({
-        statusId: draft.statusId ?? '',
-        contactName: draft.contactName ?? '',
-        contactPhone: draft.contactPhone ?? '',
-        contactEmail: draft.contactEmail ?? '',
-        notes: draft.notes ?? '',
-      });
-      setCreateRequestId(draft.clientRequestId ?? createClientRequestId());
-      setPanelSuccessMessage('Restored saved draft for this property.');
-    } else {
-      setCreateForm(emptyInteractionForm());
-      setCreateRequestId(createClientRequestId());
-    }
-
-    setCreateFieldErrors({});
-    setPanelMode('create');
-    setPanelError('');
-    setSnapshotError('');
-    setActiveSnapshot(null);
-  }, [auth.user, selectedPropertyId]);
-
-  const handleDiscardCreateDraft = useCallback(() => {
+  const handleSaveCreateDraft = useCallback(() => {
     if (!selectedPropertyId) {
       return;
     }
 
-    clearInteractionDraft(toDraftScope(auth.user, selectedPropertyId));
-    setCreateForm(emptyInteractionForm());
-    setCreateRequestId(createClientRequestId());
-    setCreateFieldErrors({});
-    setPanelError('');
-    setPanelSuccessMessage('Draft discarded.');
-  }, [auth.user, selectedPropertyId]);
+    const requestId = createRequestId ?? createClientRequestId();
+
+    if (!createRequestId) {
+      setCreateRequestId(requestId);
+    }
+
+    saveInteractionDraft(toDraftScope(auth.user, selectedPropertyId), {
+      ...createForm,
+      clientRequestId: requestId,
+      mode: 'create',
+      updatedAt: new Date().toISOString(),
+    });
+    setPanelSuccessMessage('Draft saved successfully.');
+  }, [auth.user, createForm, createRequestId, selectedPropertyId]);
+
+  const handleSaveExistingDraft = useCallback(() => {
+    if (!selectedPropertyId || !activeSnapshot?.interactionId) {
+      return;
+    }
+
+    saveInteractionDraft(toDraftScope(auth.user, selectedPropertyId), {
+      ...editForm,
+      mode: 'edit',
+      interactionId: activeSnapshot.interactionId,
+      updatedAt: new Date().toISOString(),
+    });
+    setPanelSuccessMessage('Draft saved successfully.');
+  }, [activeSnapshot?.interactionId, auth.user, editForm, selectedPropertyId]);
 
   const handleCreateInteraction = useCallback(
     async (event) => {
@@ -611,6 +720,8 @@ export function MapPage() {
       }
 
       try {
+        // clientRequestId supports safe retries without creating duplicate
+        // initial snapshots when users submit during transient failures.
         await createPropertyInteraction(selectedPropertyId, payload);
 
         await refreshCurrentInteractions(selectedPropertyId);
@@ -648,23 +759,12 @@ export function MapPage() {
     ],
   );
 
-  const handleStartEdit = useCallback(() => {
-    if (!activeSnapshot) {
-      return;
-    }
-
-    setEditForm({
-      statusId: activeSnapshot.statusId ?? '',
-      contactName: activeSnapshot.contactName ?? '',
-      contactPhone: activeSnapshot.contactPhone ?? '',
-      contactEmail: activeSnapshot.contactEmail ?? '',
-      notes: activeSnapshot.notes ?? '',
-    });
-    setPanelError('');
-    setPanelSuccessMessage('');
-    setEditFieldErrors({});
-    setPanelMode('edit');
-  }, [activeSnapshot]);
+  const enableDetailFieldEdit = useCallback((fieldName) => {
+    setEditableDetailFields((current) => ({
+      ...current,
+      [fieldName]: true,
+    }));
+  }, []);
 
   const handleUpdateInteraction = useCallback(
     async (event) => {
@@ -703,8 +803,25 @@ export function MapPage() {
         }
 
         setActiveSnapshot(updatedSnapshot);
+        setEditForm({
+          statusId: updatedSnapshot.statusId ?? '',
+          contactName: updatedSnapshot.contactName ?? '',
+          contactPhone: updatedSnapshot.contactPhone ?? '',
+          contactEmail: updatedSnapshot.contactEmail ?? '',
+          notes: updatedSnapshot.notes ?? '',
+        });
+        setEditableDetailFields({
+          contactName: false,
+          contactPhone: false,
+          contactEmail: false,
+          notes: false,
+        });
         setPanelMode('detail');
-        setPanelSuccessMessage('Interaction updated successfully.');
+        setPanelSuccessMessage(
+          updatedSnapshot.interactionId === activeSnapshot.interactionId
+            ? 'No changes to save.'
+            : 'Interaction updated successfully.',
+        );
       } catch (error) {
         const details = toValidationDetails(error);
         setEditFieldErrors(toFieldErrorMap(details));
@@ -730,7 +847,7 @@ export function MapPage() {
     setStatuses([]);
     setStatusesError('');
     setStatusesLoading(false);
-    setPanelMode('summary');
+    setPanelMode('create');
     setPanelError('');
     setPanelSuccessMessage('');
     setSnapshotError('');
@@ -740,20 +857,16 @@ export function MapPage() {
     setEditForm(emptyInteractionForm());
     setCreateFieldErrors({});
     setEditFieldErrors({});
+    setEditableDetailFields({
+      contactName: false,
+      contactPhone: false,
+      contactEmail: false,
+      notes: false,
+    });
     setCreateRequestId(null);
     setIsCreating(false);
     setIsUpdating(false);
   }, []);
-
-  const hasOwnCurrentInteraction = useMemo(() => {
-    if (!auth.user?.id) {
-      return false;
-    }
-
-    return selectedInteractions.some(
-      (interaction) => interaction.userId === auth.user.id,
-    );
-  }, [auth.user?.id, selectedInteractions]);
 
   const canEditCurrentSnapshot = useMemo(() => {
     return canEditInteraction({
@@ -831,11 +944,17 @@ export function MapPage() {
           </span>
           <button
             type="button"
-            className="map-locate-button"
+            className={`map-locate-button ${followLocation ? 'map-locate-button--active' : 'map-locate-button--inactive'}`}
             onClick={() => setFollowLocation(true)}
             disabled={!currentPosition || followLocation}
+            aria-label="Recenter to my location"
+            title="Recenter to my location"
           >
-            Follow my location
+            <span className="map-locate-button__icon" aria-hidden="true">
+              <span className="map-locate-button__crosshair map-locate-button__crosshair--horizontal" />
+              <span className="map-locate-button__crosshair map-locate-button__crosshair--vertical" />
+              <span className="map-locate-button__dot" />
+            </span>
           </button>
         </div>
 
@@ -922,76 +1041,6 @@ export function MapPage() {
 
             <div className="map-property-interactions" aria-live="polite">
               <h4>Current Interaction State</h4>
-              {panelMode === 'summary' ? (
-                <>
-                  {selectedInteractions.length === 0 ? (
-                    <p>
-                      No current interactions are visible for this property.
-                    </p>
-                  ) : (
-                    <ul className="map-summary-list">
-                      {selectedInteractions.map((interaction) => {
-                        const key =
-                          interaction.interactionId ||
-                          interaction.interactionGroupId;
-
-                        return (
-                          <li
-                            key={key}
-                            className="map-interaction-summary-item"
-                          >
-                            <div>
-                              <strong>{interaction.statusName}</strong>
-                              {interaction.notes
-                                ? ` - ${interaction.notes}`
-                                : ''}
-                            </div>
-                            <button
-                              type="button"
-                              className="button button--ghost"
-                              onClick={() => {
-                                if (!interaction.interactionId) {
-                                  setSnapshotError(
-                                    'Snapshot details are unavailable for this interaction.',
-                                  );
-                                  return;
-                                }
-
-                                void loadSnapshotDetails(
-                                  interaction.interactionId,
-                                );
-                              }}
-                              disabled={snapshotLoading}
-                            >
-                              View snapshot
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-
-                  <div className="map-panel-actions">
-                    <button
-                      type="button"
-                      className="button button--primary"
-                      onClick={handleStartInteraction}
-                      disabled={
-                        isCreating || isUpdating || hasOwnCurrentInteraction
-                      }
-                    >
-                      Start interaction
-                    </button>
-                    {hasOwnCurrentInteraction ? (
-                      <p>
-                        You already have a current interaction for this
-                        property. Open it from the list above to edit.
-                      </p>
-                    ) : null}
-                  </div>
-                </>
-              ) : null}
-
               {panelMode === 'create' ? (
                 <form
                   className="map-interaction-form"
@@ -1107,119 +1156,30 @@ export function MapPage() {
                     </button>
                     <button
                       type="button"
-                      className="button button--secondary"
-                      onClick={() => {
-                        setPanelMode('summary');
-                        setPanelError('');
-                        setCreateFieldErrors({});
-                      }}
+                      className="button button--ghost"
+                      onClick={handleSaveCreateDraft}
                       disabled={isCreating}
                     >
-                      Cancel
+                      Save draft
                     </button>
                     <button
                       type="button"
-                      className="button button--ghost"
-                      onClick={handleDiscardCreateDraft}
+                      className="button button--secondary"
+                      onClick={handleCancelSelection}
                       disabled={isCreating}
                     >
-                      Discard draft
+                      Cancel
                     </button>
                   </div>
                 </form>
               ) : null}
 
               {panelMode === 'detail' ? (
-                <div className="map-interaction-detail" aria-live="polite">
-                  <h5>Interaction Snapshot</h5>
-                  {snapshotLoading ? (
-                    <p>Loading interaction snapshot...</p>
-                  ) : null}
-                  {activeSnapshot ? (
-                    <>
-                      <p>
-                        <strong>Status:</strong> {activeSnapshot.statusName}
-                      </p>
-                      <p>
-                        <strong>Representative:</strong>{' '}
-                        {activeSnapshot.representative?.firstName}{' '}
-                        {activeSnapshot.representative?.lastName}
-                        {activeSnapshot.representative?.email
-                          ? ` (${activeSnapshot.representative.email})`
-                          : ''}
-                      </p>
-                      <p>
-                        <strong>Property:</strong>{' '}
-                        {selectedProperty.addressLine1}
-                        {selectedProperty.addressLine2
-                          ? `, ${selectedProperty.addressLine2}`
-                          : ''}
-                        {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
-                      </p>
-                      <p>
-                        <strong>First Knock:</strong>{' '}
-                        {formatDateTime(activeSnapshot.initialInteractionAt)}
-                      </p>
-                      <p>
-                        <strong>Last Updated:</strong>{' '}
-                        {formatDateTime(activeSnapshot.changedAt)}
-                      </p>
-                      {activeSnapshot.contactName ? (
-                        <p>
-                          <strong>Contact Name:</strong>{' '}
-                          {activeSnapshot.contactName}
-                        </p>
-                      ) : null}
-                      {activeSnapshot.contactPhone ? (
-                        <p>
-                          <strong>Contact Phone:</strong>{' '}
-                          {activeSnapshot.contactPhone}
-                        </p>
-                      ) : null}
-                      {activeSnapshot.contactEmail ? (
-                        <p>
-                          <strong>Contact Email:</strong>{' '}
-                          {activeSnapshot.contactEmail}
-                        </p>
-                      ) : null}
-                      {activeSnapshot.notes ? (
-                        <p>
-                          <strong>Notes:</strong> {activeSnapshot.notes}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : null}
-                  <div className="map-panel-actions">
-                    <button
-                      type="button"
-                      className="button button--secondary"
-                      onClick={() => {
-                        setPanelMode('summary');
-                        setSnapshotError('');
-                      }}
-                    >
-                      Back to property
-                    </button>
-                    {canEditCurrentSnapshot ? (
-                      <button
-                        type="button"
-                        className="button button--primary"
-                        onClick={handleStartEdit}
-                        disabled={!activeSnapshot || statusesLoading}
-                      >
-                        Edit interaction
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              {panelMode === 'edit' ? (
                 <form
                   className="map-interaction-form"
                   onSubmit={handleUpdateInteraction}
                 >
-                  <h5>Edit Interaction Snapshot</h5>
+                  <h5>Interaction Details</h5>
                   <div className="map-interaction-form__grid">
                     <label className="form-field form-field--inverse">
                       <span>Status</span>
@@ -1231,7 +1191,11 @@ export function MapPage() {
                             statusId: event.target.value,
                           }));
                         }}
-                        disabled={isUpdating || statusesLoading}
+                        disabled={
+                          isUpdating ||
+                          statusesLoading ||
+                          !canEditCurrentSnapshot
+                        }
                         required
                       >
                         <option value="">Select a status</option>
@@ -1245,56 +1209,119 @@ export function MapPage() {
                         <p role="alert">{editFieldErrors.statusId}</p>
                       ) : null}
                     </label>
+
                     <label className="form-field form-field--inverse">
                       <span>Contact phone</span>
-                      <input
-                        type="text"
-                        value={editForm.contactPhone}
-                        maxLength={50}
-                        onChange={(event) => {
-                          setEditForm((current) => ({
-                            ...current,
-                            contactPhone: event.target.value,
-                          }));
-                        }}
-                        disabled={isUpdating}
-                      />
+                      {editableDetailFields.contactPhone ? (
+                        <input
+                          type="text"
+                          value={editForm.contactPhone}
+                          maxLength={50}
+                          onChange={(event) => {
+                            setEditForm((current) => ({
+                              ...current,
+                              contactPhone: event.target.value,
+                            }));
+                          }}
+                          disabled={isUpdating}
+                        />
+                      ) : (
+                        <div className="map-detail-field-row">
+                          <span className="map-detail-field-value">
+                            {editForm.contactPhone || 'Not provided'}
+                          </span>
+                          {canEditCurrentSnapshot ? (
+                            <button
+                              type="button"
+                              className="button button--ghost map-detail-edit-button"
+                              onClick={() =>
+                                enableDetailFieldEdit('contactPhone')
+                              }
+                              disabled={isUpdating}
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
                       {editFieldErrors.contactPhone ? (
                         <p role="alert">{editFieldErrors.contactPhone}</p>
                       ) : null}
                     </label>
+
                     <label className="form-field form-field--inverse">
                       <span>Contact name</span>
-                      <input
-                        type="text"
-                        value={editForm.contactName}
-                        maxLength={255}
-                        onChange={(event) => {
-                          setEditForm((current) => ({
-                            ...current,
-                            contactName: event.target.value,
-                          }));
-                        }}
-                        disabled={isUpdating}
-                      />
+                      {editableDetailFields.contactName ? (
+                        <input
+                          type="text"
+                          value={editForm.contactName}
+                          maxLength={255}
+                          onChange={(event) => {
+                            setEditForm((current) => ({
+                              ...current,
+                              contactName: event.target.value,
+                            }));
+                          }}
+                          disabled={isUpdating}
+                        />
+                      ) : (
+                        <div className="map-detail-field-row">
+                          <span className="map-detail-field-value">
+                            {editForm.contactName || 'Not provided'}
+                          </span>
+                          {canEditCurrentSnapshot ? (
+                            <button
+                              type="button"
+                              className="button button--ghost map-detail-edit-button"
+                              onClick={() =>
+                                enableDetailFieldEdit('contactName')
+                              }
+                              disabled={isUpdating}
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
                       {editFieldErrors.contactName ? (
                         <p role="alert">{editFieldErrors.contactName}</p>
                       ) : null}
                     </label>
+
                     <label className="form-field form-field--inverse">
                       <span>Contact email</span>
-                      <input
-                        type="email"
-                        value={editForm.contactEmail}
-                        maxLength={255}
-                        onChange={(event) => {
-                          setEditForm((current) => ({
-                            ...current,
-                            contactEmail: event.target.value,
-                          }));
-                        }}
-                        disabled={isUpdating}
-                      />
+                      {editableDetailFields.contactEmail ? (
+                        <input
+                          type="email"
+                          value={editForm.contactEmail}
+                          maxLength={255}
+                          onChange={(event) => {
+                            setEditForm((current) => ({
+                              ...current,
+                              contactEmail: event.target.value,
+                            }));
+                          }}
+                          disabled={isUpdating}
+                        />
+                      ) : (
+                        <div className="map-detail-field-row">
+                          <span className="map-detail-field-value">
+                            {editForm.contactEmail || 'Not provided'}
+                          </span>
+                          {canEditCurrentSnapshot ? (
+                            <button
+                              type="button"
+                              className="button button--ghost map-detail-edit-button"
+                              onClick={() =>
+                                enableDetailFieldEdit('contactEmail')
+                              }
+                              disabled={isUpdating}
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
                       {editFieldErrors.contactEmail ? (
                         <p role="alert">{editFieldErrors.contactEmail}</p>
                       ) : null}
@@ -1302,38 +1329,72 @@ export function MapPage() {
                   </div>
                   <label className="form-field form-field--inverse">
                     <span>Notes</span>
-                    <textarea
-                      value={editForm.notes}
-                      onChange={(event) => {
-                        setEditForm((current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }));
-                      }}
-                      disabled={isUpdating}
-                      rows={4}
-                    />
+                    {editableDetailFields.notes ? (
+                      <textarea
+                        value={editForm.notes}
+                        onChange={(event) => {
+                          setEditForm((current) => ({
+                            ...current,
+                            notes: event.target.value,
+                          }));
+                        }}
+                        disabled={isUpdating}
+                        rows={4}
+                      />
+                    ) : (
+                      <div className="map-detail-field-row map-detail-field-row--notes">
+                        <span className="map-detail-field-value">
+                          {editForm.notes || 'No notes recorded.'}
+                        </span>
+                        {canEditCurrentSnapshot ? (
+                          <button
+                            type="button"
+                            className="button button--ghost map-detail-edit-button"
+                            onClick={() => enableDetailFieldEdit('notes')}
+                            disabled={isUpdating}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                     {editFieldErrors.notes ? (
                       <p role="alert">{editFieldErrors.notes}</p>
                     ) : null}
                   </label>
+
+                  {activeSnapshot ? (
+                    <p className="map-property-meta">
+                      Last updated {formatDateTime(activeSnapshot.changedAt)}
+                    </p>
+                  ) : null}
+
                   <div className="map-panel-actions">
-                    <button
-                      type="submit"
-                      className="button button--primary"
-                      disabled={isUpdating || statusesLoading}
-                    >
-                      {isUpdating
-                        ? 'Saving changes...'
-                        : 'Save as new snapshot'}
-                    </button>
+                    {canEditCurrentSnapshot ? (
+                      <>
+                        <button
+                          type="submit"
+                          className="button button--primary"
+                          disabled={isUpdating || statusesLoading}
+                        >
+                          {isUpdating
+                            ? 'Saving changes...'
+                            : 'Save interaction'}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          onClick={handleSaveExistingDraft}
+                          disabled={isUpdating}
+                        >
+                          Save draft
+                        </button>
+                      </>
+                    ) : null}
                     <button
                       type="button"
                       className="button button--secondary"
-                      onClick={() => {
-                        setPanelMode('detail');
-                        setPanelError('');
-                      }}
+                      onClick={handleCancelSelection}
                       disabled={isUpdating}
                     >
                       Cancel
@@ -1344,25 +1405,6 @@ export function MapPage() {
             </div>
           </section>
         ) : null}
-
-        <div className="map-bottom-bar">
-          <div className="map-bottom-bar__group">
-            <span className="map-bottom-bar__label">Map Status</span>
-            <strong>
-              {followLocation
-                ? 'Following current location'
-                : 'Manual map exploration'}
-            </strong>
-          </div>
-          <div className="map-bottom-bar__group">
-            <span className="map-bottom-bar__label">Selection</span>
-            <strong>
-              {selectedProperty
-                ? selectedProperty.addressLine1
-                : 'Click a marker or supported map location'}
-            </strong>
-          </div>
-        </div>
       </div>
     </section>
   );

@@ -230,6 +230,7 @@ describeDb('GET /api/teams and GET /api/teams/:id', () => {
   });
 
   it('returns team detail including members for a team in the authenticated organization', async () => {
+    // Detail endpoint validates both team ownership and member join shaping.
     const app = createApp();
     const actor = await seedAuthenticatedUser({ role: 'manager' });
     const team = await createTeamRecord({

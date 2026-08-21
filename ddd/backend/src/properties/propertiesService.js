@@ -127,6 +127,8 @@ export function createPropertiesService({
           );
         }
 
+        // Visibility is applied in repository SQL so every caller path shares
+        // one enforcement point for org + role + team-based access rules.
         const rows = await repository.listCurrentVisibleInteractions(client, {
           organizationId,
           userId,
@@ -221,6 +223,8 @@ export function createPropertiesService({
 
       try {
         const result = await runInTransaction(async (client) => {
+          // Resolve-by-address first to keep one canonical property per org
+          // location and prevent duplicate markers from repeat geocoding calls.
           const existing = await repository.findByNormalizedAddress(client, {
             organizationId,
             normalizedAddress,

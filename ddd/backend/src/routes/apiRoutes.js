@@ -52,6 +52,8 @@ export function buildApiRoutes({
   const resolvedExportsService = exportsService ?? createExportsService();
 
   router.use('/auth', buildAuthRoutes({ authService: resolvedAuthService }));
+  // Every non-auth domain is mounted behind authMiddleware so JWT identity
+  // and organization context are established before domain handlers run.
   router.use(
     '/organization',
     authMiddleware,

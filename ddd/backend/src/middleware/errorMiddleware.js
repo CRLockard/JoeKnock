@@ -14,6 +14,7 @@ export function notFoundMiddleware(req, res) {
 export function errorMiddleware(err, req, res, next) {
   void next;
 
+  // Domain/application errors are already classified and safe to return.
   if (err instanceof AppError) {
     return sendError(res, {
       statusCode: err.statusCode,
@@ -31,6 +32,7 @@ export function errorMiddleware(err, req, res, next) {
     error: err?.message,
   });
 
+  // Unknown failures are intentionally generalized to avoid leaking internals.
   return sendError(res, {
     statusCode: 500,
     code: 'INTERNAL_SERVER_ERROR',

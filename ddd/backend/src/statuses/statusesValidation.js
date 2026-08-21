@@ -8,7 +8,7 @@ export const createStatusValidators = [
   body('description')
     .optional({ nullable: true })
     .custom((value) => value === null || typeof value === 'string'),
-  body('displayOrder').isInt({ min: 1 }),
+  body('displayOrder').optional().isInt({ min: 1 }),
 ];
 
 export const updateStatusValidators = [
@@ -28,6 +28,7 @@ export const updateStatusValidators = [
       (field) => !MUTABLE_STATUS_FIELDS.includes(field),
     );
 
+    // Reject unknown keys to keep mutation contract explicit and testable.
     if (disallowedFields.length > 0) {
       throw new Error(
         `Unsupported fields for status update: ${disallowedFields.join(', ')}.`,

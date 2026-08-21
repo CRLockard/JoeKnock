@@ -26,6 +26,7 @@ function buildListUsersQuery({ organizationId, active, role }) {
     whereClauses.push(`role = $${values.length}`);
   }
 
+  // Optional filters are appended while preserving parameterized SQL.
   return {
     text: `
       SELECT id, organization_id, email, first_name, last_name, role, is_active, created_at, updated_at
@@ -62,6 +63,7 @@ function buildUpdateUserQuery({
     setClauses.push(`role = $${values.length}`);
   }
 
+  // PATCH updates only provided mutable columns and bumps updated_at.
   return {
     text: `
       UPDATE users

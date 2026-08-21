@@ -8,6 +8,8 @@ function isNonEmptyString(value) {
 }
 
 function validateClaims(payload) {
+  // Claims are validated defensively even after signature verification so
+  // downstream code can trust req.auth shape and role semantics.
   if (!isNonEmptyString(payload?.sub)) {
     throw new AuthError('Token is missing a valid subject claim.');
   }
@@ -43,6 +45,8 @@ export function authMiddleware(req, res, next) {
 
   try {
     const payload = verifyAccessToken(token);
+    // req.auth is the canonical identity context used for organization
+    // scoping and authorization; handlers must not trust client-supplied ids.
     req.auth = validateClaims(payload);
     return next();
   } catch (error) {

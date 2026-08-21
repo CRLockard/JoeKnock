@@ -20,7 +20,6 @@ import {
   getInteractionSnapshot,
   updateInteractionSnapshot,
 } from '../api/interactionsApi.js';
-import { buildInteractionDraftKey } from '../features/interactions/interactionDraftStorage.js';
 
 vi.mock('../api/mapApi.js', () => ({
   getMapProperties: vi.fn(),
@@ -364,7 +363,7 @@ describe('MapPage', () => {
       0,
     );
     expect(
-      screen.getByRole('button', { name: 'Start interaction' }),
+      screen.getByRole('heading', { name: 'Interaction Details' }),
     ).toBeInTheDocument();
   });
 
@@ -391,14 +390,11 @@ describe('MapPage', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: 'Selected Property' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Start interaction' }),
+      await screen.findByRole('heading', { name: 'Record Interaction' }),
     ).toBeInTheDocument();
   });
 
-  it('renders interaction-entry fields when starting a new interaction from selected property', async () => {
+  it('renders interaction-entry fields immediately for a selected property with no visible interaction', async () => {
     mockGeolocationSuccess();
     getPropertyInteractions.mockResolvedValueOnce({
       propertyId: 'property-1',
@@ -408,8 +404,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     expect(
       screen.getByRole('heading', { name: 'Record Interaction' }),
@@ -444,8 +438,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
@@ -485,7 +477,6 @@ describe('MapPage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Record Interaction' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Interested/)).toBeInTheDocument();
     expect(getPropertyInteractions).toHaveBeenCalledTimes(2);
     expect(getMapProperties).toHaveBeenCalledTimes(2);
   });
@@ -508,8 +499,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
@@ -568,8 +557,6 @@ describe('MapPage', () => {
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
-
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
     });
@@ -589,27 +576,25 @@ describe('MapPage', () => {
     );
   });
 
-  it('loads current interaction snapshot detail and renders only approved fields', async () => {
+  it('opens existing interaction details directly for selected properties with visible current interaction', async () => {
     mockGeolocationSuccess();
 
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View snapshot' }));
-
     await waitFor(() => {
       expect(getInteractionSnapshot).toHaveBeenCalledWith('interaction-1');
     });
 
     expect(
-      await screen.findByRole('heading', { name: 'Interaction Snapshot' }),
+      await screen.findByRole('heading', { name: 'Interaction Details' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Status:/)).toBeInTheDocument();
-    expect(screen.getByText(/First Knock:/)).toBeInTheDocument();
-    expect(screen.getByText(/Last Updated:/)).toBeInTheDocument();
-    expect(screen.queryByText(/timeline/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/interaction_at/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Start interaction' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View snapshot' })).toBeNull();
   });
 
   it('allows authorized edit and treats response as a new snapshot', async () => {
@@ -645,25 +630,19 @@ describe('MapPage', () => {
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View snapshot' }));
-    await screen.findByRole('button', { name: 'Edit interaction' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit interaction' }));
-
-    expect(
-      screen.getByRole('heading', { name: 'Edit Interaction Snapshot' }),
-    ).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Interaction Details' });
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-1' },
     });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Notes\s+Call after 5pm\./i }),
+    );
     fireEvent.change(screen.getByLabelText('Notes'), {
       target: { value: 'No answer on return visit.' },
     });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Save as new snapshot' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
 
     await waitFor(() => {
       expect(updateInteractionSnapshot).toHaveBeenCalledWith('interaction-1', {
@@ -678,11 +657,10 @@ describe('MapPage', () => {
     expect(
       await screen.findByText('Interaction updated successfully.'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Status:/)).toBeInTheDocument();
-    expect(screen.getByText(/No Answer/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('status-1');
   });
 
-  it('handles 403 response when updating an interaction snapshot', async () => {
+  it('handles 403 response when saving an existing interaction update', async () => {
     mockGeolocationSuccess();
 
     updateInteractionSnapshot.mockRejectedValueOnce({
@@ -694,18 +672,13 @@ describe('MapPage', () => {
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'View snapshot' }));
-    await screen.findByRole('button', { name: 'Edit interaction' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit interaction' }));
+    await screen.findByRole('heading', { name: 'Interaction Details' });
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-1' },
     });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Save as new snapshot' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save interaction' }));
 
     expect(
       await screen.findByText(
@@ -713,7 +686,7 @@ describe('MapPage', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Edit Interaction Snapshot' }),
+      screen.getByRole('heading', { name: 'Interaction Details' }),
     ).toBeInTheDocument();
   });
 
@@ -728,30 +701,30 @@ describe('MapPage', () => {
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
 
     expect(
-      screen.getByRole('heading', { name: 'Selected Property' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Start interaction' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('heading', { name: 'Selected Property' }),
+    ).toBeNull();
     expect(createPropertyInteraction).not.toHaveBeenCalled();
   });
 
   it('restores a saved create draft when form is reopened for the same property', async () => {
     mockGeolocationSuccess();
-    getPropertyInteractions.mockResolvedValueOnce({
-      propertyId: 'property-1',
-      interactions: [],
-    });
+    getPropertyInteractions
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [],
+      })
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [],
+      });
 
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
     });
@@ -763,12 +736,8 @@ describe('MapPage', () => {
     });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
+    await selectFirstPropertyMarker();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
-
-    expect(
-      await screen.findByText('Restored saved draft for this property.'),
-    ).toBeInTheDocument();
     expect(screen.getByLabelText('Status')).toHaveValue('status-2');
     expect(screen.getByLabelText('Contact name')).toHaveValue('Saved Name');
     expect(screen.getByLabelText('Notes')).toHaveValue('Saved note text.');
@@ -818,55 +787,27 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectPropertyMarkerByIndex(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
     fireEvent.change(screen.getByLabelText('Notes'), {
       target: { value: 'Draft for property one.' },
     });
     fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[0]);
-
     await selectPropertyMarkerByIndex(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     expect(screen.getByLabelText('Notes')).toHaveValue('');
-  });
-
-  it('supports intentional draft discard and removes local draft state', async () => {
-    mockGeolocationSuccess();
-    getPropertyInteractions.mockResolvedValueOnce({
-      propertyId: 'property-1',
-      interactions: [],
-    });
-
-    render(<MapPage />);
-
-    await selectFirstPropertyMarker();
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
-    fireEvent.change(screen.getByLabelText('Notes'), {
-      target: { value: 'Discard this draft.' },
-    });
-
-    const draftKey = buildInteractionDraftKey({
-      userId: 'user-1',
-      organizationId: 'org-1',
-      propertyId: 'property-1',
-    });
-    expect(localStorage.getItem(draftKey)).toContain('Discard this draft.');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
-
-    expect(await screen.findByText('Draft discarded.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Notes')).toHaveValue('');
-    expect(localStorage.getItem(draftKey)).toBeNull();
   });
 
   it('shows field-level validation feedback and keeps local draft for correction', async () => {
     mockGeolocationSuccess();
-    getPropertyInteractions.mockResolvedValueOnce({
-      propertyId: 'property-1',
-      interactions: [],
-    });
+    getPropertyInteractions
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [],
+      })
+      .mockResolvedValueOnce({
+        propertyId: 'property-1',
+        interactions: [],
+      });
 
     createPropertyInteraction.mockRejectedValueOnce({
       status: 400,
@@ -882,7 +823,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
@@ -906,7 +846,7 @@ describe('MapPage', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Cancel' })[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
+    await selectFirstPropertyMarker();
     expect(
       screen.getByDisplayValue(
         '555-555-010012345678901234567890123456789012345678901',
@@ -944,7 +884,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
 
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
@@ -988,7 +927,6 @@ describe('MapPage', () => {
     render(<MapPage />);
 
     await selectFirstPropertyMarker();
-    fireEvent.click(screen.getByRole('button', { name: 'Start interaction' }));
     fireEvent.change(screen.getByLabelText('Status'), {
       target: { value: 'status-2' },
     });

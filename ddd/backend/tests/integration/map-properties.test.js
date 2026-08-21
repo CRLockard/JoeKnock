@@ -253,6 +253,8 @@ describeDb('GET /api/map/properties', () => {
   });
 
   it('returns one marker per property for visible current interactions only', async () => {
+    // Marker feed is intentionally derived from current visible interactions,
+    // not all properties, to keep map signal tied to actionable state.
     const organization = await createOrganization({ repVisibility: 'own' });
     const actor = await createUser({
       organizationId: organization.id,

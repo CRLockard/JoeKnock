@@ -15,6 +15,8 @@ function buildScope({ userId, organizationId, propertyId }) {
     return null;
   }
 
+  // Include organization scope defensively so draft keys remain isolated even
+  // if the same user id format appears across different tenants/environments.
   return {
     userScope,
     orgScope: orgScope ?? 'org-unknown',
@@ -50,6 +52,8 @@ export function loadInteractionDraft(scope) {
     }
 
     const parsed = JSON.parse(raw);
+    // Draft schema is intentionally permissive for MVP resiliency; malformed
+    // payloads are ignored instead of blocking interaction entry.
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch {
     return null;

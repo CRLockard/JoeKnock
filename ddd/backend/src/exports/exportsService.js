@@ -92,6 +92,8 @@ export function createExportsService({
             timezone: settings.timezone,
           });
 
+        // Reuse reporting visibility semantics so exports cannot reveal rows
+        // the actor could not see in the corresponding report view.
         const rows = await repository.getPropertyExportRows(client, {
           organizationId,
           actorUserId,

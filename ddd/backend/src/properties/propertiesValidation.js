@@ -18,6 +18,8 @@ export const resolvePropertyValidators = [
       (field) => !MUTABLE_FIELDS.includes(field),
     );
 
+    // Strict field allow-list prevents silent acceptance of unsupported
+    // payload keys that could hide client/server contract drift.
     if (disallowedFields.length > 0) {
       throw new Error(
         `Unsupported fields for property resolution: ${disallowedFields.join(', ')}.`,

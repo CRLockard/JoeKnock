@@ -3,6 +3,7 @@ import { apiFetch } from './client.js';
 export function getActivityReport(filters) {
   const params = new URLSearchParams();
 
+  // Dates are required and interpreted server-side in organization timezone.
   params.set('dateFrom', filters.dateFrom);
   params.set('dateTo', filters.dateTo);
 

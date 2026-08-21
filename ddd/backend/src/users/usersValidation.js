@@ -22,6 +22,7 @@ export const listUsersValidators = [
   query('teamId')
     .optional()
     .custom(() => {
+      // Explicitly blocked to match current MVP scope and prevent false assumptions.
       throw new Error(
         'teamId filtering is not available until team foundation tickets are implemented.',
       );
@@ -45,6 +46,7 @@ export const updateUserValidators = [
       (field) => !MUTABLE_USER_FIELDS.includes(field),
     );
 
+    // Enforce strict payload shape for deterministic partial updates.
     if (disallowedFields.length > 0) {
       throw new Error(
         `Unsupported fields for user update: ${disallowedFields.join(', ')}.`,

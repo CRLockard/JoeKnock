@@ -75,6 +75,8 @@ const CURRENT_VISIBLE_PROPERTY_INTERACTIONS_SQL = `
   WHERE i.organization_id = $1
     AND i.property_id = $3
     AND i.is_current = true
+    -- Visibility gate is applied here so all interaction reads for properties
+    -- consistently enforce tenant and representative visibility policy.
     AND (
       $4 = 'admin'
       OR $5 = 'organization'

@@ -34,6 +34,8 @@ export function createApp({
 } = {}) {
   const app = express();
 
+  // Request IDs are attached first so every downstream log/error can be
+  // correlated across middleware, services, and repository calls.
   app.use(requestIdMiddleware);
   app.use(helmet());
   app.use(
@@ -51,6 +53,8 @@ export function createApp({
   );
   app.use(express.json());
 
+  // Lightweight request logging at the edge gives timing + status visibility
+  // without coupling domain handlers to logging concerns.
   app.use((req, res, next) => {
     const startedAt = Date.now();
 

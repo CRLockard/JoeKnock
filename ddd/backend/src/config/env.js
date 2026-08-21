@@ -46,6 +46,7 @@ export function loadEnv() {
   };
 
   if (!isTest) {
+    // Production-like modes must fail fast on missing security/runtime config.
     must(env.databaseUrl, 'DATABASE_URL');
     must(env.jwtSecret, 'JWT_SECRET');
     must(env.jwtExpiresIn, 'JWT_EXPIRES_IN');

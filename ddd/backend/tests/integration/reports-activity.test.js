@@ -241,6 +241,8 @@ describeDb('GET /api/reports/activity', () => {
   });
 
   it('returns grouped activity for authorized manager with team filter and knock semantics', async () => {
+    // Baseline scenario: actor can see only team-constrained rows and report
+    // metrics should reflect latest/current snapshot rules.
     const organization = await createOrganization({
       repVisibility: 'own',
       timezone: 'UTC',

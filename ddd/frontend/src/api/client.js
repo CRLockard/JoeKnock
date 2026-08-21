@@ -9,6 +9,8 @@ export function setAuthFailureHandler(handler) {
 }
 
 function shouldRecoverAuthentication({ response, body, session }) {
+  // Only trigger global auth recovery when the client believed it had a
+  // session. Public endpoint failures should not force a logout transition.
   if (!session?.token) {
     return false;
   }
@@ -21,6 +23,9 @@ async function recoverAuthentication() {
     return;
   }
 
+  // Multiple concurrent protected requests can fail together after token
+  // expiry. Reuse one in-flight recovery to avoid repeated session clears
+  // and route churn.
   if (!authRecoveryPromise) {
     authRecoveryPromise = Promise.resolve()
       .then(() => authFailureHandler())
@@ -52,6 +57,8 @@ export async function apiFetch(path, options = {}) {
   const body = hasJson ? await response.json() : null;
 
   if (!response.ok) {
+    // Centralized auth recovery keeps 401 handling consistent across pages
+    // and API modules instead of duplicating logout logic at call sites.
     if (shouldRecoverAuthentication({ response, body, session })) {
       await recoverAuthentication();
     }

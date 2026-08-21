@@ -6,6 +6,8 @@ const EXPORT_PROPERTIES_SQL = `
       AND tu.user_id = $2
   ),
   authorized_interactions AS (
+    -- Apply organization + role + rep_visibility filter before any export
+    -- shaping so CSV cannot bypass visibility controls.
     SELECT i.*
     FROM interactions i
     WHERE i.organization_id = $1

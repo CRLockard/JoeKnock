@@ -32,6 +32,7 @@ export const updateOrganizationSettingsValidators = [
       (field) => !ORG_SETTINGS_FIELDS.includes(field),
     );
 
+    // Reject unknown keys to keep frontend and API payload contracts explicit.
     if (disallowedFields.length > 0) {
       throw new Error(
         `Unsupported fields for organization settings update: ${disallowedFields.join(', ')}.`,

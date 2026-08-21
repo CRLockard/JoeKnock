@@ -15,6 +15,8 @@ function requireRoles(allowedRoles) {
   return (req, res, next) => {
     void res;
 
+    // Team membership controls representative visibility, so only elevated
+    // roles can mutate or inspect team structures.
     if (!allowedRoleSet.has(req.auth.role)) {
       return next(
         new AppError(

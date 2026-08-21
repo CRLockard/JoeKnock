@@ -282,6 +282,7 @@ describeDb('Phase 3 interactions core endpoints', () => {
   });
 
   it('POST /api/properties/:propertyId/interactions reuses original result for duplicate clientRequestId', async () => {
+    // Idempotency expectation: client retries must not duplicate snapshots.
     const organization = await createOrganization({ repVisibility: 'own' });
     const representative = await createUser({
       organizationId: organization.id,
@@ -440,6 +441,51 @@ describeDb('Phase 3 interactions core endpoints', () => {
     expect(rows.rows[0].initial_interaction_at).toEqual(
       rows.rows[1].initial_interaction_at,
     );
+  });
+
+  it('POST /api/interactions/:id does not create a new snapshot when effective values are unchanged', async () => {
+    const organization = await createOrganization({ repVisibility: 'own' });
+    const representative = await createUser({
+      organizationId: organization.id,
+    });
+    const property = await createProperty({ organizationId: organization.id });
+    const status = await createStatus({
+      organizationId: organization.id,
+      name: 'Interested',
+    });
+
+    const created = await request(app)
+      .post(`/api/properties/${property.id}/interactions`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({
+        statusId: status.id,
+        contactName: 'Jamie',
+        notes: 'Leave flyer.',
+      });
+
+    expect(created.status).toBe(201);
+
+    const update = await request(app)
+      .post(`/api/interactions/${created.body.interactionId}`)
+      .set('Authorization', `Bearer ${tokenFor(representative)}`)
+      .send({
+        statusId: status.id,
+        contactName: 'Jamie',
+        notes: 'Leave flyer.',
+      });
+
+    expect(update.status).toBe(200);
+    expect(update.body.interactionId).toBe(created.body.interactionId);
+
+    const rows = await query(
+      `SELECT id, is_current
+       FROM interactions
+       WHERE organization_id = $1 AND interaction_group_id = $2`,
+      [organization.id, created.body.interactionGroupId],
+    );
+
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].is_current).toBe(true);
   });
 
   it('POST /api/interactions/:id rejects invalid revision payload without creating a new snapshot', async () => {

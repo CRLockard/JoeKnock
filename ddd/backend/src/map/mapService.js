@@ -11,6 +11,8 @@ function toMarkerResponse(row) {
 }
 
 function validateBounds({ north, south, east, west }) {
+  // Bounding box sanity checks avoid expensive/wide queries from malformed
+  // client viewport values.
   if (north <= south) {
     throw new AppError(
       400,

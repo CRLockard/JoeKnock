@@ -45,6 +45,9 @@ export function SettingsWorkspace({
       <aside className="settings-sidebar" aria-label="Settings navigation">
         <nav className="settings-sidebar__nav">
           {SETTINGS_ITEMS.map((item) => {
+            // Settings are modeled as one workspace with sections so shared
+            // context (org/team/status) stays visible while moving between
+            // management tasks.
             const isActive = activeSection === item.id;
 
             return (

@@ -51,6 +51,8 @@ export function buildOrganizationRoutes({
 
   router.patch(
     '/settings',
+    // Organization-level settings changes are admin-only because they affect
+    // report visibility and interpretation for every user in tenant.
     requireRoles(['admin']),
     updateOrganizationSettingsValidators,
     validate,

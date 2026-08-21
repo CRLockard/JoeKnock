@@ -66,6 +66,8 @@ export function createOrganizationService({
       repVisibility,
       timezone,
     }) {
+      // Settings are loaded/saved in a transaction to keep a single read/write
+      // boundary for tenant-wide behavior knobs.
       const updatedSettings = await runInTransaction(async (client) => {
         return repository.updateOrganizationSettings(client, {
           organizationId,

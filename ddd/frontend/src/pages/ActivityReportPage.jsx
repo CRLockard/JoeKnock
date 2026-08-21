@@ -65,6 +65,8 @@ export function ActivityReportPage() {
       setIsLoadingOptions(true);
 
       try {
+        // Filters are loaded independently from report data so the page can
+        // render selection controls before the first query is run.
         const [usersResponse, teamsResponse, statusesResponse] =
           await Promise.all([getUsers(), getTeams(), getStatuses()]);
 
@@ -102,6 +104,8 @@ export function ActivityReportPage() {
     setIsLoadingReport(true);
 
     try {
+      // dateFrom/dateTo are calendar dates. Backend resolves these against the
+      // organization timezone before converting to UTC query boundaries.
       const response = await getActivityReport({
         dateFrom,
         dateTo,
@@ -123,6 +127,8 @@ export function ActivityReportPage() {
     setIsExporting(true);
 
     try {
+      // Export reuses the same filter model as report queries so downloaded CSV
+      // matches what users are viewing in the UI.
       const response = await exportPropertiesCsv({
         dateFrom,
         dateTo,

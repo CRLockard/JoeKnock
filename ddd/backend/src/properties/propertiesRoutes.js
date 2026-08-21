@@ -17,6 +17,8 @@ export function buildPropertiesRoutes({
 
   router.post(
     '/:propertyId/interactions',
+    // Validation occurs before service so interaction service can focus on
+    // snapshot/permission rules rather than payload-shape checks.
     createInteractionValidators,
     validate,
     async (req, res, next) => {

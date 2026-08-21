@@ -9,6 +9,7 @@ export function buildAuthRoutes({ authService = createAuthService() } = {}) {
 
   router.post(
     '/register',
+    // Validate before service logic so downstream code can assume shape.
     registerValidators,
     validate,
     async (req, res, next) => {

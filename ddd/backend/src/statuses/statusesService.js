@@ -20,6 +20,8 @@ function normalizeDescription(description) {
     return null;
   }
 
+  // Empty descriptions collapse to null so persistence has one "no description"
+  // representation instead of empty-string/null drift.
   const normalized = String(description).trim();
   return normalized.length === 0 ? null : normalized;
 }
@@ -47,11 +49,18 @@ export function createStatusesService({
 
     async createStatus({ organizationId, name, description, displayOrder }) {
       const createdStatus = await runInTransaction(async (client) => {
+        const resolvedDisplayOrder =
+          displayOrder !== undefined
+            ? displayOrder
+            : await repository.getNextDisplayOrder(client, {
+                organizationId,
+              });
+
         return repository.createStatus(client, {
           organizationId,
           name: String(name).trim(),
           description: normalizeDescription(description),
-          displayOrder,
+          displayOrder: resolvedDisplayOrder,
           isActive: true,
         });
       });

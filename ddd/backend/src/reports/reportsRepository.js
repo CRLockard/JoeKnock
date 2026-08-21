@@ -13,6 +13,8 @@ const ACTIVITY_REPORT_SQL = `
       AND tu.user_id = $2
   ),
   authorized_interactions AS (
+    -- Central visibility gate: all downstream report aggregations derive only
+    -- from rows the actor can see within their authenticated organization.
     SELECT i.*
     FROM interactions i
     WHERE i.organization_id = $1
@@ -64,6 +66,8 @@ const ACTIVITY_REPORT_SQL = `
       )
   ),
   knock_group_latest AS (
+    -- Knock counts are based on latest snapshot per interaction group where the
+    -- first knock date falls inside range (business meaning: "new knocks").
     SELECT DISTINCT ON (i.interaction_group_id)
       i.interaction_group_id,
       i.user_id,
@@ -81,6 +85,8 @@ const ACTIVITY_REPORT_SQL = `
     WHERE ($9::uuid IS NULL OR status_id = $9::uuid)
   ),
   status_group_latest AS (
+    -- Status activity uses changed_at window to capture latest state movement
+    -- in range, independent from initial interaction creation date.
     SELECT DISTINCT ON (i.interaction_group_id)
       i.interaction_group_id,
       i.user_id,

@@ -30,6 +30,7 @@ function parseActiveFilter(active) {
     return undefined;
   }
 
+  // Query-string booleans are normalized once so repository stays typed.
   return active === 'true';
 }
 
@@ -109,6 +110,7 @@ export function createUsersService({
     }) {
       try {
         const createdUser = await runInTransaction(async (client) => {
+          // Password hashing occurs server-side only; hash never leaves backend.
           const passwordHash = await passwordHasher(password);
 
           return repository.createUser(client, {
@@ -125,6 +127,7 @@ export function createUsersService({
         return toPublicUser(createdUser);
       } catch (error) {
         if (isUniqueViolation(error)) {
+          // Unique(email, organization) collisions surface as domain conflict.
           throw new AppError(
             409,
             'CONFLICT',

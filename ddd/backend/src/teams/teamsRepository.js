@@ -54,6 +54,7 @@ const TEAM_MEMBERS_SQL = `
    AND u.organization_id = tu.organization_id
   WHERE tu.team_id = $1
     AND tu.organization_id = $2
+  -- Membership reads stay tenant-scoped through both join and where clauses.
   ORDER BY lower(u.last_name) ASC, lower(u.first_name) ASC, lower(u.email) ASC
 `;
 

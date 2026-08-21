@@ -20,6 +20,7 @@ export const registerValidators = [
     .trim()
     .notEmpty()
     .bail()
+    // Accept only valid IANA names so report/export date semantics stay stable.
     .custom((value) => isValidIanaTimeZone(value)),
 ];
 

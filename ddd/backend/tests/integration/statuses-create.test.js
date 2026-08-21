@@ -96,9 +96,16 @@ describeDb('POST /api/statuses', () => {
     await resetRegistrationTables();
   });
 
-  it('creates a status for manager in authenticated organization scope', async () => {
+  it('creates a status for manager in authenticated organization scope and appends order when omitted', async () => {
     const app = createApp();
     const actor = await seedAuthenticatedUser({ role: 'manager' });
+
+    await query(
+      `INSERT INTO statuses (organization_id, name, description, display_order, is_active)
+       VALUES ($1, 'Existing A', NULL, 1, true),
+              ($1, 'Existing B', NULL, 2, true)`,
+      [actor.organization.id],
+    );
 
     const response = await request(app)
       .post('/api/statuses')
@@ -106,14 +113,13 @@ describeDb('POST /api/statuses', () => {
       .send({
         name: 'Interested',
         description: 'Homeowner is interested.',
-        displayOrder: 1,
       });
 
     expect(response.status).toBe(201);
     expect(response.body.organizationId).toBe(actor.organization.id);
     expect(response.body.name).toBe('Interested');
     expect(response.body.description).toBe('Homeowner is interested.');
-    expect(response.body.displayOrder).toBe(1);
+    expect(response.body.displayOrder).toBe(3);
     expect(response.body.isActive).toBe(true);
 
     const rows = await query(
@@ -124,7 +130,7 @@ describeDb('POST /api/statuses', () => {
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].organization_id).toBe(actor.organization.id);
     expect(rows.rows[0].name).toBe('Interested');
-    expect(rows.rows[0].display_order).toBe(1);
+    expect(rows.rows[0].display_order).toBe(3);
     expect(rows.rows[0].is_active).toBe(true);
   });
 
@@ -137,13 +143,12 @@ describeDb('POST /api/statuses', () => {
       .set('Authorization', `Bearer ${actor.token}`)
       .send({
         name: 'No Answer',
-        displayOrder: 2,
       });
 
     expect(response.status).toBe(201);
     expect(response.body.organizationId).toBe(actor.organization.id);
     expect(response.body.description).toBeNull();
-    expect(response.body.displayOrder).toBe(2);
+    expect(response.body.displayOrder).toBe(1);
   });
 
   it('ignores client-supplied organization ownership selectors', async () => {
@@ -156,7 +161,6 @@ describeDb('POST /api/statuses', () => {
       .set('Authorization', `Bearer ${actor.token}`)
       .send({
         name: 'Do Not Trust Client Org',
-        displayOrder: 5,
         organizationId: other.organization.id,
       });
 
@@ -181,7 +185,6 @@ describeDb('POST /api/statuses', () => {
       .set('Authorization', `Bearer ${actor.token}`)
       .send({
         name: 'Not Allowed',
-        displayOrder: 1,
       });
 
     expect(response.status).toBe(403);
@@ -193,7 +196,6 @@ describeDb('POST /api/statuses', () => {
 
     const response = await request(app).post('/api/statuses').send({
       name: 'No Auth',
-      displayOrder: 1,
     });
 
     expect(response.status).toBe(401);

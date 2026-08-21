@@ -37,6 +37,7 @@ export const getActivityReportValidators = [
       return true;
     }
 
+    // Keep date range coherent before hitting service/repository.
     if (dateFrom > dateTo) {
       throw new Error('dateFrom must be less than or equal to dateTo.');
     }

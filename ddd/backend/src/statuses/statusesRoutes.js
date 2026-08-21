@@ -35,6 +35,7 @@ export function buildStatusesRoutes({
 
   router.get('/', async (req, res, next) => {
     try {
+      // Any authenticated user can read active statuses for UI workflows.
       const statuses = await statusesService.listActiveStatuses({
         organizationId: req.auth.organizationId,
       });
@@ -90,6 +91,7 @@ export function buildStatusesRoutes({
 
   router.patch(
     '/:id/active',
+    // Managers/admins can retire statuses; reps cannot alter workflow catalog.
     requireRoles(['manager', 'admin']),
     updateStatusActiveValidators,
     validate,

@@ -27,6 +27,8 @@ describe('organization isolation fixture foundation', () => {
       '/api/_scaffold/protected',
     );
 
+    // Confirms the auth fixture generator produces distinct org contexts,
+    // which downstream isolation tests depend on.
     expect(responseA.status).toBe(200);
     expect(responseB.status).toBe(200);
     expect(responseA.body.auth.organizationId).toBe(fixtures.organizationA.id);

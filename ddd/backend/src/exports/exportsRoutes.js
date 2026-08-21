@@ -31,6 +31,8 @@ export function buildExportsRoutes({
 
   router.get(
     '/properties',
+    // Export uses same permission boundary as reports because it serializes
+    // the same activity domain into a downloadable artifact.
     requireRoles(['manager', 'admin']),
     getActivityReportValidators,
     validate,

@@ -38,6 +38,7 @@ function buildOrganizationSettingsUpdateQuery({
     setClauses.push(`timezone = $${values.length}`);
   }
 
+  // Dynamic update preserves PATCH semantics (only provided fields change).
   return {
     text: `
       UPDATE organization_settings

@@ -41,6 +41,7 @@ function enforceBodyObjectWithAllowedFields(allowedFields) {
       (field) => !allowedFields.includes(field),
     );
 
+    // Prevent accidental acceptance of unknown mutation fields.
     if (disallowedFields.length > 0) {
       throw new Error(
         `Unsupported fields for interaction request: ${disallowedFields.join(', ')}.`,

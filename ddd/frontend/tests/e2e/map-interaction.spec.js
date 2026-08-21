@@ -3,6 +3,8 @@ import { test, expect } from '@playwright/test';
 test('selecting a map marker opens property workflow and interaction entry', async ({
   page,
 }) => {
+  // Route stubs keep this test focused on UI workflow transitions and guard
+  // against backend dependency noise.
   await page.route('**/api/map/properties**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -122,8 +124,6 @@ test('selecting a map marker opens property workflow and interaction entry', asy
     '123 Main St',
   );
 
-  await page.getByRole('button', { name: 'Start interaction' }).click();
-
   await expect(
     page.getByRole('heading', { name: 'Record Interaction' }),
   ).toBeVisible();
@@ -135,5 +135,5 @@ test('selecting a map marker opens property workflow and interaction entry', asy
 
   await expect(
     page.getByRole('heading', { name: 'Selected Property' }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });

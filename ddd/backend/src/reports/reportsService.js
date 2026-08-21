@@ -69,6 +69,8 @@ export function createReportsService({
           );
         }
 
+        // dateFrom/dateTo are organization-local dates. Convert once here so
+        // downstream SQL remains UTC-based and DST-safe.
         const { utcStartInclusive, utcEndExclusive } =
           resolveOrganizationDateRangeToUtc({
             dateFrom,
@@ -76,6 +78,8 @@ export function createReportsService({
             timezone: settings.timezone,
           });
 
+        // Repository enforces visibility + organization scoping using actor
+        // role and rep_visibility in SQL predicates.
         const reportRow = await repository.getActivityReportRows(client, {
           organizationId,
           actorUserId,

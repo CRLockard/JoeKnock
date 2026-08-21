@@ -102,6 +102,8 @@ export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
 
   router.patch(
     '/:id/active',
+    // Activation/deactivation is admin-only to avoid managers locking out
+    // users beyond their delegated authority in the organization.
     requireRoles(['admin']),
     updateUserActiveValidators,
     validate,

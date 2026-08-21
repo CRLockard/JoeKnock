@@ -198,6 +198,8 @@ describe('auth recovery', () => {
       }),
     );
 
+    // Concurrent failures should share one recovery execution to avoid
+    // duplicate logout side effects and racey redirect churn.
     await Promise.allSettled([
       apiFetch('/one'),
       apiFetch('/two'),

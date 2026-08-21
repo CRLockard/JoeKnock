@@ -15,6 +15,7 @@ function must(value, key) {
 
 export function resolveDatabaseUrlForMode(config = env) {
   if (config.isTest) {
+    // Hard guard to reduce risk of destructive test runs against dev/prod DB.
     const testUrl = must(config.testDatabaseUrl, 'TEST_DATABASE_URL');
 
     if (config.databaseUrl && config.databaseUrl === testUrl) {
@@ -31,6 +32,7 @@ export function resolveDatabaseUrlForMode(config = env) {
 
 export function getPool() {
   if (!pool) {
+    // Singleton pool keeps connection management centralized for the process.
     pool = new Pool({ connectionString: resolveDatabaseUrlForMode() });
   }
 

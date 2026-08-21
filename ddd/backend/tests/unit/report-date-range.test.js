@@ -41,6 +41,7 @@ describe('report date range timezone conversion', () => {
         Date.parse(boundaries.utcStartInclusive)) /
       (60 * 60 * 1000);
 
+    // Local day is 23h on spring-forward transition.
     expect(spanHours).toBe(23);
   });
 
@@ -59,6 +60,7 @@ describe('report date range timezone conversion', () => {
         Date.parse(boundaries.utcStartInclusive)) /
       (60 * 60 * 1000);
 
+    // Local day is 25h on fall-back transition.
     expect(spanHours).toBe(25);
   });
 });

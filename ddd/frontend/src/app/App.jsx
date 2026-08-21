@@ -11,9 +11,12 @@ export function App() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const isAuthenticated = auth.isAuthenticated;
+  // Map route uses a dense, full-height layout that differs from forms/tables.
   const isMapRoute = location.pathname.startsWith('/map');
 
   const navigationItems = useMemo(() => {
+    // Navigation is role-shaped at render time so unauthorized destinations
+    // are not presented in normal UX, while backend still enforces access.
     const items = [{ label: 'Map', to: '/map' }];
 
     if (auth.user?.role === 'manager' || auth.user?.role === 'admin') {
@@ -28,6 +31,8 @@ export function App() {
     : 'Account';
 
   useEffect(() => {
+    // Route transitions always collapse overlays to prevent stale menus from
+    // persisting across pages after navigation.
     setIsDrawerOpen(false);
     setIsUserMenuOpen(false);
   }, [location.pathname]);
@@ -136,6 +141,7 @@ export function App() {
             className="app-user-menu__item"
             role="menuitem"
           >
+            {/* Settings opens at company section as the workspace default. */}
             Settings
           </NavLink>
           <button

@@ -322,6 +322,7 @@ const INSERT_SNAPSHOT_SQL = `
 `;
 
 const CLEAR_CURRENT_FOR_GROUP_SQL = `
+  -- Maintain exactly one current snapshot pointer per interaction group.
   UPDATE interactions
   SET is_current = false
   WHERE organization_id = $1

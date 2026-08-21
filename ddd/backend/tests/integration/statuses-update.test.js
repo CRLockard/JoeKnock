@@ -216,6 +216,7 @@ describeDb('PATCH /api/statuses/:id', () => {
   });
 
   it('enforces organization isolation for updates', async () => {
+    // Status mutations must be tenant-scoped even for admin actors.
     const app = createApp();
     const actor = await seedAuthenticatedUser({ role: 'admin' });
     const other = await seedAuthenticatedUser({ role: 'admin' });

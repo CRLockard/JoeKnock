@@ -36,6 +36,8 @@ export async function exportPropertiesCsv(filters) {
   const headers = new Headers();
 
   if (session?.token) {
+    // Export endpoint is protected like report endpoint; pass the same bearer
+    // token flow used by apiFetch even though this request returns a Blob.
     headers.set('Authorization', `Bearer ${session.token}`);
   }
 
@@ -53,6 +55,8 @@ export async function exportPropertiesCsv(filters) {
     let details;
 
     if (contentType.includes('application/json')) {
+      // Preserve backend error envelope details so UI can surface actionable
+      // validation/permission messages for failed exports.
       const body = await response.json();
       message = body?.error?.message ?? message;
       details = body?.error?.details;

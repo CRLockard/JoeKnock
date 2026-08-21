@@ -17,6 +17,8 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      // Login returns the canonical session payload used by AuthProvider and
+      // persisted storage: bearer token plus normalized public user context.
       const result = await login({
         email,
         password,
@@ -27,6 +29,7 @@ export function LoginPage() {
         user: result.user,
       });
 
+      // Successful authentication always lands on map-first workflow.
       navigate('/map', { replace: true });
     } catch (submitError) {
       setError(submitError.message || 'Login failed.');

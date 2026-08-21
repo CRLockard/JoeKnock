@@ -66,6 +66,8 @@ export const authRepository = {
   },
 
   async findUserByEmail(client, { email }) {
+    // Email lookup is intentionally global across organizations in MVP login;
+    // org context is then carried in token claims from resolved user row.
     const result = await client.query(USER_BY_EMAIL_LOGIN_SQL, [email]);
     return result.rows[0] ?? null;
   },

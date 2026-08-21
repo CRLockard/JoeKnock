@@ -33,6 +33,8 @@ export function buildInteractionsRoutes({
 
   router.post(
     '/:id',
+    // POST is used intentionally for revision action semantics in MVP while
+    // service enforces immutable snapshot creation instead of in-place update.
     updateInteractionValidators,
     validate,
     async (req, res, next) => {

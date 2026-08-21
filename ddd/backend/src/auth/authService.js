@@ -99,6 +99,8 @@ export function createAuthService({
       }
 
       const publicUser = toPublicUser(user);
+      // JWT includes only claims required for identity + authorization context;
+      // richer profile data continues to come from organization-scoped queries.
       const token = tokenSigner({
         userId: publicUser.id,
         organizationId: publicUser.organizationId,
@@ -121,6 +123,8 @@ export function createAuthService({
     }) {
       try {
         const result = await runInTransaction(async (client) => {
+          // Registration bootstraps the tenant boundary first, then settings,
+          // then the initial admin user, all in one transaction.
           const organization = await repository.createOrganization(client, {
             name: organizationName,
           });

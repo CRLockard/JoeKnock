@@ -7,6 +7,8 @@ export function getOrganization() {
 }
 
 export function getOrganizationSettings() {
+  // Settings drive both authorization-aware UX and backend visibility/report
+  // behavior, so this endpoint is a first-class workspace dependency.
   return apiFetch('/organization/settings', {
     method: 'GET',
   });

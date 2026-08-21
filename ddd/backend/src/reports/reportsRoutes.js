@@ -31,6 +31,7 @@ export function buildReportsRoutes({
 
   router.get(
     '/activity',
+    // Reports are restricted because they aggregate cross-user activity.
     requireRoles(['manager', 'admin']),
     getActivityReportValidators,
     validate,

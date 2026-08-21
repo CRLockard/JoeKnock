@@ -127,6 +127,7 @@ describeDb('PATCH /api/users/:id/active', () => {
   });
 
   it('deactivates a same-organization user for admin and preserves user row', async () => {
+    // Contract check: deactivation toggles state and does not delete account.
     const app = createApp();
     const admin = await seedActor('admin');
     const target = await createUserRecord({

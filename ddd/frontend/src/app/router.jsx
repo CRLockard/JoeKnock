@@ -13,8 +13,12 @@ export const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
+      // Keep '/' as a compatibility entrypoint and redirect to the canonical
+      // authenticated landing page. This avoids duplicating home/dashboard UI.
       { index: true, element: <Navigate to="/map" replace /> },
       { path: 'login', element: <LoginPage /> },
+      // ProtectedRoute is a client-navigation guard. Server-side auth remains
+      // authoritative for every API request behind these screens.
       {
         path: 'map',
         element: (

@@ -229,9 +229,9 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     expect(
-      await screen.findByText('No Answer (order: 1) - No contact established'),
+      await screen.findByText('No Answer - No contact established'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Interested (order: 2)')).toBeInTheDocument();
+    expect(screen.getByText('Interested')).toBeInTheDocument();
     expect(getStatuses).toHaveBeenCalledTimes(1);
   });
 
@@ -267,9 +267,9 @@ describe('settings page', () => {
     renderSettings(['/settings']);
 
     expect(
-      await screen.findByText('No Answer (order: 1) - No contact established'),
+      await screen.findByText('No Answer - No contact established'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Interested (order: 2)')).toBeInTheDocument();
+    expect(screen.getByText('Interested')).toBeInTheDocument();
     expect(getStatuses).toHaveBeenCalledTimes(1);
   });
 
@@ -313,16 +313,12 @@ describe('settings page', () => {
     fireEvent.change(screen.getByLabelText('Status description'), {
       target: { value: 'No one answered door' },
     });
-    fireEvent.change(screen.getByLabelText('Display order'), {
-      target: { value: '3' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Create status' }));
 
     await waitFor(() => {
       expect(createStatus).toHaveBeenCalledWith({
         name: 'Not Home',
         description: 'No one answered door',
-        displayOrder: 3,
       });
     });
 
@@ -330,7 +326,7 @@ describe('settings page', () => {
       await screen.findByText('Status created successfully.'),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText('Not Home (order: 3) - No one answered door'),
+      await screen.findByText('Not Home - No one answered door'),
     ).toBeInTheDocument();
   });
 
@@ -377,7 +373,7 @@ describe('settings page', () => {
 
     renderSettings(['/settings']);
 
-    await screen.findByText('Interested (order: 1)');
+    await screen.findByText('Interested');
     fireEvent.click(screen.getByRole('button', { name: 'Edit Interested' }));
 
     fireEvent.change(screen.getByLabelText('Edit status name'), {
@@ -403,9 +399,7 @@ describe('settings page', () => {
       await screen.findByText('Status updated successfully.'),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(
-        'Very Interested (order: 4) - Requested callback',
-      ),
+      await screen.findByText('Very Interested - Requested callback'),
     ).toBeInTheDocument();
   });
 
@@ -460,7 +454,7 @@ describe('settings page', () => {
 
     renderSettings(['/settings']);
 
-    await screen.findByText('Deactivate Me (order: 2)');
+    await screen.findByText('Deactivate Me');
     fireEvent.click(
       screen.getByRole('button', { name: 'Deactivate Deactivate Me' }),
     );
@@ -472,8 +466,135 @@ describe('settings page', () => {
     expect(
       await screen.findByText('Status deactivated successfully.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Deactivate Me (order: 2)')).toBeNull();
-    expect(screen.getByText('Keep Me (order: 1)')).toBeInTheDocument();
+    expect(screen.queryByText('Deactivate Me')).toBeNull();
+    expect(screen.getByText('Keep Me')).toBeInTheDocument();
+  });
+
+  it('hides organization id and current visibility from company information panel', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings']);
+
+    await screen.findByText('Company Information');
+    expect(screen.queryByText('Organization ID')).not.toBeInTheDocument();
+    expect(screen.queryByText('Current Visibility')).not.toBeInTheDocument();
+  });
+
+  it('renders representative-visibility wording from admin configuration perspective', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderSettings(['/settings?section=visibility']);
+
+    expect(
+      await screen.findByText('Reps can see only their own interactions.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Reps can see interactions belonging to members of their assigned teams.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Reps can see all interactions in the organization.'),
+    ).toBeInTheDocument();
+  });
+
+  it('supports drag-and-drop status ordering and persists new display order', async () => {
+    setStoredUser('admin');
+
+    getOrganization.mockResolvedValue({
+      id: 'org-1',
+      name: 'Org Name',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    getStatuses
+      .mockResolvedValueOnce([
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'New',
+          description: null,
+          displayOrder: 1,
+          isActive: true,
+        },
+        {
+          id: 'status-2',
+          organizationId: 'org-1',
+          name: 'Interested',
+          description: null,
+          displayOrder: 2,
+          isActive: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'status-2',
+          organizationId: 'org-1',
+          name: 'Interested',
+          description: null,
+          displayOrder: 1,
+          isActive: true,
+        },
+        {
+          id: 'status-1',
+          organizationId: 'org-1',
+          name: 'New',
+          description: null,
+          displayOrder: 2,
+          isActive: true,
+        },
+      ]);
+
+    updateStatus.mockResolvedValue({});
+
+    renderSettings(['/settings?section=statuses']);
+
+    expect(
+      await screen.findByText('Drag and drop to reorder statuses'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('⋮⋮').length).toBeGreaterThan(0);
+
+    const interestedCell = await screen.findByText('Interested');
+    const newCell = screen.getByText('New');
+    const interestedRow = interestedCell.closest('tr');
+    const newRow = newCell.closest('tr');
+
+    fireEvent.dragStart(newRow);
+    fireEvent.dragOver(interestedRow);
+    fireEvent.drop(interestedRow);
+
+    await waitFor(() => {
+      expect(updateStatus).toHaveBeenCalledWith('status-2', {
+        displayOrder: 1,
+      });
+      expect(updateStatus).toHaveBeenCalledWith('status-1', {
+        displayOrder: 2,
+      });
+    });
+
+    expect(
+      await screen.findByText('Status order updated successfully.'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Teams' }));
+    expect(
+      screen.queryByText('Status order updated successfully.'),
+    ).not.toBeInTheDocument();
   });
 
   it('renders teams loading state', async () => {

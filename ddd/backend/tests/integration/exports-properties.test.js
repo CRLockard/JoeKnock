@@ -319,6 +319,8 @@ describeDb('GET /api/exports/properties', () => {
   });
 
   it('exports CSV for authorized manager with expected headers and filter parity', async () => {
+    // CSV should include only rows visible under the same team/visibility rules
+    // as the activity report endpoint.
     const organization = await createOrganization({
       repVisibility: 'own',
       timezone: 'UTC',

@@ -52,6 +52,10 @@ function normalizeNullableText(value) {
   return normalized.length === 0 ? null : normalized;
 }
 
+function sameNullableText(left, right) {
+  return (left ?? null) === (right ?? null);
+}
+
 function isEditAllowed({ actorRole, actorUserId, ownerUserId, sharesTeam }) {
   if (actorRole === 'admin') {
     return true;
@@ -159,6 +163,8 @@ export function createInteractionsService({
           }
 
           const interactionGroupId = randomUUID();
+          // Initial interaction creates the immutable history chain for this
+          // representative/property relationship.
           const created = await repository.createSnapshot(client, {
             interactionGroupId,
             propertyId,
@@ -355,11 +361,41 @@ export function createInteractionsService({
           nextStatusName = activeStatus.name;
         }
 
+        const nextContactName =
+          normalizedPatch.contactName !== undefined
+            ? normalizedPatch.contactName
+            : currentSnapshot.contact_name;
+        const nextContactPhone =
+          normalizedPatch.contactPhone !== undefined
+            ? normalizedPatch.contactPhone
+            : currentSnapshot.contact_phone;
+        const nextContactEmail =
+          normalizedPatch.contactEmail !== undefined
+            ? normalizedPatch.contactEmail
+            : currentSnapshot.contact_email;
+        const nextNotes =
+          normalizedPatch.notes !== undefined
+            ? normalizedPatch.notes
+            : currentSnapshot.notes;
+
+        const isNoOpRevision =
+          nextStatusId === currentSnapshot.status_id &&
+          sameNullableText(nextContactName, currentSnapshot.contact_name) &&
+          sameNullableText(nextContactPhone, currentSnapshot.contact_phone) &&
+          sameNullableText(nextContactEmail, currentSnapshot.contact_email) &&
+          sameNullableText(nextNotes, currentSnapshot.notes);
+
+        if (isNoOpRevision) {
+          return currentSnapshot;
+        }
+
         await repository.clearCurrentForGroup(client, {
           organizationId,
           interactionGroupId: currentSnapshot.interaction_group_id,
         });
 
+        // Revisions never mutate historical rows. A new snapshot is inserted
+        // and marked current while prior current becomes non-current.
         const finalCurrent = await repository.createSnapshot(client, {
           interactionGroupId: currentSnapshot.interaction_group_id,
           propertyId: currentSnapshot.property_id,
@@ -369,22 +405,10 @@ export function createInteractionsService({
           statusName: nextStatusName,
           initialInteractionAt: currentSnapshot.initial_interaction_at,
           changedBy: userId,
-          contactName:
-            normalizedPatch.contactName !== undefined
-              ? normalizedPatch.contactName
-              : currentSnapshot.contact_name,
-          contactPhone:
-            normalizedPatch.contactPhone !== undefined
-              ? normalizedPatch.contactPhone
-              : currentSnapshot.contact_phone,
-          contactEmail:
-            normalizedPatch.contactEmail !== undefined
-              ? normalizedPatch.contactEmail
-              : currentSnapshot.contact_email,
-          notes:
-            normalizedPatch.notes !== undefined
-              ? normalizedPatch.notes
-              : currentSnapshot.notes,
+          contactName: nextContactName,
+          contactPhone: nextContactPhone,
+          contactEmail: nextContactEmail,
+          notes: nextNotes,
           clientRequestId: null,
         });
 

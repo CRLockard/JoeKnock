@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 test('manager can apply filters and request CSV export from Activity Report', async ({
   page,
 }) => {
+  // Verify frontend sends filter-parity query params to export endpoint.
   await page.route('**/api/users', async (route) => {
     await route.fulfill({
       status: 200,

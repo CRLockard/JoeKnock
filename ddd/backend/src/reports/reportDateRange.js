@@ -92,6 +92,8 @@ function zoneOffsetMs(instantMs, timeZone) {
 }
 
 function zonedMidnightToUtc({ year, month, day }, timeZone) {
+  // Convert a local calendar midnight in the organization timezone into the
+  // exact UTC instant used for SQL range predicates.
   const localUtcEquivalent = Date.UTC(year, month - 1, day, 0, 0, 0);
   const firstOffset = zoneOffsetMs(localUtcEquivalent, timeZone);
   let candidate = localUtcEquivalent - firstOffset;
@@ -115,6 +117,13 @@ function zonedMidnightToUtc({ year, month, day }, timeZone) {
   return new Date(candidate).toISOString();
 }
 
+/**
+ * Converts inclusive organization-local report dates into UTC boundaries.
+ *
+ * Stored timestamps are UTC, but report filters are calendar dates in the
+ * organization's configured timezone. Queries use a half-open interval:
+ * [utcStartInclusive, utcEndExclusive).
+ */
 export function resolveOrganizationDateRangeToUtc({
   dateFrom,
   dateTo,

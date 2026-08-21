@@ -7,6 +7,7 @@ export const createTeamValidators = [
 export const getTeamValidators = [param('id').isUUID()];
 
 export const addTeamUserValidators = [
+  // Team and user identifiers are fully server-validated before service logic.
   param('id').isUUID(),
   body('userId').isUUID(),
 ];
