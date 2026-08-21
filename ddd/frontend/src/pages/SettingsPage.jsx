@@ -1048,125 +1048,127 @@ export function SettingsPage() {
                       Drag and drop to reorder statuses
                     </p>
                     <div className="table-shell">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th scope="col" aria-label="Drag handle" />
-                          <th scope="col">Order</th>
-                          <th scope="col">Status Name</th>
-                          <th scope="col">Description</th>
-                          <th scope="col">Active</th>
-                          <th scope="col">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {statuses.map((status) => (
-                          <tr
-                            key={status.id}
-                            className={`status-order-row${draggedStatusId === status.id ? ' status-order-row--dragging' : ''}${
-                              dragOverStatusId === status.id
-                                ? ' status-order-row--drop-target'
-                                : ''
-                            }`}
-                            draggable={
-                              canManageStatuses && !isReorderingStatuses
-                            }
-                            onDragStart={() => {
-                              setDraggedStatusId(status.id);
-                              setDragOverStatusId('');
-                            }}
-                            onDragEnd={() => {
-                              setDraggedStatusId('');
-                              setDragOverStatusId('');
-                            }}
-                            onDragOver={(event) => {
-                              if (canManageStatuses) {
-                                event.preventDefault();
-                                setDragOverStatusId(status.id);
-                              }
-                            }}
-                            onDragLeave={() => {
-                              if (dragOverStatusId === status.id) {
-                                setDragOverStatusId('');
-                              }
-                            }}
-                            onDrop={(event) => {
-                              event.preventDefault();
-                              void handleStatusDrop(status.id);
-                            }}
-                          >
-                            <td>
-                              <span
-                                aria-hidden="true"
-                                className="status-order-handle"
-                              >
-                                ⋮⋮
-                              </span>
-                              <span className="visually-hidden">
-                                Drag to reorder {status.name}
-                              </span>
-                            </td>
-                            <td>{status.displayOrder}</td>
-                            <td>
-                              {status.name}
-                              {status.description
-                                ? ` - ${status.description}`
-                                : ''}
-                            </td>
-                            <td>{status.description || 'No description'}</td>
-                            <td>
-                              <StatusBadge
-                                tone={
-                                  status.isActive === false
-                                    ? 'muted'
-                                    : 'success'
-                                }
-                              >
-                                {status.isActive === false
-                                  ? 'Inactive'
-                                  : 'Active'}
-                              </StatusBadge>
-                            </td>
-                            <td>
-                              <div className="table-actions">
-                                {canManageStatuses ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="button button--ghost"
-                                      onClick={() => startEditingStatus(status)}
-                                      disabled={
-                                        isUpdatingStatus ||
-                                        isDeactivatingStatus ||
-                                        isReorderingStatuses
-                                      }
-                                    >
-                                      Edit {status.name}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="button button--ghost"
-                                      onClick={() =>
-                                        handleDeactivateStatus(status)
-                                      }
-                                      disabled={
-                                        isDeactivatingStatus ||
-                                        isUpdatingStatus ||
-                                        isReorderingStatuses
-                                      }
-                                    >
-                                      {isDeactivatingStatus
-                                        ? 'Deactivating...'
-                                        : `Deactivate ${status.name}`}
-                                    </button>
-                                  </>
-                                ) : null}
-                              </div>
-                            </td>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th scope="col" aria-label="Drag handle" />
+                            <th scope="col">Order</th>
+                            <th scope="col">Status Name</th>
+                            <th scope="col">Description</th>
+                            <th scope="col">Active</th>
+                            <th scope="col">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {statuses.map((status) => (
+                            <tr
+                              key={status.id}
+                              className={`status-order-row${draggedStatusId === status.id ? ' status-order-row--dragging' : ''}${
+                                dragOverStatusId === status.id
+                                  ? ' status-order-row--drop-target'
+                                  : ''
+                              }`}
+                              draggable={
+                                canManageStatuses && !isReorderingStatuses
+                              }
+                              onDragStart={() => {
+                                setDraggedStatusId(status.id);
+                                setDragOverStatusId('');
+                              }}
+                              onDragEnd={() => {
+                                setDraggedStatusId('');
+                                setDragOverStatusId('');
+                              }}
+                              onDragOver={(event) => {
+                                if (canManageStatuses) {
+                                  event.preventDefault();
+                                  setDragOverStatusId(status.id);
+                                }
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverStatusId === status.id) {
+                                  setDragOverStatusId('');
+                                }
+                              }}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                void handleStatusDrop(status.id);
+                              }}
+                            >
+                              <td>
+                                <span
+                                  aria-hidden="true"
+                                  className="status-order-handle"
+                                >
+                                  ⋮⋮
+                                </span>
+                                <span className="visually-hidden">
+                                  Drag to reorder {status.name}
+                                </span>
+                              </td>
+                              <td>{status.displayOrder}</td>
+                              <td>
+                                {status.name}
+                                {status.description
+                                  ? ` - ${status.description}`
+                                  : ''}
+                              </td>
+                              <td>{status.description || 'No description'}</td>
+                              <td>
+                                <StatusBadge
+                                  tone={
+                                    status.isActive === false
+                                      ? 'muted'
+                                      : 'success'
+                                  }
+                                >
+                                  {status.isActive === false
+                                    ? 'Inactive'
+                                    : 'Active'}
+                                </StatusBadge>
+                              </td>
+                              <td>
+                                <div className="table-actions">
+                                  {canManageStatuses ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="button button--ghost"
+                                        onClick={() =>
+                                          startEditingStatus(status)
+                                        }
+                                        disabled={
+                                          isUpdatingStatus ||
+                                          isDeactivatingStatus ||
+                                          isReorderingStatuses
+                                        }
+                                      >
+                                        Edit {status.name}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="button button--ghost"
+                                        onClick={() =>
+                                          handleDeactivateStatus(status)
+                                        }
+                                        disabled={
+                                          isDeactivatingStatus ||
+                                          isUpdatingStatus ||
+                                          isReorderingStatuses
+                                        }
+                                      >
+                                        {isDeactivatingStatus
+                                          ? 'Deactivating...'
+                                          : `Deactivate ${status.name}`}
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </>
                 ) : null}
