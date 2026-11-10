@@ -69,6 +69,7 @@ export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
           email: req.body.email,
           password: req.body.password,
           role: req.body.role,
+          actorRole: req.auth.role,
         });
 
         return res.status(201).json(user);
@@ -91,6 +92,7 @@ export function buildUsersRoutes({ usersService = createUsersService() } = {}) {
           firstName: req.body.firstName,
           lastName: req.body.lastName,
           role: req.body.role,
+          actorRole: req.auth.role,
         });
 
         return res.status(200).json(updatedUser);

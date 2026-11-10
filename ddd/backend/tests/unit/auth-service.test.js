@@ -20,7 +20,8 @@ describe('auth service duplicate conflict mapping', () => {
 
     const service = createAuthService({
       repository,
-      runInTransaction: async (callback) => callback({ query: async () => {} }),
+      runInTransaction: async (callback) =>
+        callback({ query: async () => ({ rowCount: 1 }) }),
       passwordHasher: async () => 'hash',
       tokenSigner: () => 'token',
     });
@@ -79,7 +80,8 @@ describe('auth service duplicate conflict mapping', () => {
 
     const service = createAuthService({
       repository,
-      runInTransaction: async (callback) => callback({ query: async () => {} }),
+      runInTransaction: async (callback) =>
+        callback({ query: async () => ({ rowCount: 1 }) }),
       passwordHasher: async () => 'hash',
       tokenSigner: () => 'token',
     });

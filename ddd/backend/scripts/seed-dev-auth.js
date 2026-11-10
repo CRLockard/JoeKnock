@@ -246,12 +246,10 @@ async function main() {
   requireDevelopmentMode();
 
   const config = loadSeedConfig();
-  const [{ withTransaction }, { closePool }, { hashPassword }] =
-    await Promise.all([
-      import('../src/db/transaction.js'),
-      import('../src/db/client.js'),
-      import('../src/auth/password.js'),
-    ]);
+  const [{ withTransaction }, { hashPassword }] = await Promise.all([
+    import('../src/db/transaction.js'),
+    import('../src/auth/password.js'),
+  ]);
 
   try {
     const result = await withTransaction(async (client) => {

@@ -15,6 +15,34 @@ const ACTIVE_STATUS_BY_ID_SQL = `
   LIMIT 1
 `;
 
+const TODAY_VISIT_SQL = `
+  -- The counted visit for this rep/property on the org-local day of $4.
+  SELECT cur.id
+  FROM interactions counted
+  INNER JOIN interactions cur
+    ON cur.organization_id = counted.organization_id
+   AND cur.interaction_group_id = counted.interaction_group_id
+   AND cur.is_current = true
+  WHERE counted.organization_id = $1
+    AND counted.user_id = $2
+    AND counted.property_id = $3
+    AND counted.counts_as_daily_knock IS TRUE
+    AND counted.knock_date = ($4::timestamptz AT TIME ZONE $5)::date
+  LIMIT 1
+`;
+
+const LOCK_RELATIONSHIP_SQL = `
+  SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || $2::text || ':' || $3::text, 0))
+`;
+
+const ORGANIZATION_TIMEZONE_SQL = `
+  SELECT s.timezone
+  FROM organization_settings s
+  WHERE s.organization_id = $1
+    AND EXISTS (SELECT 1 FROM pg_timezone_names n WHERE n.name = s.timezone)
+  LIMIT 1
+`;
+
 const ORGANIZATION_VISIBILITY_SQL = `
   SELECT rep_visibility
   FROM organization_settings
@@ -33,6 +61,8 @@ const SNAPSHOT_BY_ID_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.changed_by,
     i.is_current,
     i.contact_name,
@@ -42,11 +72,16 @@ const SNAPSHOT_BY_ID_SQL = `
     i.client_request_id,
     u.first_name AS owner_first_name,
     u.last_name AS owner_last_name,
-    u.email AS owner_email
+    u.email AS owner_email,
+    eu.first_name AS editor_first_name,
+    eu.last_name AS editor_last_name
   FROM interactions i
   INNER JOIN users u
     ON u.id = i.user_id
    AND u.organization_id = i.organization_id
+  LEFT JOIN users eu
+    ON eu.id = i.changed_by
+   AND eu.organization_id = i.organization_id
   WHERE i.organization_id = $1
     AND i.id = $2
   LIMIT 1
@@ -63,6 +98,8 @@ const SNAPSHOT_BY_CLIENT_REQUEST_ID_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.changed_by,
     i.is_current,
     i.contact_name,
@@ -72,11 +109,16 @@ const SNAPSHOT_BY_CLIENT_REQUEST_ID_SQL = `
     i.client_request_id,
     u.first_name AS owner_first_name,
     u.last_name AS owner_last_name,
-    u.email AS owner_email
+    u.email AS owner_email,
+    eu.first_name AS editor_first_name,
+    eu.last_name AS editor_last_name
   FROM interactions i
   INNER JOIN users u
     ON u.id = i.user_id
    AND u.organization_id = i.organization_id
+  LEFT JOIN users eu
+    ON eu.id = i.changed_by
+   AND eu.organization_id = i.organization_id
   WHERE i.organization_id = $1
     AND i.client_request_id = $2
   LIMIT 1
@@ -93,6 +135,8 @@ const CURRENT_SNAPSHOT_BY_GROUP_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.changed_by,
     i.is_current,
     i.contact_name,
@@ -156,6 +200,8 @@ const VISIBLE_SNAPSHOT_BY_ID_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.changed_by,
     i.is_current,
     i.contact_name,
@@ -165,11 +211,16 @@ const VISIBLE_SNAPSHOT_BY_ID_SQL = `
     i.client_request_id,
     u.first_name AS owner_first_name,
     u.last_name AS owner_last_name,
-    u.email AS owner_email
+    u.email AS owner_email,
+    eu.first_name AS editor_first_name,
+    eu.last_name AS editor_last_name
   FROM interactions i
   INNER JOIN users u
     ON u.id = i.user_id
    AND u.organization_id = i.organization_id
+  LEFT JOIN users eu
+    ON eu.id = i.changed_by
+   AND eu.organization_id = i.organization_id
   WHERE i.organization_id = $1
     AND i.id = $3
     AND (
@@ -227,6 +278,8 @@ const VISIBLE_CURRENT_SNAPSHOT_BY_GROUP_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.changed_by,
     i.is_current,
     i.contact_name,
@@ -236,11 +289,16 @@ const VISIBLE_CURRENT_SNAPSHOT_BY_GROUP_SQL = `
     i.client_request_id,
     u.first_name AS owner_first_name,
     u.last_name AS owner_last_name,
-    u.email AS owner_email
+    u.email AS owner_email,
+    eu.first_name AS editor_first_name,
+    eu.last_name AS editor_last_name
   FROM interactions i
   INNER JOIN users u
     ON u.id = i.user_id
    AND u.organization_id = i.organization_id
+  LEFT JOIN users eu
+    ON eu.id = i.changed_by
+   AND eu.organization_id = i.organization_id
   WHERE i.organization_id = $1
     AND i.interaction_group_id = $3
     AND i.is_current = true
@@ -299,7 +357,12 @@ const INSERT_SNAPSHOT_SQL = `
     contact_phone,
     contact_email,
     notes,
-    client_request_id
+    client_request_id,
+    initial_interaction_at_utc,
+    changed_at_utc,
+    knock_timezone,
+    knock_date,
+    counts_as_daily_knock
   )
   VALUES (
     $1,
@@ -316,7 +379,26 @@ const INSERT_SNAPSHOT_SQL = `
     $10,
     $11,
     $12,
-    $13
+    $13,
+    -- $14 is the source snapshot for revisions (timing is copied, never
+    -- recomputed). $15 is the submission instant for new initial snapshots.
+    CASE WHEN $14::uuid IS NULL THEN $15::timestamptz
+      ELSE (SELECT src.initial_interaction_at_utc FROM interactions src
+            WHERE src.id = $14::uuid AND src.organization_id = $3) END,
+    now(),
+    CASE WHEN $14::uuid IS NULL
+      THEN (SELECT s.timezone FROM organization_settings s WHERE s.organization_id = $3)
+      ELSE (SELECT src.knock_timezone FROM interactions src
+            WHERE src.id = $14::uuid AND src.organization_id = $3) END,
+    CASE WHEN $14::uuid IS NULL
+      THEN ($15::timestamptz AT TIME ZONE
+            (SELECT s.timezone FROM organization_settings s WHERE s.organization_id = $3))::date
+      ELSE (SELECT src.knock_date FROM interactions src
+            WHERE src.id = $14::uuid AND src.organization_id = $3) END,
+    -- Only a new initial snapshot earns the count; revisions and same-day
+    -- returns copy timing from their source. The service rejects a missing or
+    -- invalid organization timezone before this statement runs.
+    $14::uuid IS NULL
   )
   RETURNING id
 `;
@@ -385,6 +467,38 @@ export const interactionsRepository = {
     const result = await client.query(CURRENT_SNAPSHOT_BY_GROUP_SQL, [
       organizationId,
       interactionGroupId,
+    ]);
+
+    return result.rows[0] ?? null;
+  },
+
+  // Serializes concurrent first visits for one organization/rep/property.
+  async lockRelationship(client, { organizationId, userId, propertyId }) {
+    await client.query(LOCK_RELATIONSHIP_SQL, [
+      organizationId,
+      userId,
+      propertyId,
+    ]);
+  },
+
+  async findValidOrganizationTimezone(client, { organizationId }) {
+    const result = await client.query(ORGANIZATION_TIMEZONE_SQL, [
+      organizationId,
+    ]);
+
+    return result.rows[0]?.timezone ?? null;
+  },
+
+  async findVisitForLocalDay(
+    client,
+    { organizationId, userId, propertyId, instant, timezone },
+  ) {
+    const result = await client.query(TODAY_VISIT_SQL, [
+      organizationId,
+      userId,
+      propertyId,
+      instant,
+      timezone,
     ]);
 
     return result.rows[0] ?? null;
@@ -475,6 +589,8 @@ export const interactionsRepository = {
       contactEmail,
       notes,
       clientRequestId,
+      timingSourceSnapshotId = null,
+      submittedAt = null,
     },
   ) {
     const result = await client.query(INSERT_SNAPSHOT_SQL, [
@@ -491,6 +607,8 @@ export const interactionsRepository = {
       contactEmail,
       notes,
       clientRequestId,
+      timingSourceSnapshotId,
+      timingSourceSnapshotId ? null : (submittedAt ?? initialInteractionAt),
     ]);
 
     return result.rows[0] ?? null;

@@ -278,7 +278,7 @@ describeDb('Phase 3 interactions core endpoints', () => {
       .send({ statusId: status.id, notes: 'Second save should fail.' });
 
     expect(duplicate.status).toBe(409);
-    expect(duplicate.body.error.code).toBe('CONFLICT');
+    expect(duplicate.body.error.code).toBe('SAME_DAY_VISIT_EXISTS');
   });
 
   it('POST /api/properties/:propertyId/interactions reuses original result for duplicate clientRequestId', async () => {
@@ -795,5 +795,51 @@ describeDb('Phase 3 interactions core endpoints', () => {
     const currentRows = rows.rows.filter((row) => row.is_current === true);
     expect(currentRows).toHaveLength(1);
     expect(currentRows[0].id).toBe(rev2.body.interactionId);
+  });
+
+  it('rejects stale and concurrent revisions without losing history', async () => {
+    const organization = await createOrganization({ repVisibility: 'own' });
+    const representative = await createUser({
+      organizationId: organization.id,
+      role: 'rep',
+    });
+    const property = await createProperty({ organizationId: organization.id });
+    const status = await createStatus({
+      organizationId: organization.id,
+      name: 'No Answer',
+    });
+    const token = tokenFor(representative);
+    const created = await request(app)
+      .post(`/api/properties/${property.id}/interactions`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statusId: status.id, notes: 'Original' });
+    expect(created.status).toBe(201);
+    const revise = (notes) =>
+      request(app)
+        .post(`/api/interactions/${created.body.interactionId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ notes });
+    const responses = await Promise.all([
+      revise('Editor A'),
+      revise('Editor B'),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
+    const stale = await revise('Stale overwrite');
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('CONFLICT');
+    const rows = await query(
+      'SELECT id, notes, is_current FROM interactions WHERE organization_id = $1 AND interaction_group_id = $2',
+      [organization.id, created.body.interactionGroupId],
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows.filter((row) => row.is_current)).toHaveLength(1);
+    expect(
+      rows.rows.find((row) => row.id === created.body.interactionId).notes,
+    ).toBe('Original');
+    expect(['Editor A', 'Editor B']).toContain(
+      rows.rows.find((row) => row.is_current).notes,
+    );
   });
 });

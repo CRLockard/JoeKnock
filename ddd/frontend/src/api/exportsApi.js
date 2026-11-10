@@ -1,5 +1,4 @@
-import { loadSession } from '../auth/authStorage.js';
-import { config } from '../config/env.js';
+import { apiRequest } from './client.js';
 
 function buildQuery(filters) {
   const params = new URLSearchParams();
@@ -32,41 +31,10 @@ function getFilenameFromDisposition(value) {
 }
 
 export async function exportPropertiesCsv(filters) {
-  const session = loadSession();
-  const headers = new Headers();
-
-  if (session?.token) {
-    // Export endpoint is protected like report endpoint; pass the same bearer
-    // token flow used by apiFetch even though this request returns a Blob.
-    headers.set('Authorization', `Bearer ${session.token}`);
-  }
-
-  const response = await fetch(
-    `${config.apiBaseUrl}/exports/properties?${buildQuery(filters)}`,
-    {
-      method: 'GET',
-      headers,
-    },
+  const { response } = await apiRequest(
+    `/exports/properties?${buildQuery(filters)}`,
+    { method: 'GET' },
   );
-
-  if (!response.ok) {
-    const contentType = response.headers.get('content-type') ?? '';
-    let message = 'Export failed.';
-    let details;
-
-    if (contentType.includes('application/json')) {
-      // Preserve backend error envelope details so UI can surface actionable
-      // validation/permission messages for failed exports.
-      const body = await response.json();
-      message = body?.error?.message ?? message;
-      details = body?.error?.details;
-    }
-
-    const error = new Error(message);
-    error.status = response.status;
-    error.details = details;
-    throw error;
-  }
 
   return {
     blob: await response.blob(),

@@ -121,7 +121,7 @@ describeDb('PATCH /api/users/:id', () => {
     await resetRegistrationTables();
   });
 
-  it('updates permitted fields for manager within authenticated organization scope', async () => {
+  it('updates rep names for manager within authenticated organization scope', async () => {
     const app = createApp();
     const auth = await seedActor('manager');
     const target = await createUserRecord({
@@ -138,7 +138,6 @@ describeDb('PATCH /api/users/:id', () => {
       .send({
         firstName: 'Janet',
         lastName: 'Johnson',
-        role: 'manager',
       });
 
     expect(response.status).toBe(200);
@@ -146,7 +145,7 @@ describeDb('PATCH /api/users/:id', () => {
     expect(response.body.organizationId).toBe(auth.organizationId);
     expect(response.body.firstName).toBe('Janet');
     expect(response.body.lastName).toBe('Johnson');
-    expect(response.body.role).toBe('manager');
+    expect(response.body.role).toBe('rep');
     expect(response.body.password_hash).toBeUndefined();
     expect(response.body.passwordHash).toBeUndefined();
 
@@ -157,7 +156,7 @@ describeDb('PATCH /api/users/:id', () => {
 
     expect(row.rows[0].first_name).toBe('Janet');
     expect(row.rows[0].last_name).toBe('Johnson');
-    expect(row.rows[0].role).toBe('manager');
+    expect(row.rows[0].role).toBe('rep');
   });
 
   it('allows admin to update another user in the same organization', async () => {

@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDatabaseUrlForMode } from '../../src/db/client.js';
+import {
+  resolveDatabaseUrlForMode,
+  assertSafeTestDatabaseUrl,
+} from '../../src/db/client.js';
 
 describe('database config isolation', () => {
+  it('rejects shared targets even if URL spelling or credentials differ', () => {
+    expect(() =>
+      assertSafeTestDatabaseUrl(
+        'postgresql://test:pw@127.0.0.1:5432/shared_test?sslmode=disable',
+        'postgres://dev:pw@localhost/shared_test',
+      ),
+    ).toThrow('same database');
+  });
+  it('rejects a non-test target instead of trusting string inequality', () => {
+    expect(() =>
+      assertSafeTestDatabaseUrl('postgres://localhost/production'),
+    ).toThrow('test-only');
+  });
   it('uses TEST_DATABASE_URL in test mode', () => {
     const value = resolveDatabaseUrlForMode({
       isTest: true,

@@ -139,12 +139,17 @@ function toFieldErrorMap(details) {
   return fieldErrors;
 }
 
-function toDraftScope(authUser, propertyId) {
+function toDraftScope(authUser, propertyId, interactionId) {
   return {
     userId: authUser?.id,
     organizationId: authUser?.organizationId,
     propertyId,
+    interactionId,
   };
+}
+
+function toDraftReadyKey(authUser, propertyId) {
+  return `${authUser?.organizationId}:${authUser?.id}:${propertyId}`;
 }
 
 function formatInteractionError(error, fallbackMessage) {
@@ -167,6 +172,10 @@ function formatInteractionError(error, fallbackMessage) {
       error.message ||
       'Please check the interaction fields and try again.'
     );
+  }
+
+  if (error.status === 409) {
+    return 'This interaction was updated by someone else. Your unsaved changes are retained. Reopen the property and review the latest version before saving.';
   }
 
   if (!error.status) {
@@ -193,16 +202,18 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
-function canEditInteraction({ role, userId, snapshotOwnerId }) {
+function canEditInteraction({ role, userId, snapshotOwnerId, canEdit }) {
+  if (typeof canEdit === 'boolean') return canEdit;
   if (!role || !snapshotOwnerId || !userId) {
     return false;
   }
 
-  if (role === 'admin' || role === 'manager') {
+  if (role === 'admin') {
     return true;
   }
 
-  return role === 'rep' && userId === snapshotOwnerId;
+  // Older API responses lack capabilities: managers safely default to own only.
+  return (role === 'rep' || role === 'manager') && userId === snapshotOwnerId;
 }
 
 function MapEventBridge({
@@ -261,7 +272,8 @@ export function MapPage() {
 
   const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
-  const [, setSelectedInteractions] = useState([]);
+  const [selectedInteractions, setSelectedInteractions] = useState([]);
+  const [propertyIdCopied, setPropertyIdCopied] = useState(false);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
   const [statuses, setStatuses] = useState([]);
@@ -273,7 +285,7 @@ export function MapPage() {
   const [panelSuccessMessage, setPanelSuccessMessage] = useState('');
 
   const [activeSnapshot, setActiveSnapshot] = useState(null);
-  const [, setSnapshotLoading] = useState(false);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState('');
   const [editableDetailFields, setEditableDetailFields] = useState({
     contactName: false,
@@ -290,6 +302,14 @@ export function MapPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Autosave/auto-delete of the create draft is only allowed once the draft for
+  // this exact org/user/property has been restored into the form.
+  const [draftReadyKey, setDraftReadyKey] = useState(null);
+  const [draftStorageError, setDraftStorageError] = useState('');
+  const [conflictSnapshot, setConflictSnapshot] = useState(null);
+  const [refreshRetry, setRefreshRetry] = useState(null);
+  const [sameDayConflict, setSameDayConflict] = useState(null);
+  const selectionTokenRef = useRef(0);
   const latestRequestRef = useRef(0);
   const latestBoundsRef = useRef(null);
 
@@ -397,7 +417,11 @@ export function MapPage() {
         setCreateRequestId(createClientRequestId());
       }
 
+      setDraftReadyKey(
+        propertyId ? toDraftReadyKey(auth.user, propertyId) : null,
+      );
       setCreateFieldErrors({});
+      setSameDayConflict(null);
       setPanelMode('create');
       setPanelError('');
       setSnapshotError('');
@@ -413,7 +437,7 @@ export function MapPage() {
   );
 
   const loadSnapshotDetails = useCallback(
-    async (interactionId) => {
+    async (interactionId, propertyId, selectionToken) => {
       setPanelError('');
       setPanelSuccessMessage('');
       setSnapshotError('');
@@ -421,15 +445,24 @@ export function MapPage() {
 
       try {
         const snapshot = await getInteractionSnapshot(interactionId);
-        const draftScope = toDraftScope(auth.user, selectedPropertyId);
-        const draft = selectedPropertyId
-          ? loadInteractionDraft(draftScope)
+
+        if (
+          selectionToken !== undefined &&
+          selectionTokenRef.current !== selectionToken
+        ) {
+          return;
+        }
+        const draft = propertyId
+          ? loadInteractionDraft(
+              toDraftScope(auth.user, propertyId, snapshot.interactionId),
+            )
           : null;
         const hasMatchingEditDraft =
           draft?.mode === 'edit' &&
           draft?.interactionId === snapshot.interactionId;
 
         setActiveSnapshot(snapshot);
+        setDraftReadyKey(toDraftReadyKey(auth.user, propertyId));
         setEditForm({
           statusId: hasMatchingEditDraft
             ? (draft.statusId ?? snapshot.statusId ?? '')
@@ -460,26 +493,55 @@ export function MapPage() {
           setPanelSuccessMessage('Restored saved draft for this property.');
         }
       } catch (error) {
+        if (
+          selectionToken !== undefined &&
+          selectionTokenRef.current !== selectionToken
+        ) {
+          return;
+        }
+
+        handleStartInteraction(propertyId);
         setSnapshotError(
           formatInteractionError(
             error,
             'Unable to load interaction snapshot details right now.',
           ),
         );
-        setPanelMode('create');
-        setActiveSnapshot(null);
       } finally {
-        setSnapshotLoading(false);
+        if (
+          selectionToken === undefined ||
+          selectionTokenRef.current === selectionToken
+        ) {
+          setSnapshotLoading(false);
+        }
       }
     },
-    [auth.user, selectedPropertyId],
+    [auth.user, handleStartInteraction],
   );
 
   const handleMarkerSelect = useCallback(
-    async (propertyId) => {
+    async (propertyId, existingToken) => {
+      // A map click claims its token before reverse geocoding starts; marker
+      // clicks claim a fresh one here.
+      const selectionToken = existingToken ?? (selectionTokenRef.current += 1);
+      selectionTokenRef.current = selectionToken;
+      setDraftReadyKey(null);
+      setDraftStorageError('');
+      setConflictSnapshot(null);
+      setSameDayConflict(null);
       setSelectionLoading(true);
       setSelectionError('');
       setSelectedPropertyId(propertyId);
+      // Drop the previous property's panel so its editable form can never be
+      // submitted against the newly selected id while details load.
+      setSelectedProperty(null);
+      setSelectedInteractions([]);
+      setRefreshRetry(null);
+      setIsCreating(false);
+      setIsUpdating(false);
+      setCreateRequestId(null);
+      setCreateFieldErrors({});
+      setEditFieldErrors({});
       setPanelError('');
       setPanelSuccessMessage('');
       setSnapshotError('');
@@ -500,6 +562,10 @@ export function MapPage() {
           getPropertyInteractions(propertyId),
         ]);
 
+        if (selectionTokenRef.current !== selectionToken) {
+          return;
+        }
+
         const interactions = interactionsPayload?.interactions ?? [];
 
         setSelectedProperty(property);
@@ -513,7 +579,11 @@ export function MapPage() {
           );
 
           if (targetInteraction?.interactionId) {
-            await loadSnapshotDetails(targetInteraction.interactionId);
+            await loadSnapshotDetails(
+              targetInteraction.interactionId,
+              propertyId,
+              selectionToken,
+            );
           } else {
             setSelectionError(
               'Unable to open current interaction details for this property.',
@@ -522,13 +592,19 @@ export function MapPage() {
           }
         }
       } catch (error) {
+        if (selectionTokenRef.current !== selectionToken) {
+          return;
+        }
+
         setSelectedProperty(null);
         setSelectedInteractions([]);
         setSelectionError(
           error?.message || 'Unable to load property details right now.',
         );
       } finally {
-        setSelectionLoading(false);
+        if (selectionTokenRef.current === selectionToken) {
+          setSelectionLoading(false);
+        }
       }
     },
     [handleStartInteraction, loadSnapshotDetails],
@@ -536,6 +612,9 @@ export function MapPage() {
 
   const handleMapLocationSelect = useCallback(
     async ({ lat, lng }) => {
+      // Identity tracking starts at click time so an older, slower lookup can
+      // never replace a newer selection or reopen a cancelled one.
+      const selectionToken = (selectionTokenRef.current += 1);
       setSelectionError('');
 
       try {
@@ -546,6 +625,10 @@ export function MapPage() {
           longitude: lng,
         });
 
+        if (selectionTokenRef.current !== selectionToken) {
+          return;
+        }
+
         const propertyId = resolved?.property?.propertyId;
 
         if (!propertyId) {
@@ -555,8 +638,12 @@ export function MapPage() {
           return;
         }
 
-        await handleMarkerSelect(propertyId);
+        await handleMarkerSelect(propertyId, selectionToken);
       } catch (error) {
+        if (selectionTokenRef.current !== selectionToken) {
+          return;
+        }
+
         setSelectionError(
           error?.message ||
             'Unable to resolve that location to a property right now.',
@@ -609,13 +696,23 @@ export function MapPage() {
     };
   }, [selectedPropertyId]);
 
-  const refreshCurrentInteractions = useCallback(async (propertyId) => {
-    const interactionsPayload = await getPropertyInteractions(propertyId);
-    setSelectedInteractions(interactionsPayload?.interactions ?? []);
-  }, []);
+  const refreshCurrentInteractions = useCallback(
+    async (propertyId, selectionToken) => {
+      const interactionsPayload = await getPropertyInteractions(propertyId);
+
+      if (selectionTokenRef.current === selectionToken) {
+        setSelectedInteractions(interactionsPayload?.interactions ?? []);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (panelMode !== 'create' || !selectedPropertyId) {
+    if (
+      panelMode !== 'create' ||
+      !selectedPropertyId ||
+      draftReadyKey !== toDraftReadyKey(auth.user, selectedPropertyId)
+    ) {
       return;
     }
 
@@ -628,12 +725,78 @@ export function MapPage() {
 
     // Drafts are scoped by authenticated user + organization + property to
     // prevent cross-property/cross-user leakage of in-progress form data.
-    saveInteractionDraft(draftScope, {
+    const saved = saveInteractionDraft(draftScope, {
       ...createForm,
       clientRequestId: createRequestId,
+      mode: 'create',
       updatedAt: new Date().toISOString(),
     });
-  }, [auth.user, createForm, createRequestId, panelMode, selectedPropertyId]);
+    setDraftStorageError(
+      saved
+        ? ''
+        : 'Draft could not be saved on this device. Keep this form open or submit your interaction before leaving.',
+    );
+  }, [
+    auth.user,
+    createForm,
+    createRequestId,
+    draftReadyKey,
+    panelMode,
+    selectedPropertyId,
+  ]);
+
+  useEffect(() => {
+    if (
+      panelMode !== 'detail' ||
+      !activeSnapshot?.interactionId ||
+      !selectedPropertyId ||
+      draftReadyKey !== toDraftReadyKey(auth.user, selectedPropertyId) ||
+      selectedProperty?.propertyId !== selectedPropertyId ||
+      isUpdating ||
+      !canEditInteraction({
+        role: auth.user?.role,
+        userId: auth.user?.id,
+        snapshotOwnerId: activeSnapshot.userId,
+        canEdit: activeSnapshot.canEdit,
+      })
+    )
+      return;
+    const fields = [
+      'statusId',
+      'contactName',
+      'contactPhone',
+      'contactEmail',
+      'notes',
+    ];
+    const changed = fields.some(
+      (field) =>
+        normalizeOptionalValue(editForm[field]) !==
+        normalizeOptionalValue(activeSnapshot[field]),
+    );
+    if (!changed) return;
+    const saved = saveInteractionDraft(
+      toDraftScope(auth.user, selectedPropertyId, activeSnapshot.interactionId),
+      {
+        ...editForm,
+        mode: 'edit',
+        interactionId: activeSnapshot.interactionId,
+      },
+    );
+    setDraftStorageError(
+      saved
+        ? ''
+        : 'Draft could not be saved on this device. Keep this form open or submit your interaction before leaving.',
+    );
+  }, [
+    panelMode,
+    activeSnapshot,
+    selectedPropertyId,
+    selectedProperty,
+    draftReadyKey,
+    auth.user,
+    editForm,
+    isUpdating,
+  ]);
 
   const handleSaveCreateDraft = useCallback(() => {
     if (!selectedPropertyId) {
@@ -646,13 +809,21 @@ export function MapPage() {
       setCreateRequestId(requestId);
     }
 
-    saveInteractionDraft(toDraftScope(auth.user, selectedPropertyId), {
-      ...createForm,
-      clientRequestId: requestId,
-      mode: 'create',
-      updatedAt: new Date().toISOString(),
-    });
-    setPanelSuccessMessage('Draft saved successfully.');
+    const saved = saveInteractionDraft(
+      toDraftScope(auth.user, selectedPropertyId),
+      {
+        ...createForm,
+        clientRequestId: requestId,
+        mode: 'create',
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    setPanelSuccessMessage(saved ? 'Draft saved successfully.' : '');
+    setDraftStorageError(
+      saved
+        ? ''
+        : 'Draft could not be saved on this device. Keep this form open or submit your interaction before leaving.',
+    );
   }, [auth.user, createForm, createRequestId, selectedPropertyId]);
 
   const handleSaveExistingDraft = useCallback(() => {
@@ -660,20 +831,30 @@ export function MapPage() {
       return;
     }
 
-    saveInteractionDraft(toDraftScope(auth.user, selectedPropertyId), {
-      ...editForm,
-      mode: 'edit',
-      interactionId: activeSnapshot.interactionId,
-      updatedAt: new Date().toISOString(),
-    });
-    setPanelSuccessMessage('Draft saved successfully.');
+    const saved = saveInteractionDraft(
+      toDraftScope(auth.user, selectedPropertyId, activeSnapshot.interactionId),
+      {
+        ...editForm,
+        mode: 'edit',
+        interactionId: activeSnapshot.interactionId,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    setPanelSuccessMessage(saved ? 'Draft saved successfully.' : '');
+    setDraftStorageError(
+      saved
+        ? ''
+        : 'Draft could not be saved on this device. Keep this form open or submit your interaction before leaving.',
+    );
   }, [activeSnapshot?.interactionId, auth.user, editForm, selectedPropertyId]);
 
-  const handleCreateInteraction = useCallback(
-    async (event) => {
-      event.preventDefault();
-
-      if (!selectedPropertyId) {
+  const submitCreateInteraction = useCallback(
+    async ({ sameDayReturn = false } = {}) => {
+      if (
+        !selectedPropertyId ||
+        selectionLoading ||
+        selectedProperty?.propertyId !== selectedPropertyId
+      ) {
         return;
       }
 
@@ -682,10 +863,17 @@ export function MapPage() {
         return;
       }
 
+      // Bind the request to the selection it was started from.
+      const requestPropertyId = selectedPropertyId;
+      const requestToken = selectionTokenRef.current;
+      const requestUser = auth.user;
+      const isCurrent = () => selectionTokenRef.current === requestToken;
+
       setIsCreating(true);
       setPanelError('');
       setPanelSuccessMessage('');
       setCreateFieldErrors({});
+      setSameDayConflict(null);
 
       const requestId = createRequestId ?? createClientRequestId();
 
@@ -697,6 +885,10 @@ export function MapPage() {
         statusId: createForm.statusId,
         clientRequestId: requestId,
       };
+
+      if (sameDayReturn) {
+        payload.sameDayReturn = true;
+      }
 
       const contactName = normalizeOptionalValue(createForm.contactName);
       const contactPhone = normalizeOptionalValue(createForm.contactPhone);
@@ -722,31 +914,69 @@ export function MapPage() {
       try {
         // clientRequestId supports safe retries without creating duplicate
         // initial snapshots when users submit during transient failures.
-        await createPropertyInteraction(selectedPropertyId, payload);
+        await createPropertyInteraction(requestPropertyId, payload);
+      } catch (error) {
+        if (isCurrent()) {
+          if (error?.code === 'SAME_DAY_VISIT_EXISTS') {
+            // Nothing was saved; the entered details and draft stay as they
+            // are until the rep explicitly confirms the same-day return.
+            setSameDayConflict({ propertyId: requestPropertyId });
+            setPanelError('');
+          } else {
+            const details = toValidationDetails(error);
+            setCreateFieldErrors(toFieldErrorMap(details));
+            setPanelError(
+              formatInteractionError(
+                error,
+                'Unable to save this interaction right now.',
+              ),
+            );
+          }
+          setIsCreating(false);
+        }
 
-        await refreshCurrentInteractions(selectedPropertyId);
+        return;
+      }
+
+      // The write is confirmed: the draft belongs to the original property
+      // even if the user has since moved on to another one.
+      clearInteractionDraft(toDraftScope(requestUser, requestPropertyId));
+
+      if (isCurrent()) {
+        setDraftReadyKey(null);
+        setCreateForm(emptyInteractionForm());
+        setCreateRequestId(null);
+        setActiveSnapshot(null);
+        setPanelMode('summary');
+      }
+
+      try {
+        await refreshCurrentInteractions(requestPropertyId, requestToken);
 
         if (latestBoundsRef.current) {
           await loadMarkers(latestBoundsRef.current);
         }
 
-        clearInteractionDraft(toDraftScope(auth.user, selectedPropertyId));
-        setCreateForm(emptyInteractionForm());
-        setCreateRequestId(null);
-        setActiveSnapshot(null);
-        setPanelMode('summary');
-        setPanelSuccessMessage('Interaction recorded successfully.');
-      } catch (error) {
-        const details = toValidationDetails(error);
-        setCreateFieldErrors(toFieldErrorMap(details));
-        setPanelError(
-          formatInteractionError(
-            error,
-            'Unable to save this interaction right now.',
-          ),
-        );
+        if (isCurrent()) {
+          setPanelSuccessMessage(
+            sameDayReturn
+              ? 'Same-day return recorded. No additional knock was added.'
+              : 'Interaction recorded successfully.',
+          );
+        }
+      } catch {
+        if (isCurrent()) {
+          setRefreshRetry({
+            propertyId: requestPropertyId,
+            token: requestToken,
+            message:
+              'Your interaction was saved, but the latest property details could not be refreshed.',
+          });
+        }
       } finally {
-        setIsCreating(false);
+        if (isCurrent()) {
+          setIsCreating(false);
+        }
       }
     },
     [
@@ -755,9 +985,26 @@ export function MapPage() {
       createRequestId,
       loadMarkers,
       refreshCurrentInteractions,
+      selectedProperty,
       selectedPropertyId,
+      selectionLoading,
     ],
   );
+
+  const handleCreateInteraction = useCallback(
+    (event) => {
+      event.preventDefault();
+      return submitCreateInteraction();
+    },
+    [submitCreateInteraction],
+  );
+
+  const handleConfirmSameDayReturn = useCallback(() => {
+    if (sameDayConflict?.propertyId !== selectedPropertyId) {
+      return;
+    }
+    return submitCreateInteraction({ sameDayReturn: true });
+  }, [sameDayConflict, selectedPropertyId, submitCreateInteraction]);
 
   const enableDetailFieldEdit = useCallback((fieldName) => {
     setEditableDetailFields((current) => ({
@@ -770,7 +1017,12 @@ export function MapPage() {
     async (event) => {
       event.preventDefault();
 
-      if (!activeSnapshot?.interactionId) {
+      if (
+        !activeSnapshot?.interactionId ||
+        !selectedPropertyId ||
+        selectionLoading ||
+        selectedProperty?.propertyId !== selectedPropertyId
+      ) {
         return;
       }
 
@@ -778,6 +1030,13 @@ export function MapPage() {
         setPanelError('Select a status before saving updates.');
         return;
       }
+
+      // Bind the request to the selection and interaction it started from.
+      const requestPropertyId = selectedPropertyId;
+      const requestInteractionId = activeSnapshot.interactionId;
+      const requestToken = selectionTokenRef.current;
+      const requestUser = auth.user;
+      const isCurrent = () => selectionTokenRef.current === requestToken;
 
       setIsUpdating(true);
       setPanelError('');
@@ -792,16 +1051,54 @@ export function MapPage() {
         notes: normalizeOptionalValue(editForm.notes),
       };
 
+      let updatedSnapshot;
+
       try {
-        const updatedSnapshot = await updateInteractionSnapshot(
-          activeSnapshot.interactionId,
+        updatedSnapshot = await updateInteractionSnapshot(
+          requestInteractionId,
           payload,
         );
-
-        if (selectedPropertyId) {
-          await refreshCurrentInteractions(selectedPropertyId);
+      } catch (error) {
+        if (isCurrent()) {
+          const details = toValidationDetails(error);
+          setEditFieldErrors(toFieldErrorMap(details));
+          setPanelError(
+            formatInteractionError(
+              error,
+              'Unable to save interaction updates right now.',
+            ),
+          );
+          setIsUpdating(false);
+          if (error.status === 409) {
+            try {
+              const latest = await getInteractionSnapshot(requestInteractionId);
+              if (isCurrent()) setConflictSnapshot(latest);
+            } catch {
+              /* Keep the entered form intact if latest values cannot load. */
+            }
+          }
         }
 
+        return;
+      }
+
+      // Edit drafts are keyed per interaction; clear both the edited one
+      // and the new snapshot so obsolete values never restore.
+      clearInteractionDraft(
+        toDraftScope(requestUser, requestPropertyId, requestInteractionId),
+      );
+
+      if (updatedSnapshot?.interactionId) {
+        clearInteractionDraft(
+          toDraftScope(
+            requestUser,
+            requestPropertyId,
+            updatedSnapshot.interactionId,
+          ),
+        );
+      }
+
+      if (isCurrent()) {
         setActiveSnapshot(updatedSnapshot);
         setEditForm({
           statusId: updatedSnapshot.statusId ?? '',
@@ -817,28 +1114,103 @@ export function MapPage() {
           notes: false,
         });
         setPanelMode('detail');
-        setPanelSuccessMessage(
-          updatedSnapshot.interactionId === activeSnapshot.interactionId
-            ? 'No changes to save.'
-            : 'Interaction updated successfully.',
-        );
-      } catch (error) {
-        const details = toValidationDetails(error);
-        setEditFieldErrors(toFieldErrorMap(details));
-        setPanelError(
-          formatInteractionError(
-            error,
-            'Unable to save interaction updates right now.',
-          ),
-        );
+      }
+
+      try {
+        await refreshCurrentInteractions(requestPropertyId, requestToken);
+
+        if (isCurrent()) {
+          setPanelSuccessMessage(
+            updatedSnapshot.interactionId === requestInteractionId
+              ? 'No changes to save.'
+              : 'Interaction updated successfully.',
+          );
+        }
+      } catch {
+        if (isCurrent()) {
+          setRefreshRetry({
+            propertyId: requestPropertyId,
+            token: requestToken,
+            message:
+              'Your changes were saved, but the latest property details could not be refreshed.',
+          });
+        }
       } finally {
-        setIsUpdating(false);
+        if (isCurrent()) {
+          setIsUpdating(false);
+        }
       }
     },
-    [activeSnapshot, editForm, refreshCurrentInteractions, selectedPropertyId],
+    [
+      activeSnapshot,
+      auth.user,
+      editForm,
+      refreshCurrentInteractions,
+      selectedProperty,
+      selectedPropertyId,
+      selectionLoading,
+    ],
   );
 
+  const handleRetryRefresh = useCallback(async () => {
+    if (!refreshRetry || selectionTokenRef.current !== refreshRetry.token) {
+      return;
+    }
+
+    const { propertyId, token } = refreshRetry;
+
+    // Only the read is retried; the confirmed write is never resubmitted.
+    try {
+      await refreshCurrentInteractions(propertyId, token);
+
+      if (latestBoundsRef.current) {
+        await loadMarkers(latestBoundsRef.current);
+      }
+
+      if (selectionTokenRef.current === token) {
+        setRefreshRetry(null);
+        setPanelSuccessMessage('Saved changes and refreshed property details.');
+      }
+    } catch {
+      // The retry control stays available.
+    }
+  }, [loadMarkers, refreshCurrentInteractions, refreshRetry]);
+
+  const handleOpenVisit = useCallback(
+    (interactionId) => {
+      if (!selectedPropertyId) return;
+      setSameDayConflict(null);
+      void loadSnapshotDetails(
+        interactionId,
+        selectedPropertyId,
+        selectionTokenRef.current,
+      );
+    },
+    [loadSnapshotDetails, selectedPropertyId],
+  );
+
+  const handleCopyPropertyId = useCallback(async () => {
+    if (!selectedProperty?.propertyId) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(String(selectedProperty.propertyId));
+      setPropertyIdCopied(true);
+      setTimeout(() => setPropertyIdCopied(false), 1500);
+    } catch {
+      setPropertyIdCopied(false);
+    }
+  }, [selectedProperty]);
+
   const handleCancelSelection = useCallback(() => {
+    // Invalidate in-flight selection responses; stored drafts are kept.
+    selectionTokenRef.current += 1;
+    setRefreshRetry(null);
+    setDraftReadyKey(null);
+    setDraftStorageError('');
+    setConflictSnapshot(null);
+    setSameDayConflict(null);
     setSelectedPropertyId(null);
     setSelectedProperty(null);
     setSelectedInteractions([]);
@@ -873,8 +1245,14 @@ export function MapPage() {
       role: auth.user?.role,
       userId: auth.user?.id,
       snapshotOwnerId: activeSnapshot?.userId,
+      canEdit: activeSnapshot?.canEdit,
     });
-  }, [activeSnapshot?.userId, auth.user?.id, auth.user?.role]);
+  }, [
+    activeSnapshot?.userId,
+    activeSnapshot?.canEdit,
+    auth.user?.id,
+    auth.user?.role,
+  ]);
 
   return (
     <section className="map-page" aria-label="Map workspace">
@@ -914,22 +1292,30 @@ export function MapPage() {
           {statusesLoading && selectedPropertyId ? (
             <p className="feedback">Loading statuses...</p>
           ) : null}
-          {statusesError ? (
+          {statusesError && !selectedProperty ? (
             <p role="alert" className="feedback feedback--error">
               {statusesError}
             </p>
           ) : null}
-          {panelError ? (
+          {panelError && !selectedProperty ? (
             <p role="alert" className="feedback feedback--error">
               {panelError}
             </p>
           ) : null}
-          {snapshotError ? (
+          {snapshotError && !selectedProperty ? (
             <p role="alert" className="feedback feedback--error">
               {snapshotError}
             </p>
           ) : null}
-          {panelSuccessMessage ? (
+          {refreshRetry && !selectedProperty ? (
+            <div role="alert" className="feedback feedback--error">
+              <span>{refreshRetry.message}</span>{' '}
+              <button type="button" onClick={handleRetryRefresh}>
+                Retry refresh
+              </button>
+            </div>
+          ) : null}
+          {panelSuccessMessage && !selectedProperty ? (
             <p role="status" className="feedback feedback--success">
               {panelSuccessMessage}
             </p>
@@ -1013,20 +1399,13 @@ export function MapPage() {
           </MapContainer>
         </div>
 
-        {selectedProperty ? (
+        {selectedProperty && !selectionLoading ? (
           <section
             className="map-property-panel map-property-panel--overlay"
             aria-label="Selected property panel"
           >
             <header className="map-property-panel-header">
               <h3>Selected Property</h3>
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={handleCancelSelection}
-              >
-                Cancel
-              </button>
             </header>
             <p className="map-property-address">
               {selectedProperty.addressLine1}
@@ -1034,13 +1413,188 @@ export function MapPage() {
                 ? `, ${selectedProperty.addressLine2}`
                 : ''}
               {` - ${selectedProperty.city}, ${selectedProperty.state} ${selectedProperty.postalCode}`}
-            </p>
-            <p className="map-property-meta">
-              Property ID: {selectedProperty.propertyId}
+              <button
+                type="button"
+                className="map-copy-id-button"
+                onClick={handleCopyPropertyId}
+                title={propertyIdCopied ? 'Copied!' : 'Copy property ID'}
+                aria-label="Copy property ID"
+              >
+                {propertyIdCopied ? '✓' : '⧉'}
+              </button>
             </p>
 
             <div className="map-property-interactions" aria-live="polite">
+              {draftStorageError ? (
+                <p role="alert" className="feedback feedback--error">
+                  {draftStorageError}
+                </p>
+              ) : null}
+              {panelError ? (
+                <p role="alert" className="feedback feedback--error">
+                  {panelError}
+                </p>
+              ) : null}
+              {snapshotError ? (
+                <p role="alert" className="feedback feedback--error">
+                  {snapshotError}
+                </p>
+              ) : null}
+              {panelSuccessMessage ? (
+                <p role="status" className="feedback feedback--success">
+                  {panelSuccessMessage}
+                </p>
+              ) : null}
+              {statusesError ? (
+                <p role="alert" className="feedback feedback--error">
+                  {statusesError}
+                </p>
+              ) : null}
+              {refreshRetry ? (
+                <div role="alert" className="feedback feedback--error">
+                  <span>{refreshRetry.message}</span>{' '}
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={handleRetryRefresh}
+                  >
+                    Retry refresh
+                  </button>
+                </div>
+              ) : null}
+              {conflictSnapshot ? (
+                <section
+                  className="panel"
+                  aria-label="Review interaction conflict"
+                >
+                  <h4>Review the latest saved values</h4>
+                  <p>
+                    Your entered values remain in the form below. Nothing has
+                    been overwritten.
+                  </p>
+                  <dl>
+                    {[
+                      'statusName',
+                      'contactName',
+                      'contactPhone',
+                      'contactEmail',
+                      'notes',
+                    ].map((field) => (
+                      <div key={field}>
+                        <dt>
+                          {
+                            {
+                              statusName: 'Status',
+                              contactName: 'Contact name',
+                              contactPhone: 'Phone',
+                              contactEmail: 'Email',
+                              notes: 'Notes',
+                            }[field]
+                          }
+                        </dt>
+                        <dd>{conflictSnapshot[field] || 'Not provided'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() => {
+                      setActiveSnapshot(conflictSnapshot);
+                      setConflictSnapshot(null);
+                      setPanelError('');
+                      setPanelSuccessMessage(
+                        'Latest version reviewed. Your entered values are still in the form; save only the changes you want to keep.',
+                      );
+                    }}
+                  >
+                    Keep my entered values for review
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() => {
+                      clearInteractionDraft(
+                        toDraftScope(
+                          auth.user,
+                          selectedPropertyId,
+                          activeSnapshot.interactionId,
+                        ),
+                      );
+                      setEditForm(
+                        Object.fromEntries(
+                          [
+                            'statusId',
+                            'contactName',
+                            'contactPhone',
+                            'contactEmail',
+                            'notes',
+                          ].map((field) => [
+                            field,
+                            conflictSnapshot[field] ?? '',
+                          ]),
+                        ),
+                      );
+                      setActiveSnapshot(conflictSnapshot);
+                      setConflictSnapshot(null);
+                      setPanelError('');
+                    }}
+                  >
+                    Use latest saved values
+                  </button>
+                </section>
+              ) : null}
               <h4>Current Interaction State</h4>
+              {panelMode !== 'create' ? (
+                <div className="map-panel-actions">
+                  <button
+                    type="button"
+                    className="button button--primary"
+                    onClick={() => handleStartInteraction(selectedPropertyId)}
+                    disabled={isUpdating || isCreating}
+                  >
+                    Log a visit
+                  </button>
+                </div>
+              ) : null}
+              {panelMode !== 'create' && selectedInteractions.length > 1 ? (
+                <ul
+                  className="map-visit-list"
+                  aria-label="Visits to this property"
+                >
+                  {selectedInteractions.map((visit) => (
+                    <li key={visit.interactionId}>
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        aria-current={
+                          activeSnapshot?.interactionId === visit.interactionId
+                            ? 'true'
+                            : undefined
+                        }
+                        onClick={() => handleOpenVisit(visit.interactionId)}
+                        disabled={snapshotLoading}
+                      >
+                        {`Open visit from ${formatDateTime(visit.initialInteractionAt)}`}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {panelMode === 'summary' && selectedInteractions.length === 1 ? (
+                <div className="map-panel-actions">
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() =>
+                      handleOpenVisit(selectedInteractions[0].interactionId)
+                    }
+                    disabled={snapshotLoading}
+                  >
+                    View latest visit
+                  </button>
+                </div>
+              ) : null}
               {panelMode === 'create' ? (
                 <form
                   className="map-interaction-form"
@@ -1144,6 +1698,26 @@ export function MapPage() {
                       <p role="alert">{createFieldErrors.notes}</p>
                     ) : null}
                   </label>
+                  {sameDayConflict?.propertyId === selectedPropertyId ? (
+                    <div role="alert" className="feedback feedback--error">
+                      <p>
+                        You already logged a visit to this property today. Your
+                        details are kept below.
+                      </p>
+                      <p>
+                        Confirming saves them as a same-day return. It won't add
+                        another knock.
+                      </p>
+                      <button
+                        type="button"
+                        className="button button--primary"
+                        onClick={handleConfirmSameDayReturn}
+                        disabled={isCreating}
+                      >
+                        Confirm same-day return
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="map-panel-actions">
                     <button
                       type="submit"
@@ -1365,7 +1939,9 @@ export function MapPage() {
 
                   {activeSnapshot ? (
                     <p className="map-property-meta">
-                      Last updated {formatDateTime(activeSnapshot.changedAt)}
+                      {activeSnapshot.lastEditedBy
+                        ? `Last edited by ${[activeSnapshot.lastEditedBy.firstName, activeSnapshot.lastEditedBy.lastName].filter(Boolean).join(' ')} on ${formatDateTime(activeSnapshot.changedAt)}`
+                        : `Last updated ${formatDateTime(activeSnapshot.changedAt)}`}
                     </p>
                   ) : null}
 

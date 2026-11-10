@@ -27,8 +27,17 @@ function pickAddressLine1(address) {
 
 export function createNominatimGeocodingProvider({
   fetchImpl = fetch,
-  baseUrl = 'https://nominatim.openstreetmap.org',
+  baseUrl = process.env.GEOCODING_BASE_URL ||
+    'https://nominatim.openstreetmap.org',
+  userAgent = process.env.GEOCODING_USER_AGENT ||
+    'JoeKnock/0.1 property-resolution',
+  timeoutMs = Number(process.env.GEOCODING_TIMEOUT_MS || 5000),
 } = {}) {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) {
+    throw new Error(
+      'GEOCODING_TIMEOUT_MS must be an integer between 1 and 30000.',
+    );
+  }
   return {
     async reverseGeocode({ latitude, longitude }) {
       const url = new URL('/reverse', baseUrl);
@@ -38,18 +47,22 @@ export function createNominatimGeocodingProvider({
       url.searchParams.set('lon', String(longitude));
 
       let response;
+      const signal = AbortSignal.timeout(timeoutMs);
 
       try {
         response = await fetchImpl(url, {
           method: 'GET',
+          signal,
           headers: {
             Accept: 'application/json',
-            'User-Agent': 'JoeKnock/0.1 property-resolution',
+            'User-Agent': userAgent,
           },
         });
       } catch {
         throw new GeocodingProviderError('Geocoding provider request failed.', {
-          category: 'network_transport_failure',
+          category: signal.aborted
+            ? 'provider_timeout'
+            : 'network_transport_failure',
         });
       }
 
@@ -68,7 +81,9 @@ export function createNominatimGeocodingProvider({
         throw new GeocodingProviderError(
           'Geocoding provider response was invalid.',
           {
-            category: 'provider_invalid_json',
+            category: signal.aborted
+              ? 'provider_timeout'
+              : 'provider_invalid_json',
           },
         );
       }

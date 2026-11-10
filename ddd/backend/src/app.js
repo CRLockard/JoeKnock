@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { query } from './db/client.js';
 import { logger } from './common/logger.js';
+import { sendError } from './common/response.js';
 import { requestIdMiddleware } from './middleware/requestIdMiddleware.js';
 import {
   notFoundMiddleware,
@@ -49,6 +50,13 @@ export function createApp({
       max: 250,
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (req, res) =>
+        sendError(res, {
+          statusCode: 429,
+          code: 'RATE_LIMITED',
+          message: 'Too many requests. Please try again shortly.',
+          requestId: req.requestId,
+        }),
     }),
   );
   app.use(express.json());

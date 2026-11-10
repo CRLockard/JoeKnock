@@ -25,6 +25,10 @@ function isUniqueViolation(error) {
   return error && error.code === '23505';
 }
 
+function forbiddenError(message) {
+  return new AppError(403, 'FORBIDDEN', message);
+}
+
 function parseActiveFilter(active) {
   if (active === undefined) {
     return undefined;
@@ -40,6 +44,27 @@ function hasAnyUpdatableField({ firstName, lastName, role }) {
   );
 }
 
+async function lockOrganizationUsers(client, organizationId) {
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1), 2)', [
+    organizationId,
+  ]);
+}
+
+async function protectLastAdmin(client, organizationId, target) {
+  if (target.role !== 'admin' || !target.is_active) return;
+  const result = await client.query(
+    "SELECT COUNT(*)::int AS count FROM users WHERE organization_id = $1 AND role = 'admin' AND is_active = true",
+    [organizationId],
+  );
+  if (result.rows[0].count <= 1) {
+    throw new AppError(
+      409,
+      'CONFLICT',
+      'Assign another active administrator before deactivating or demoting the last administrator.',
+    );
+  }
+}
+
 export function createUsersService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
@@ -48,6 +73,13 @@ export function createUsersService({
   return {
     async setUserActiveStatus({ organizationId, userId, isActive }) {
       const updatedUser = await runInTransaction(async (client) => {
+        await lockOrganizationUsers(client, organizationId);
+        const target = await repository.findUserForUpdate(client, {
+          organizationId,
+          userId,
+        });
+        if (!target) return null;
+        if (!isActive) await protectLastAdmin(client, organizationId, target);
         return repository.setUserActiveStatus(client, {
           organizationId,
           userId,
@@ -62,7 +94,14 @@ export function createUsersService({
       return toPublicUser(updatedUser);
     },
 
-    async updateUser({ organizationId, userId, firstName, lastName, role }) {
+    async updateUser({
+      organizationId,
+      userId,
+      firstName,
+      lastName,
+      role,
+      actorRole,
+    }) {
       if (!hasAnyUpdatableField({ firstName, lastName, role })) {
         throw new AppError(
           400,
@@ -72,6 +111,28 @@ export function createUsersService({
       }
 
       const updatedUser = await runInTransaction(async (client) => {
+        await lockOrganizationUsers(client, organizationId);
+        const target = await repository.findUserForUpdate(client, {
+          organizationId,
+          userId,
+        });
+        if (!target) return null;
+        if (actorRole !== 'admin') {
+          // Only admins may change roles; managers may only rename reps.
+          if (role !== undefined) {
+            throw forbiddenError('Only administrators can change user roles.');
+          }
+
+          if (target.role !== 'rep') {
+            throw forbiddenError(
+              'Only administrators can modify manager or admin accounts.',
+            );
+          }
+        }
+
+        if (role !== undefined && role !== 'admin')
+          await protectLastAdmin(client, organizationId, target);
+
         return repository.updateUser(client, {
           organizationId,
           userId,
@@ -107,7 +168,14 @@ export function createUsersService({
       email,
       password,
       role,
+      actorRole,
     }) {
+      if (actorRole !== 'admin' && role !== 'rep') {
+        throw forbiddenError(
+          'Only administrators can create manager or admin accounts.',
+        );
+      }
+
       try {
         const createdUser = await runInTransaction(async (client) => {
           // Password hashing occurs server-side only; hash never leaves backend.

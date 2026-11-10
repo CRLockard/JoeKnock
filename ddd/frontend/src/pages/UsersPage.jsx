@@ -45,6 +45,11 @@ export function UsersPage() {
   const canManageUsers =
     auth.user?.role === 'admin' || auth.user?.role === 'manager';
   const canSetActive = auth.user?.role === 'admin';
+  const canAssignRoles = auth.user?.role === 'admin';
+
+  function canEditUser(user) {
+    return canAssignRoles || user.role === 'rep';
+  }
 
   useEffect(() => {
     if (!canManageUsers) {
@@ -146,8 +151,11 @@ export function UsersPage() {
     const payload = {
       firstName: editForm.firstName.trim(),
       lastName: editForm.lastName.trim(),
-      role: editForm.role,
     };
+
+    if (canAssignRoles) {
+      payload.role = editForm.role;
+    }
 
     if (!payload.firstName || !payload.lastName) {
       setEditError('First name and last name are required for update.');
@@ -195,7 +203,7 @@ export function UsersPage() {
       lastName: form.lastName.trim(),
       email: form.email.trim(),
       password: form.password,
-      role: form.role,
+      role: canAssignRoles ? form.role : 'rep',
     };
 
     if (
@@ -394,7 +402,9 @@ export function UsersPage() {
                               className="button button--ghost"
                               onClick={() => startEditingUser(user)}
                               disabled={
-                                isEditSubmitting || isSetActiveSubmitting
+                                isEditSubmitting ||
+                                isSetActiveSubmitting ||
+                                !canEditUser(user)
                               }
                             >
                               Edit {user.firstName} {user.lastName}
@@ -498,8 +508,12 @@ export function UsersPage() {
                   disabled={!canManageUsers || isSubmitting}
                 >
                   <option value="rep">Representative</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Administrator</option>
+                  {canAssignRoles ? (
+                    <>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Administrator</option>
+                    </>
+                  ) : null}
                 </select>
               </label>
 
@@ -546,20 +560,22 @@ export function UsersPage() {
                   />
                 </label>
 
-                <label className="form-field" htmlFor="edit-role">
-                  <span>Edit role</span>
-                  <select
-                    id="edit-role"
-                    name="role"
-                    value={editForm.role}
-                    onChange={handleEditChange}
-                    disabled={isEditSubmitting}
-                  >
-                    <option value="rep">Representative</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </label>
+                {canAssignRoles ? (
+                  <label className="form-field" htmlFor="edit-role">
+                    <span>Edit role</span>
+                    <select
+                      id="edit-role"
+                      name="role"
+                      value={editForm.role}
+                      onChange={handleEditChange}
+                      disabled={isEditSubmitting}
+                    >
+                      <option value="rep">Representative</option>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </label>
+                ) : null}
 
                 <div className="form-actions">
                   <button

@@ -2,10 +2,8 @@ import { AppError } from '../common/errors.js';
 import { logger } from '../common/logger.js';
 import { withTransaction } from '../db/transaction.js';
 import { normalizeResolvedAddress } from './addressNormalization.js';
-import {
-  createNominatimGeocodingProvider,
-  GeocodingProviderError,
-} from './geocodingProvider.js';
+import { GeocodingProviderError } from './geocodingProvider.js';
+import { managedGeocodingProvider } from './managedGeocodingProvider.js';
 import { propertiesRepository as defaultRepository } from './propertiesRepository.js';
 
 function isUniqueViolation(error) {
@@ -54,8 +52,10 @@ function toCurrentInteractionResponse(row) {
     userId: row.user_id,
     statusId: row.status_id,
     statusName: row.status_name,
-    initialInteractionAt: toIsoTimestamp(row.initial_interaction_at),
-    changedAt: toIsoTimestamp(row.changed_at),
+    initialInteractionAt: toIsoTimestamp(
+      row.initial_interaction_at_utc ?? row.initial_interaction_at,
+    ),
+    changedAt: toIsoTimestamp(row.changed_at_utc ?? row.changed_at),
     contactName: row.contact_name,
     contactPhone: row.contact_phone,
     contactEmail: row.contact_email,
@@ -83,7 +83,7 @@ function normalizeResolvedCoordinates({ resolved, requested }) {
 
 export function createPropertiesService({
   repository = defaultRepository,
-  geocodingProvider = createNominatimGeocodingProvider(),
+  geocodingProvider = managedGeocodingProvider,
   runInTransaction = withTransaction,
 } = {}) {
   return {
@@ -176,9 +176,9 @@ export function createPropertiesService({
         });
 
         throw new AppError(
-          500,
-          'INTERNAL_SERVER_ERROR',
-          'Unable to resolve the selected location right now.',
+          category === 'provider_invalid_json' ? 502 : 503,
+          'GEOCODING_UNAVAILABLE',
+          'Address lookup is temporarily unavailable. Please try again shortly.',
         );
       }
 

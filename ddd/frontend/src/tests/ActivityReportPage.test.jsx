@@ -341,4 +341,60 @@ describe('ActivityReportPage', () => {
 
     expect(screen.getByText('Total Knocks')).toBeInTheDocument();
   });
+
+  it('lists each property once with its knock count', async () => {
+    getActivityReport.mockResolvedValueOnce({
+      dateRange: {
+        dateFrom: '2026-08-01',
+        dateTo: '2026-08-02',
+        timezone: 'UTC',
+      },
+      appliedFilters: { userId: null, teamId: null, statusId: null },
+      summary: { totalKnocks: 3, totalStatusActivityGroups: 3 },
+      byStatus: [{ statusId: 'status-1', statusName: 'No Answer', knocks: 3 }],
+      byRepresentative: [
+        {
+          userId: 'user-1',
+          firstName: 'Ava',
+          lastName: 'Rep',
+          email: 'ava@example.com',
+          knocks: 3,
+          properties: [
+            {
+              propertyId: 'p1',
+              address: '1 Oak St, Knoxville, TN 37901',
+              knocks: 2,
+            },
+            {
+              propertyId: 'p2',
+              address: '2 Elm St, Knoxville, TN 37901',
+              knocks: 1,
+            },
+          ],
+        },
+      ],
+    });
+
+    renderAs({
+      id: 'manager-1',
+      organizationId: 'org-1',
+      role: 'manager',
+      email: 'manager@example.com',
+      firstName: 'Manager',
+      lastName: 'One',
+    });
+    await waitFor(() => expect(getTeams).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Run report' }));
+
+    const section = await screen.findByRole('region', {
+      name: 'Representative grouping',
+    });
+    const items = within(section).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('1 Oak St, Knoxville, TN 37901: 2'),
+        expect.stringContaining('2 Elm St, Knoxville, TN 37901: 1'),
+      ]),
+    );
+  });
 });

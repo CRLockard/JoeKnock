@@ -67,6 +67,8 @@ const CURRENT_VISIBLE_PROPERTY_INTERACTIONS_SQL = `
     i.status_name,
     i.initial_interaction_at,
     i.changed_at,
+    i.initial_interaction_at_utc,
+    i.changed_at_utc,
     i.contact_name,
     i.contact_phone,
     i.contact_email,
