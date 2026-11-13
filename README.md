@@ -52,15 +52,15 @@ npm run test:e2e
 npm run build
 ```
 
-Integration and browser tests require a disposable test database. PR #52 adds
-a test-migration target guard, but it is open and not part of `main`; see the
-specification for the required precautions. These commands are not claims that
-the suites were run as part of this documentation change.
+Integration and browser tests require a disposable test database. PR #52's
+test-migration target guard is now on `main`; still verify the target and use a
+disposable database. These commands are not claims that the suites were run as
+part of this documentation change.
 
 ## Current follow-up
 
-- [PR #52](https://github.com/CRLockard/JoeKnock/pull/52) is open; its required
-  CI checks passed when last checked.
+- [PR #52](https://github.com/CRLockard/JoeKnock/pull/52) is merged as
+  `998502b`; both required CI checks passed.
 - [Issue #51](https://github.com/CRLockard/JoeKnock/issues/51) tracks remaining
   dependency advisories/upgrades. The dependency audit is not clean.
 - There is no active public deployment.

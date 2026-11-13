@@ -19,8 +19,8 @@ entry point.
   data. Do not change databases, run migrations, deploy, or perform destructive
   cleanup unless explicitly requested.
 - Use disposable databases for tests and validate the target before migration.
-  The test-migration guard in PR #52 is not in `main`; do not assume it protects
-  test setup until merged.
+  The test-migration guard from PR #52 is in `main`; never assume a configured
+  database is disposable without validating its target.
 - Add or update focused regression tests for behavior changes. Do not weaken
   tests to hide defects, and report only checks actually run.
 - Update the specification when an approved requirement changes. Do not

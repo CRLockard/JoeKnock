@@ -5,9 +5,9 @@ requirements, architecture constraints, data/API semantics, and engineering
 workflow. The README and Copilot instructions are entry points only. Code and
 tests are evidence of implementation, not authority to change a requirement.
 
-**Baseline reviewed:** `main` at `a9446a5` (PR #50 merge). This is a
-documentation consolidation, not a new code or test result. Current open-PR
-status and validation are recorded in
+**Baseline reviewed:** `main` at `998502b` (PR #52 merge; includes PR #50).
+This is a documentation consolidation, not a new code or test result. Current
+open-PR status and validation are recorded in
 [Release status](#release-status-and-follow-up).
 
 ## Status labels and change control
@@ -70,12 +70,12 @@ and shared-team records under the narrower settings; admins can read all
 organization records. Visibility does not expand edit authority.
 
 V1 registration is an API flow that creates an organization and its first
-admin and requires a valid client-supplied IANA timezone; it is not a public
-signup screen. V1 login uses email/password and preserves exact password input.
-The global email lookup and organization-scoped uniqueness do not support
-shared accounts across organizations. Passwords are stored as hashes; never
-log or expose credentials, tokens, connection strings, hashes, or personal
-field notes.
+admin and requires a valid client-supplied IANA timezone with no silent
+fallback; it is not a public signup screen. V1 login uses email/password and
+preserves exact password input. The global email lookup and organization-
+scoped uniqueness do not support shared accounts across organizations.
+Passwords are stored as hashes; never log or expose credentials, tokens,
+connection strings, hashes, or personal field notes.
 
 ### Map, properties, and interaction capture
 
@@ -92,7 +92,8 @@ a configurable provider identity and timeout, bounded in-process caching,
 sharing of identical in-flight requests, and database advisory-gate pacing
 with cooldown. The gate coordinates processes sharing its database and may hold
 a connection while waiting; deployment capacity/policy checks remain open.
-There is no general property-edit endpoint or user-editable coordinate flow.
+Provide appropriate OpenStreetMap attribution. There is no general
+property-edit endpoint or user-editable coordinate flow.
 
 The interaction record is an immutable snapshot in a history scoped to
 organization, representative, and property. Revisions preserve prior business
@@ -102,12 +103,19 @@ is not implemented. Stale revisions are rejected rather than silently
 overwritten. A same-key create retry returns the original result; a request ID
 is not an interaction identity.
 
+Users and statuses are deactivated rather than deleted. Removing a team
+membership removes only that relationship; it does not delete the user, team,
+or recorded work. The approved V2 team-deletion exception is described below
+and is not implemented.
+
 Drafts are private, browser-local, and are not shared interactions until
 explicitly submitted. Drafts are scoped by organization, user, property, and
 snapshot when editing; failed writes preserve draft work. They are plaintext
 on the local device, not cross-device storage. PR #49 added read-time seven-day
 expiration and deliberate-logout cleanup; physical removal is not guaranteed
-while a browser is closed.
+while a browser is closed. Popup/context switching preserves unfinished work
+without a normal confirmation prompt; a confirmed submission clears only its
+own draft.
 
 Map selection claims its identity before asynchronous property lookup. Late
 lookup, detail, save, or error results cannot replace a newer selection.
@@ -268,7 +276,8 @@ first admin; employees normally join by invitation. Existing users may accept
 another invitation or create another organization without a second identity.
 Users with multiple memberships need an organization chooser and visible active
 organization. Organization context is tab-specific. Admin authority remains
-organization-scoped.
+organization-scoped. The creator of an organization becomes its initial admin
+and designated main admin.
 
 The future flow includes email verification, invitations, password recovery,
 and notification emails. Existing-account invite acceptance must not
@@ -334,7 +343,8 @@ Do not treat any of these as approved implementation details:
   switching prompts.
 - Address search, map filters, marker status/counts, a user-facing interaction
   history, territories, heat maps, CRM integrations/webhooks, custom fields,
-  scheduled exports, advanced analytics, leaderboards, and distance tracking.
+  status colors, scheduled exports, advanced analytics, leaderboards, and
+  distance tracking.
 - US-025's dedicated/shared geocoding-cache feature remains deferred; the
   bounded in-process cache and pacing added for provider safety are current
   reliability behavior, not a general cache product feature.
@@ -369,39 +379,38 @@ Common root commands:
 
 Integration and browser tests require a disposable isolated test database.
 Validate the target before migrations; never run destructive cleanup against
-an unverified URL and never expose connection strings in logs. The test migration guard is in PR #52, not in current main. It validates
+an unverified URL and never expose connection strings in logs. PR #52 is
+merged into main as `998502b`. Its test-migration guard validates
 `TEST_DATABASE_URL` with the shared safety check, requires the test-mode target
-to match, and passes the validated URL explicitly to the migration runner.
-It rejects development/mismatched targets before migration starts; intentional
-development migrations keep using `DATABASE_URL`. Until PR #52 is merged,
-explicitly ensure the test migration runner and test process target the same
-disposable `TEST_DATABASE_URL`.
+to match, and passes the validated URL explicitly to the migration runner. It
+rejects development/mismatched targets before migration starts; intentional
+development migrations keep using `DATABASE_URL`.
 
 Test real PostgreSQL behavior where constraints/concurrency matter. Cover
 tenant isolation, active users/roles, team and status permissions, daily knock
 uniqueness, timezone/DST boundaries, idempotency, same-day returns, revisions
 and conflicts, drafts, reports/CSV, provider failures, and asynchronous map
 selection. Mock external providers. Browser emulation does not replace real
-phone/keyboard/accessibility validation. Do not weaken tests to hide defects.
+phone/keyboard/accessibility validation. P0 security and core business-rule
+tests must pass before any MVP/public release. Do not weaken tests to hide
+defects.
 
 ## Release status and follow-up
 
-- `main` is at `a9446a5`, the regular merge of PR #50. PRs #49 and #50 are
-  merged. Stabilization and daily-knock behavior are on main.
-- [PR #52](https://github.com/CRLockard/JoeKnock/pull/52) is **open,
-  unmerged, and not a draft**. Its two required `verify` checks were successful
-  when checked for this consolidation. It contains the test-migration guard
-  described above; the guard is therefore not part of main.
+- `main` includes PR #49's stabilization/daily-knock work, PR #50's
+  compatible dependency updates, and PR #52's test-migration guard. PR #52
+  merged as regular merge commit `998502b`; both required `verify` checks
+  passed.
 - [Issue #51](https://github.com/CRLockard/JoeKnock/issues/51) is open and
   tracks remaining dependency advisory/upgrades. The last dependency review
   found the audit was not clean; severity labels require exposure/usage
   assessment. Larger upgrade work includes React Router 7, the Vitest/Vite
   toolchain, and `node-pg-migrate` 9. No new audit was run for this
   documentation change.
-- Earlier owner/Copilot reports say PR #49 and #50 validation passed on
+- Earlier owner/Copilot reports say PR #49, #50, and #52 validation passed on
   disposable or local environments. Those are historical results, not tests
-  run for this documentation change. PR #52's passing CI is the current check
-  performed here; no application tests were rerun.
+  run for this documentation change. PR #52's CI results were checked during
+  this review; no application tests were rerun.
 - An earlier local inspection confirmed development uses
   `joeknock_devclean` and the original demo database is preserved; neither was
   rechecked or changed during this documentation task. Earlier checks found no
