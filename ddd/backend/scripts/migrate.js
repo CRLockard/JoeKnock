@@ -3,8 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadMigrationEnv } from '../src/config/migrationEnv.js';
 
-const migrationEnv = loadMigrationEnv();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
@@ -16,32 +14,47 @@ const migrateBin = path.resolve(
 );
 const migrationsDir = path.resolve(projectRoot, 'migrations');
 
-const command = process.argv[2] ?? 'up';
-const extraArgs = process.argv.slice(3);
+export function runMigration({
+  args = process.argv.slice(2),
+  environment = process.env,
+  spawnProcess = spawn,
+  platform = process.platform,
+  onExit = (code) => process.exit(code ?? 1),
+} = {}) {
+  const migrationEnv = loadMigrationEnv(environment);
+  const [command = 'up', ...extraArgs] = args;
+  const baseArgs = [
+    command,
+    ...extraArgs,
+    '-m',
+    migrationsDir,
+    '-d',
+    'DATABASE_URL',
+  ];
+  const spawnOptions = {
+    stdio: 'inherit',
+    cwd: projectRoot,
+    shell: false,
+    env: {
+      ...environment,
+      DATABASE_URL: migrationEnv.databaseUrl,
+    },
+  };
 
-const baseArgs = [
-  command,
-  ...extraArgs,
-  '-m',
-  migrationsDir,
-  '-d',
-  'DATABASE_URL',
-];
-const spawnOptions = {
-  stdio: 'inherit',
-  cwd: projectRoot,
-  shell: false,
-  env: {
-    ...process.env,
-    DATABASE_URL: migrationEnv.databaseUrl,
-  },
-};
+  const child =
+    platform === 'win32'
+      ? spawnProcess('cmd.exe', ['/c', migrateBin, ...baseArgs], spawnOptions)
+      : spawnProcess(migrateBin, baseArgs, spawnOptions);
 
-const child =
-  process.platform === 'win32'
-    ? spawn('cmd.exe', ['/c', migrateBin, ...baseArgs], spawnOptions)
-    : spawn(migrateBin, baseArgs, spawnOptions);
+  child.on('exit', onExit);
+  return child;
+}
 
-child.on('exit', (code) => {
-  process.exit(code ?? 1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  try {
+    runMigration();
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+}
