@@ -14,6 +14,10 @@ export function hasTestDatabase() {
 }
 
 function runMigrationCommand(args) {
+  const developmentDatabaseUrl = process.env.DATABASE_URL;
+  const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+  assertSafeTestDatabaseUrl(testDatabaseUrl, developmentDatabaseUrl);
+
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['scripts/migrate.js', ...args], {
       cwd: backendRoot,
@@ -21,7 +25,8 @@ function runMigrationCommand(args) {
       env: {
         ...process.env,
         NODE_ENV: 'test',
-        DATABASE_URL: process.env.TEST_DATABASE_URL,
+        DEVELOPMENT_DATABASE_URL: developmentDatabaseUrl,
+        DATABASE_URL: testDatabaseUrl,
       },
       shell: false,
     });
