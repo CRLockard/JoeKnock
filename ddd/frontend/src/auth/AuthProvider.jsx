@@ -1,14 +1,20 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
 import { setAuthFailureHandler } from '../api/client.js';
-import { clearSession, loadSession, saveSession } from './authStorage.js';
+import {
+  clearSession,
+  loadSession,
+  saveSession,
+  reloadSessionFromStorage,
+  SESSION_KEYS,
+} from './authStorage.js';
+import { clearUserInteractionDrafts } from '../features/interactions/interactionDraftStorage.js';
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   // Session hydration is synchronous so protected routes can render from a
   // known auth state on first paint.
-  const initial = loadSession();
-  const [session, setSession] = useState(initial);
+  const [session, setSession] = useState(loadSession);
 
   useEffect(() => {
     // apiFetch delegates token-expiry handling here so auth teardown behavior
@@ -18,8 +24,16 @@ export function AuthProvider({ children }) {
       setSession(null);
     });
 
+    const onStorage = (event) => {
+      if (event.key === null || SESSION_KEYS.includes(event.key)) {
+        setSession(reloadSessionFromStorage());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
     return () => {
       setAuthFailureHandler(null);
+      window.removeEventListener('storage', onStorage);
     };
   }, []);
 
@@ -33,6 +47,7 @@ export function AuthProvider({ children }) {
         setSession(nextSession);
       },
       logout() {
+        clearUserInteractionDrafts(session?.user?.id);
         clearSession();
         setSession(null);
       },

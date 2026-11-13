@@ -247,7 +247,7 @@ describeDb('POST /api/properties/resolve', () => {
     expect(count.rows[0].count).toBe(0);
   });
 
-  it('contains provider failures behind internal error behavior', async () => {
+  it('contains provider failures behind an actionable unavailable response', async () => {
     const orgId = await createOrganization('Org A');
     const user = await createUser({ organizationId: orgId, label: 'actor' });
 
@@ -264,8 +264,8 @@ describeDb('POST /api/properties/resolve', () => {
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ latitude: 35.9, longitude: -84.0 });
 
-    expect(response.status).toBe(500);
-    expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe('GEOCODING_UNAVAILABLE');
 
     const count = await query('SELECT COUNT(*)::int AS count FROM properties');
     expect(count.rows[0].count).toBe(0);

@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import {
+  authMiddleware,
+  verifyTokenClaimsMiddleware,
+} from '../middleware/authMiddleware.js';
 import { validate } from '../validation/validate.js';
 import { buildAuthRoutes } from '../auth/authRoutes.js';
 import { createAuthService } from '../auth/authService.js';
@@ -134,12 +137,16 @@ export function buildApiRoutes({
   });
 
   if (includeTestScaffold) {
-    router.get('/_scaffold/protected', authMiddleware, (req, res) => {
-      return res.status(200).json({
-        ok: true,
-        auth: req.auth,
-      });
-    });
+    router.get(
+      '/_scaffold/protected',
+      verifyTokenClaimsMiddleware,
+      (req, res) => {
+        return res.status(200).json({
+          ok: true,
+          auth: req.auth,
+        });
+      },
+    );
 
     router.post(
       '/_scaffold/validate',

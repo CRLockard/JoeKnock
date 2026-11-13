@@ -1,13 +1,5 @@
 import { body } from 'express-validator';
-
-function isValidIanaTimeZone(timeZone) {
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { isValidIanaTimeZone } from '../common/timezone.js';
 
 export const registerValidators = [
   body('organizationName').isString().trim().notEmpty(),
@@ -26,5 +18,6 @@ export const registerValidators = [
 
 export const loginValidators = [
   body('email').isEmail().normalizeEmail(),
-  body('password').isString().trim().notEmpty(),
+  // Passwords are opaque secrets: creation hashes the exact input, including spaces.
+  body('password').isString().notEmpty(),
 ];

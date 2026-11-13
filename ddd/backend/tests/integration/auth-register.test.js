@@ -168,6 +168,21 @@ describeDb('POST /api/auth/register', () => {
     expect(counts.rows[0].users_count).toBe(0);
   });
 
+  it.each(['+05:00', 'america/new_york', 'Etc/../Zulu'])(
+    'rejects %s, which the database could not resolve by name',
+    async (timezone) => {
+      await ensureTestMigrations();
+      await resetRegistrationTables();
+
+      const response = await request(createApp())
+        .post('/api/auth/register')
+        .send(createPayload({ timezone }));
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    },
+  );
+
   it('accepts America/New_York only when explicitly submitted and persists it', async () => {
     await ensureTestMigrations();
     await resetRegistrationTables();

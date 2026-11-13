@@ -279,6 +279,10 @@ Implemented
 - Enforced organization isolation by scoping update lookup to authenticated
   `organizationId` from JWT context.
 - Implemented permitted update fields: `firstName`, `lastName`, `role`.
+- Audit finding #2 policy (supersedes the above): only admins may change
+  `role`; managers may update names of `rep` accounts only and receive 403 for
+  any `role` field or manager/admin target. Managers may create `rep` accounts
+  only (US-006).
 - Rejected protected fields (email, password, activation, organization ownership,
   and other unsupported fields) with validation errors.
 - Returned not-found behavior for inaccessible/nonexistent user IDs.

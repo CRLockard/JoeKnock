@@ -34,6 +34,7 @@ export function buildPropertiesRoutes({
             contactEmail: req.body.contactEmail,
             notes: req.body.notes,
             clientRequestId: req.body.clientRequestId,
+            sameDayReturn: req.body.sameDayReturn === true,
           },
         );
 

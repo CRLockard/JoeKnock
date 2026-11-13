@@ -1,4 +1,5 @@
 import { AppError, AuthError } from '../common/errors.js';
+import { TIMEZONE_MESSAGE, isRecognizedTimezone } from '../common/timezone.js';
 import { withTransaction } from '../db/transaction.js';
 import { organizationRepository as defaultRepository } from './organizationRepository.js';
 
@@ -69,6 +70,13 @@ export function createOrganizationService({
       // Settings are loaded/saved in a transaction to keep a single read/write
       // boundary for tenant-wide behavior knobs.
       const updatedSettings = await runInTransaction(async (client) => {
+        if (
+          timezone !== undefined &&
+          !(await isRecognizedTimezone(client, timezone))
+        ) {
+          throw new AppError(400, 'VALIDATION_ERROR', TIMEZONE_MESSAGE);
+        }
+
         return repository.updateOrganizationSettings(client, {
           organizationId,
           repVisibility,

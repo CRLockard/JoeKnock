@@ -358,7 +358,18 @@ export function ActivityReportPage() {
                 <tbody>
                   {report.byRepresentative.map((row) => (
                     <tr key={row.userId}>
-                      <td>{`${row.firstName} ${row.lastName} (${row.email})`}</td>
+                      <td>
+                        {`${row.firstName} ${row.lastName} (${row.email})`}
+                        {(row.properties ?? []).length > 0 ? (
+                          <ul className="report-properties">
+                            {row.properties.map((property) => (
+                              <li key={property.propertyId}>
+                                {property.address}: {property.knocks}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </td>
                       <td>{row.knocks}</td>
                     </tr>
                   ))}

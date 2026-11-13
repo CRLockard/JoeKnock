@@ -1,16 +1,8 @@
 import { body } from 'express-validator';
+import { isValidIanaTimeZone } from '../common/timezone.js';
 
 const ORG_SETTINGS_FIELDS = ['rep_visibility', 'timezone'];
 const REP_VISIBILITY_VALUES = ['own', 'team', 'organization'];
-
-function isValidIanaTimeZone(timeZone) {
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export const updateOrganizationValidators = [
   body('name').isString().trim().notEmpty().isLength({ max: 255 }),

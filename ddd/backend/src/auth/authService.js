@@ -1,4 +1,5 @@
 import { AppError, AuthError } from '../common/errors.js';
+import { TIMEZONE_MESSAGE, isRecognizedTimezone } from '../common/timezone.js';
 import { withTransaction } from '../db/transaction.js';
 import { signAccessToken } from './jwt.js';
 import { hashPassword, verifyPassword } from './password.js';
@@ -125,6 +126,10 @@ export function createAuthService({
         const result = await runInTransaction(async (client) => {
           // Registration bootstraps the tenant boundary first, then settings,
           // then the initial admin user, all in one transaction.
+          if (!(await isRecognizedTimezone(client, timezone))) {
+            throw new AppError(400, 'VALIDATION_ERROR', TIMEZONE_MESSAGE);
+          }
+
           const organization = await repository.createOrganization(client, {
             name: organizationName,
           });

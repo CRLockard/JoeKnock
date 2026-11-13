@@ -88,6 +88,20 @@ function buildUpdateUserActiveQuery({ organizationId, userId, isActive }) {
 }
 
 export const usersRepository = {
+  async findUserForUpdate(client, { organizationId, userId }) {
+    // Row lock keeps the target's role stable between the policy check and
+    // the update inside the same transaction.
+    const result = await client.query(
+      `SELECT id, organization_id, role, is_active
+       FROM users
+       WHERE organization_id = $1 AND id = $2
+       FOR UPDATE`,
+      [organizationId, userId],
+    );
+
+    return result.rows[0] ?? null;
+  },
+
   async createUser(
     client,
     {

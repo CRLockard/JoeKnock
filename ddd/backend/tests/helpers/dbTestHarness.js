@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { query } from '../../src/db/client.js';
+import { query, assertSafeTestDatabaseUrl } from '../../src/db/client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +52,16 @@ export async function ensureTestMigrations() {
 }
 
 export async function resetRegistrationTables() {
+  const expected = assertSafeTestDatabaseUrl(
+    process.env.TEST_DATABASE_URL,
+    process.env.DATABASE_URL,
+  );
+  const actual = await query('SELECT current_database() AS database_name');
+  if (actual.rows[0]?.database_name !== expected) {
+    throw new Error(
+      'Refusing cleanup: connected database is not the explicitly selected test database.',
+    );
+  }
   await query('DELETE FROM team_users');
   await query('DELETE FROM interactions');
   await query('DELETE FROM statuses');

@@ -3,13 +3,19 @@ function escapeCsvValue(value) {
     return '';
   }
 
-  const text = String(value);
+  // CSV quotes protect delimiters, not spreadsheet formula evaluation. Prefix
+  // untrusted formula-like text only in the export; never alter stored values.
+  const raw = String(value);
+  // A quoted tab prefix is for spreadsheet viewing and remains in raw CSV.
+  const text = /^[\s\uFEFF]*[=+@\-＝＋－＠]|^[\t\r\n]/u.test(raw)
+    ? `\t${raw}`
+    : raw;
 
   if (text.includes('"')) {
     return `"${text.replace(/"/g, '""')}"`;
   }
 
-  if (text.includes(',') || text.includes('\n') || text.includes('\r')) {
+  if (text.includes(',') || /[\t\n\r]/.test(text)) {
     return `"${text}"`;
   }
 

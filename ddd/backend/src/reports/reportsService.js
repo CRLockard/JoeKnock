@@ -1,7 +1,8 @@
 import { AppError } from '../common/errors.js';
 import { withTransaction } from '../db/transaction.js';
 import { reportsRepository as defaultRepository } from './reportsRepository.js';
-import { resolveOrganizationDateRangeToUtc } from './reportDateRange.js';
+import { assertCalendarDate } from './reportDateRange.js';
+import { formatAddress } from './addressFormat.js';
 
 function toReportResponse(
   row,
@@ -20,7 +21,8 @@ function toReportResponse(
     },
     summary: {
       totalKnocks: row.total_knocks,
-      totalStatusActivityGroups: row.total_status_groups,
+      // Kept for API compatibility; status counts now cover the same knocks.
+      totalStatusActivityGroups: row.total_knocks,
     },
     byStatus: Array.isArray(row.by_status)
       ? row.by_status.map((item) => ({
@@ -36,6 +38,11 @@ function toReportResponse(
           lastName: item.last_name,
           email: item.email,
           knocks: item.knocks,
+          properties: (item.properties ?? []).map((property) => ({
+            propertyId: property.property_id,
+            address: formatAddress(property),
+            knocks: property.knocks,
+          })),
         }))
       : [],
   };
@@ -69,14 +76,11 @@ export function createReportsService({
           );
         }
 
-        // dateFrom/dateTo are organization-local dates. Convert once here so
-        // downstream SQL remains UTC-based and DST-safe.
-        const { utcStartInclusive, utcEndExclusive } =
-          resolveOrganizationDateRangeToUtc({
-            dateFrom,
-            dateTo,
-            timezone: settings.timezone,
-          });
+        // dateFrom/dateTo are organization-local calendar dates compared with
+        // the knock_date frozen at submission, so later timezone changes and
+        // DST never move an existing knock.
+        assertCalendarDate(dateFrom);
+        assertCalendarDate(dateTo);
 
         // Repository enforces visibility + organization scoping using actor
         // role and rep_visibility in SQL predicates.
@@ -88,8 +92,8 @@ export function createReportsService({
           userId,
           teamId,
           statusId,
-          utcStartInclusive,
-          utcEndExclusive,
+          dateFrom,
+          dateTo,
         });
 
         return {
@@ -101,7 +105,6 @@ export function createReportsService({
       return toReportResponse(
         result.reportRow ?? {
           total_knocks: 0,
-          total_status_groups: 0,
           by_status: [],
           by_representative: [],
         },

@@ -2,10 +2,8 @@ import { AppError } from '../common/errors.js';
 import { withTransaction } from '../db/transaction.js';
 import { exportsRepository as defaultRepository } from './exportsRepository.js';
 import { reportsRepository } from '../reports/reportsRepository.js';
-import {
-  formatUtcDateForTimezone,
-  resolveOrganizationDateRangeToUtc,
-} from '../reports/reportDateRange.js';
+import { assertCalendarDate } from '../reports/reportDateRange.js';
+import { formatAddress } from '../reports/addressFormat.js';
 import { serializeCsv } from './csv.js';
 
 const CSV_HEADERS = [
@@ -17,19 +15,6 @@ const CSV_HEADERS = [
   'interactionDate',
 ];
 
-function formatAddress(row) {
-  const line1 = String(row.address_line_1 ?? '').trim();
-  const line2 = String(row.address_line_2 ?? '').trim();
-  const city = String(row.city ?? '').trim();
-  const state = String(row.state ?? '').trim();
-  const postalCode = String(row.postal_code ?? '').trim();
-
-  const street = [line1, line2].filter(Boolean).join(' ');
-  const cityStatePostal = [city, state, postalCode].filter(Boolean).join(' ');
-
-  return [street, cityStatePostal].filter(Boolean).join(', ');
-}
-
 function formatRepresentative(row) {
   return [row.first_name, row.last_name]
     .map((value) => String(value ?? '').trim())
@@ -37,14 +22,15 @@ function formatRepresentative(row) {
     .join(' ');
 }
 
-function toCsvRows(rows, timezone) {
+function toCsvRows(rows) {
   return rows.map((row) => [
     formatAddress(row),
     row.contact_name ?? '',
     row.contact_phone ?? '',
     row.status_name ?? '',
     formatRepresentative(row),
-    formatUtcDateForTimezone(row.changed_at, timezone),
+    // Organization-local knock date frozen at submission.
+    row.knock_date_text,
   ]);
 }
 
@@ -85,12 +71,8 @@ export function createExportsService({
           );
         }
 
-        const { utcStartInclusive, utcEndExclusive } =
-          resolveOrganizationDateRangeToUtc({
-            dateFrom,
-            dateTo,
-            timezone: settings.timezone,
-          });
+        assertCalendarDate(dateFrom);
+        assertCalendarDate(dateTo);
 
         // Reuse reporting visibility semantics so exports cannot reveal rows
         // the actor could not see in the corresponding report view.
@@ -102,17 +84,14 @@ export function createExportsService({
           userId,
           teamId,
           statusId,
-          utcStartInclusive,
-          utcEndExclusive,
+          dateFrom,
+          dateTo,
         });
 
-        return {
-          rows,
-          timezone: settings.timezone,
-        };
+        return { rows };
       });
 
-      const csvRows = toCsvRows(result.rows, result.timezone);
+      const csvRows = toCsvRows(result.rows);
 
       return {
         filename: buildFilename(),

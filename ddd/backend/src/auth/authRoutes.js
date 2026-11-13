@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { createAuthService } from './authService.js';
 import { loginValidators, registerValidators } from './authValidation.js';
 import { validate } from '../validation/validate.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { verifyTokenClaimsMiddleware } from '../middleware/authMiddleware.js';
 
 export function buildAuthRoutes({ authService = createAuthService() } = {}) {
   const router = Router();
@@ -43,7 +43,7 @@ export function buildAuthRoutes({ authService = createAuthService() } = {}) {
     }
   });
 
-  router.post('/logout', authMiddleware, (req, res) => {
+  router.post('/logout', verifyTokenClaimsMiddleware, (req, res) => {
     void req;
     // JWT auth is stateless in MVP: logout confirms intent while the client
     // clears local auth state and drops the bearer token.

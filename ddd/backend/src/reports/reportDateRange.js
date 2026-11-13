@@ -139,6 +139,25 @@ export function resolveOrganizationDateRangeToUtc({
   };
 }
 
+/**
+ * Validates an inclusive organization-local calendar date (YYYY-MM-DD).
+ * Reports compare these dates directly with the stored knock_date.
+ */
+export function assertCalendarDate(value) {
+  const { year, month, day } = parseDateOnly(value);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Invalid date range.');
+  }
+
+  return value;
+}
+
 export function formatUtcDateForTimezone(value, timezone) {
   if (!value) {
     return '';

@@ -7,6 +7,7 @@ const CREATE_FIELDS = [
   'contactPhone',
   'contactEmail',
   'notes',
+  'sameDayReturn',
 ];
 
 const UPDATE_FIELDS = [
@@ -59,6 +60,10 @@ export const createInteractionValidators = [
     .optional({ nullable: true })
     .isUUID()
     .withMessage('clientRequestId must be a valid UUID when provided.'),
+  body('sameDayReturn')
+    .optional()
+    .isBoolean({ strict: true })
+    .withMessage('sameDayReturn must be a boolean when provided.'),
   body('statusId')
     .exists()
     .withMessage('statusId is required.')

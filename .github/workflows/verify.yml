@@ -1,0 +1,46 @@
+name: Verify JoeKnock
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: joeknock_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d joeknock_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/joeknock_test
+      JWT_SECRET: ci-only-never-production-secret
+      JWT_EXPIRES_IN: 15m
+      CORS_ORIGIN: http://127.0.0.1:4173
+      VITE_API_BASE_URL: http://127.0.0.1:3000/api
+      JOEKNOCK_FULL_STACK: "1"
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm ci --prefix ddd/backend
+      - run: npm ci --prefix ddd/frontend
+      - name: Migrate disposable CI database
+        run: npm run migrate:up --prefix ddd/backend
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/joeknock_test
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+        env:
+          NODE_ENV: production
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

@@ -318,7 +318,7 @@ describeDb('PATCH /api/users/:id/active', () => {
     expect(loginResponse.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('allows admin self-deactivation per current API contract', async () => {
+  it('blocks self-deactivation when it would leave no active administrator', async () => {
     const app = createApp();
     const admin = await seedActor('admin');
 
@@ -327,8 +327,11 @@ describeDb('PATCH /api/users/:id/active', () => {
       .set('Authorization', `Bearer ${admin.token}`)
       .send({ isActive: false });
 
-    expect(response.status).toBe(200);
-    expect(response.body.id).toBe(admin.actor.id);
-    expect(response.body.isActive).toBe(false);
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('CONFLICT');
+    const row = await query('SELECT is_active FROM users WHERE id = $1', [
+      admin.actor.id,
+    ]);
+    expect(row.rows[0].is_active).toBe(true);
   });
 });

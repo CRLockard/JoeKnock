@@ -17,15 +17,25 @@ function toIsoTimestamp(value) {
 
 function toInteractionSnapshotResponse(row) {
   return {
+    ...(typeof row.can_edit === 'boolean' ? { canEdit: row.can_edit } : {}),
     interactionId: row.id,
     interactionGroupId: row.interaction_group_id,
     propertyId: row.property_id,
     userId: row.user_id,
     statusId: row.status_id,
     statusName: row.status_name,
-    initialInteractionAt: toIsoTimestamp(row.initial_interaction_at),
-    changedAt: toIsoTimestamp(row.changed_at),
+    initialInteractionAt: toIsoTimestamp(
+      row.initial_interaction_at_utc ?? row.initial_interaction_at,
+    ),
+    changedAt: toIsoTimestamp(row.changed_at_utc ?? row.changed_at),
     changedBy: row.changed_by,
+    lastEditedBy:
+      row.editor_first_name || row.editor_last_name
+        ? {
+            firstName: row.editor_first_name,
+            lastName: row.editor_last_name,
+          }
+        : null,
     isCurrent: row.is_current,
     contactName: row.contact_name,
     contactPhone: row.contact_phone,
@@ -75,6 +85,7 @@ function isEditAllowed({ actorRole, actorUserId, ownerUserId, sharesTeam }) {
 export function createInteractionsService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
+  now = () => new Date(),
 } = {}) {
   return {
     async createInteractionForProperty({
@@ -87,6 +98,7 @@ export function createInteractionsService({
       contactEmail,
       notes,
       clientRequestId,
+      sameDayReturn = false,
     }) {
       const normalizedPayload = {
         contactName: normalizeNullableText(contactName),
@@ -124,6 +136,12 @@ export function createInteractionsService({
             );
           }
 
+          await repository.lockRelationship(client, {
+            organizationId,
+            userId,
+            propertyId,
+          });
+
           if (normalizedPayload.clientRequestId) {
             const existingByRequestId =
               await repository.findSnapshotByClientRequestId(client, {
@@ -147,24 +165,76 @@ export function createInteractionsService({
             }
           }
 
-          const existingGroup =
-            await repository.findExistingGroupForUserProperty(client, {
+          const organizationTimezone =
+            await repository.findValidOrganizationTimezone(client, {
               organizationId,
-              userId,
-              propertyId,
             });
 
-          if (existingGroup) {
+          if (!organizationTimezone) {
             throw new AppError(
-              409,
-              'CONFLICT',
-              'An interaction already exists for this representative and property. Use POST /api/interactions/:id to revise it.',
+              422,
+              'ORGANIZATION_TIMEZONE_INVALID',
+              'This organization has no valid timezone configured. Ask an administrator to set one in Settings before recording visits.',
             );
           }
 
           const interactionGroupId = randomUUID();
-          // Initial interaction creates the immutable history chain for this
-          // representative/property relationship.
+          const submittedAt = now().toISOString();
+
+          // A counted visit already exists for this organization-local day.
+          const todaysVisitId = await repository.findVisitForLocalDay(client, {
+            organizationId,
+            userId,
+            propertyId,
+            instant: submittedAt,
+            timezone: organizationTimezone,
+          });
+
+          if (todaysVisitId && !sameDayReturn) {
+            throw new AppError(
+              409,
+              'SAME_DAY_VISIT_EXISTS',
+              'You already logged a visit to this property today. Edit that visit, or save a same-day return to add details without another knock.',
+            );
+          }
+
+          if (todaysVisitId) {
+            // Same-day return: an additional snapshot on today's history that
+            // copies its frozen timing and earns no knock.
+            const todaysCurrent = await repository.findSnapshotById(client, {
+              organizationId,
+              interactionId: todaysVisitId.id,
+            });
+
+            await repository.clearCurrentForGroup(client, {
+              organizationId,
+              interactionGroupId: todaysCurrent.interaction_group_id,
+            });
+
+            const added = await repository.createSnapshot(client, {
+              interactionGroupId: todaysCurrent.interaction_group_id,
+              propertyId,
+              organizationId,
+              ownerUserId: userId,
+              statusId: status.id,
+              statusName: status.name,
+              initialInteractionAt: todaysCurrent.initial_interaction_at,
+              timingSourceSnapshotId: todaysCurrent.id,
+              changedBy: userId,
+              contactName: normalizedPayload.contactName,
+              contactPhone: normalizedPayload.contactPhone,
+              contactEmail: normalizedPayload.contactEmail,
+              notes: normalizedPayload.notes,
+              clientRequestId: normalizedPayload.clientRequestId,
+            });
+
+            return repository.findSnapshotById(client, {
+              organizationId,
+              interactionId: added.id,
+            });
+          }
+
+          // First visit of the local day starts a new history and earns the knock.
           const created = await repository.createSnapshot(client, {
             interactionGroupId,
             propertyId,
@@ -172,7 +242,8 @@ export function createInteractionsService({
             ownerUserId: userId,
             statusId: status.id,
             statusName: status.name,
-            initialInteractionAt: new Date().toISOString(),
+            initialInteractionAt: submittedAt,
+            submittedAt,
             changedBy: userId,
             contactName: normalizedPayload.contactName,
             contactPhone: normalizedPayload.contactPhone,
@@ -189,6 +260,17 @@ export function createInteractionsService({
 
         return toInteractionSnapshotResponse(snapshot);
       } catch (error) {
+        if (
+          isUniqueViolation(error) &&
+          error.constraint === 'interactions_daily_knock_unique'
+        ) {
+          throw new AppError(
+            409,
+            'SAME_DAY_VISIT_EXISTS',
+            'You already logged a visit to this property today. Edit that visit, or save a same-day return to add details without another knock.',
+          );
+        }
+
         if (!isUniqueViolation(error) || !normalizedPayload.clientRequestId) {
           throw error;
         }
@@ -250,17 +332,32 @@ export function createInteractionsService({
           return null;
         }
 
-        if (requestedSnapshot.is_current) {
-          return requestedSnapshot;
-        }
-
-        return repository.findVisibleCurrentSnapshotByGroup(client, {
-          organizationId,
-          actorUserId: userId,
-          actorRole: role,
-          repVisibility,
-          interactionGroupId: requestedSnapshot.interaction_group_id,
-        });
+        const current = requestedSnapshot.is_current
+          ? requestedSnapshot
+          : await repository.findVisibleCurrentSnapshotByGroup(client, {
+              organizationId,
+              actorUserId: userId,
+              actorRole: role,
+              repVisibility,
+              interactionGroupId: requestedSnapshot.interaction_group_id,
+            });
+        if (!current) return null;
+        const sharesTeam =
+          role === 'manager' &&
+          (await repository.hasSharedTeamMembership(client, {
+            organizationId,
+            actorUserId: userId,
+            ownerUserId: current.user_id,
+          }));
+        return {
+          ...current,
+          can_edit: isEditAllowed({
+            actorRole: role,
+            actorUserId: userId,
+            ownerUserId: current.user_id,
+            sharesTeam,
+          }),
+        };
       });
 
       if (!snapshot) {
@@ -324,6 +421,12 @@ export function createInteractionsService({
           );
         }
 
+        // Lock the stable group identity, not the replaceable current row.
+        // After waiting, READ COMMITTED sees the latest committed snapshot.
+        await client.query(
+          'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+          [organizationId, baseSnapshot.interaction_group_id],
+        );
         const currentSnapshot = await repository.findCurrentSnapshotByGroup(
           client,
           {
@@ -337,6 +440,16 @@ export function createInteractionsService({
             409,
             'CONFLICT',
             'Current interaction snapshot could not be resolved.',
+          );
+        }
+
+        // The URL's snapshot ID is the version the editor actually loaded.
+        // An old ID still resolves on GET, but may not overwrite a newer save.
+        if (currentSnapshot.id !== interactionId) {
+          throw new AppError(
+            409,
+            'CONFLICT',
+            'This interaction was updated by someone else. Your draft is retained; reopen the property to review the latest version before saving.',
           );
         }
 
@@ -404,6 +517,7 @@ export function createInteractionsService({
           statusId: nextStatusId,
           statusName: nextStatusName,
           initialInteractionAt: currentSnapshot.initial_interaction_at,
+          timingSourceSnapshotId: currentSnapshot.id,
           changedBy: userId,
           contactName: nextContactName,
           contactPhone: nextContactPhone,
@@ -418,9 +532,21 @@ export function createInteractionsService({
         });
 
         return finalSnapshot;
+      }).catch((error) => {
+        if (
+          isUniqueViolation(error) &&
+          error.constraint === 'interactions_current_group_unique'
+        ) {
+          throw new AppError(
+            409,
+            'CONFLICT',
+            'This interaction changed while saving. Review the latest version and try again.',
+          );
+        }
+        throw error;
       });
 
-      return toInteractionSnapshotResponse(revised);
+      return toInteractionSnapshotResponse({ ...revised, can_edit: true });
     },
   };
 }

@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { query } from '../../src/db/client.js';
+import { stampKnockFields } from '../helpers/knockFixtures.js';
 import { signAccessToken } from '../../src/auth/jwt.js';
 import {
   ensureTestMigrations,
@@ -168,6 +169,7 @@ async function createProperty({
 }
 
 async function createInteractionSnapshot({
+  knock,
   id,
   interactionGroupId,
   propertyId,
@@ -236,6 +238,7 @@ async function createInteractionSnapshot({
       notes,
     ],
   );
+  await stampKnockFields(id, knock);
 }
 
 function tokenFor(user) {

@@ -902,6 +902,11 @@ td {
   max-width: min(420px, calc(100vw - 2rem));
   display: grid;
   gap: 0.45rem;
+  pointer-events: none;
+}
+
+.map-stage__feedback button {
+  pointer-events: auto;
 }
 
 .map-stage__feedback .feedback {
@@ -1029,6 +1034,26 @@ td {
   width: min(860px, calc(100vw - 2rem));
   padding: 1.25rem 1.4rem;
   transform: translateX(-50%);
+  max-height: calc(100vh - 72px - 6.4rem);
+  max-height: calc(100dvh - 72px - 6.4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #272c3f;
+}
+
+@supports (height: 100dvh) {
+  .map-page,
+  .map-stage {
+    min-height: calc(100dvh - 72px);
+  }
+  .map-canvas {
+    height: calc(100dvh - 72px);
+  }
+}
+
+.map-property-panel :focus-visible {
+  outline: 2px solid #a7c6ff;
+  outline-offset: 2px;
 }
 
 .map-property-panel-header {
@@ -1049,6 +1074,21 @@ td {
 .map-property-meta {
   margin: 0.45rem 0;
   color: var(--color-text-muted);
+}
+
+.map-copy-id-button {
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-copy-id-button:hover {
+  color: var(--color-text, inherit);
 }
 
 .map-property-interactions {
