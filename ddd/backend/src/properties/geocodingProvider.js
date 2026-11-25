@@ -58,7 +58,7 @@ export function createNominatimGeocodingProvider({
     );
   }
   return {
-    async reverseGeocode({ latitude, longitude }) {
+    async reverseGeocode({ latitude, longitude, signal: coordinationSignal }) {
       const url = new URL('/reverse', baseUrl);
       url.searchParams.set('format', 'jsonv2');
       url.searchParams.set('addressdetails', '1');
@@ -66,7 +66,10 @@ export function createNominatimGeocodingProvider({
       url.searchParams.set('lon', String(longitude));
 
       let response;
-      const signal = AbortSignal.timeout(timeoutMs);
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      const signal = coordinationSignal
+        ? AbortSignal.any([timeoutSignal, coordinationSignal])
+        : timeoutSignal;
 
       try {
         response = await fetchImpl(url, {
@@ -79,7 +82,7 @@ export function createNominatimGeocodingProvider({
         });
       } catch {
         throw new GeocodingProviderError('Geocoding provider request failed.', {
-          category: signal.aborted
+          category: timeoutSignal.aborted
             ? 'provider_timeout'
             : 'network_transport_failure',
         });
@@ -100,7 +103,7 @@ export function createNominatimGeocodingProvider({
         throw new GeocodingProviderError(
           'Geocoding provider response was invalid.',
           {
-            category: signal.aborted
+            category: timeoutSignal.aborted
               ? 'provider_timeout'
               : 'provider_invalid_json',
           },
