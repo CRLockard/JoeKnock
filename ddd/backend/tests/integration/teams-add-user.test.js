@@ -146,6 +146,10 @@ describeDb('POST /api/teams/:id/users', () => {
       organizationId: actor.organization.id,
       name: 'North Team',
     });
+    await query(
+      'INSERT INTO team_users (organization_id, team_id, user_id) VALUES ($1, $2, $3)',
+      [actor.organization.id, team.id, actor.user.id],
+    );
     const member = await createUserRecord({
       organizationId: actor.organization.id,
       email: `member-mgr.${Date.now()}@example.com`,
@@ -206,6 +210,10 @@ describeDb('POST /api/teams/:id/users', () => {
       organizationId: actor.organization.id,
       name: 'Duplicate Team',
     });
+    await query(
+      'INSERT INTO team_users (organization_id, team_id, user_id) VALUES ($1, $2, $3)',
+      [actor.organization.id, team.id, actor.user.id],
+    );
     const member = await createUserRecord({
       organizationId: actor.organization.id,
       email: `member-dup.${Date.now()}@example.com`,
@@ -441,6 +449,10 @@ describeDb('POST /api/teams/:id/users', () => {
       organizationId: actor.organization.id,
       name: 'Detail Team',
     });
+    await query(
+      'INSERT INTO team_users (organization_id, team_id, user_id) VALUES ($1, $2, $3)',
+      [actor.organization.id, team.id, actor.user.id],
+    );
     const member = await createUserRecord({
       organizationId: actor.organization.id,
       email: `member-detail.${Date.now()}@example.com`,

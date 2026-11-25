@@ -110,12 +110,14 @@ export function SettingsPage() {
     useState(false);
 
   const isAdmin = auth.user?.role === 'admin';
-  // Managers share most operational settings work with admins, but only admins
-  // can apply org-wide writes for security-sensitive fields.
   const canViewTeams = isAdmin || auth.user?.role === 'manager';
   const canCreateTeams = canViewTeams;
-  const canManageStatuses = canViewTeams;
-  const canViewOrganizationSettings = canViewTeams;
+  const canManageStatuses = isAdmin;
+  const canViewOrganizationSettings = isAdmin;
+  const canManageSelectedTeam =
+    isAdmin ||
+    (auth.user?.role === 'manager' &&
+      selectedTeam?.members.some((member) => member.id === auth.user.id));
   const activeSection =
     searchParams.get('section') &&
     ['company', 'teams', 'statuses', 'visibility'].includes(
@@ -169,6 +171,12 @@ export function SettingsPage() {
   }, [canViewOrganizationSettings]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setOrganization(null);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     async function loadOrganization() {
@@ -199,7 +207,7 @@ export function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!canViewTeams) {
@@ -428,9 +436,9 @@ export function SettingsPage() {
     setRemoveMemberError('');
     setRemoveMemberSuccessMessage('');
 
-    if (!canViewTeams) {
+    if (!canManageSelectedTeam) {
       setAddMemberError(
-        'Only managers and administrators can add users to teams.',
+        'You can only manage representatives on a team you belong to.',
       );
       return;
     }
@@ -466,9 +474,12 @@ export function SettingsPage() {
     setAddMemberError('');
     setAddMemberSuccessMessage('');
 
-    if (!canViewTeams) {
+    if (
+      !canManageSelectedTeam ||
+      (!isAdmin && (member.role !== 'rep' || member.id === auth.user?.id))
+    ) {
       setRemoveMemberError(
-        'Only managers and administrators can remove users from teams.',
+        'You can only manage representatives on a team you belong to.',
       );
       return;
     }
@@ -540,7 +551,7 @@ export function SettingsPage() {
     setStatusesSuccessMessage('');
 
     if (!canManageStatuses) {
-      setStatusesError('Only managers and administrators can create statuses.');
+      setStatusesError('Only administrators can create statuses.');
       return;
     }
 
@@ -823,9 +834,16 @@ export function SettingsPage() {
         </p>
       ) : null}
 
-      {!isLoading && organization ? (
+      {!isLoading && (organization || !isAdmin) ? (
         <>
-          {activeSection === 'all' || activeSection === 'company' ? (
+          {!isAdmin &&
+          (activeSection === 'company' || activeSection === 'visibility') ? (
+            <p className="feedback">
+              Only administrators can access organization settings.
+            </p>
+          ) : null}
+          {isAdmin &&
+          (activeSection === 'all' || activeSection === 'company') ? (
             <div className="workspace-grid">
               <form onSubmit={handleSubmit} className="panel stack-form">
                 <div className="panel__header">
@@ -932,6 +950,12 @@ export function SettingsPage() {
                         Only managers and administrators can create teams.
                       </p>
                     )}
+                    {!isAdmin && canCreateTeams ? (
+                      <p className="feedback">
+                        An administrator must add you to a new team before you
+                        can manage its representatives.
+                      </p>
+                    ) : null}
                   </form>
                 </section>
 
@@ -970,55 +994,78 @@ export function SettingsPage() {
                               <StatusBadge tone="info">
                                 {member.role}
                               </StatusBadge>
-                              <button
-                                type="button"
-                                className="button button--ghost"
-                                onClick={() => handleRemoveMember(member)}
-                                disabled={isRemovingMember || isAddingMember}
-                              >
-                                {isRemovingMember
-                                  ? 'Removing member...'
-                                  : `Remove ${member.firstName} ${member.lastName}`}
-                              </button>
+                              {isAdmin ||
+                              (canManageSelectedTeam &&
+                                member.role === 'rep' &&
+                                member.id !== auth.user?.id) ? (
+                                <button
+                                  type="button"
+                                  className="button button--ghost"
+                                  onClick={() => handleRemoveMember(member)}
+                                  disabled={isRemovingMember || isAddingMember}
+                                >
+                                  {isRemovingMember
+                                    ? 'Removing member...'
+                                    : `Remove ${member.firstName} ${member.lastName}`}
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    <form
-                      onSubmit={handleAddMember}
-                      aria-label="add team member"
-                      className="stack-form"
-                    >
-                      <label className="form-field" htmlFor="team-member-user">
-                        <span>Team member</span>
-                        <select
-                          id="team-member-user"
-                          name="teamMemberUser"
-                          value={selectedUserId}
-                          onChange={(event) =>
-                            setSelectedUserId(event.target.value)
-                          }
+                    {canManageSelectedTeam ? (
+                      <form
+                        onSubmit={handleAddMember}
+                        aria-label="add team member"
+                        className="stack-form"
+                      >
+                        <label
+                          className="form-field"
+                          htmlFor="team-member-user"
+                        >
+                          <span>Team member</span>
+                          <select
+                            id="team-member-user"
+                            name="teamMemberUser"
+                            value={selectedUserId}
+                            onChange={(event) =>
+                              setSelectedUserId(event.target.value)
+                            }
+                            disabled={isAddingMember || isUsersLoading}
+                          >
+                            <option value="">Select a user</option>
+                            {organizationUsers
+                              .filter(
+                                (user) =>
+                                  isAdmin ||
+                                  (user.role === 'rep' &&
+                                    user.id !== auth.user?.id),
+                              )
+                              .map((user) => (
+                                <option key={user.id} value={user.id}>
+                                  {user.firstName} {user.lastName} ({user.email}
+                                  )
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+
+                        <button
+                          type="submit"
+                          className="button button--primary"
                           disabled={isAddingMember || isUsersLoading}
                         >
-                          <option value="">Select a user</option>
-                          {organizationUsers.map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.firstName} {user.lastName} ({user.email})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <button
-                        type="submit"
-                        className="button button--primary"
-                        disabled={isAddingMember || isUsersLoading}
-                      >
-                        {isAddingMember ? 'Adding member...' : 'Add member'}
-                      </button>
-                    </form>
+                          {isAddingMember ? 'Adding member...' : 'Add member'}
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="feedback">
+                        Only members of this team can manage its
+                        representatives.
+                      </p>
+                    )}
                   </section>
                 ) : null}
               </aside>
@@ -1044,19 +1091,25 @@ export function SettingsPage() {
 
                 {!isStatusesLoading && statuses.length > 0 ? (
                   <>
-                    <p className="feedback status-order-hint">
-                      Drag and drop to reorder statuses
-                    </p>
+                    {canManageStatuses ? (
+                      <p className="feedback status-order-hint">
+                        Drag and drop to reorder statuses
+                      </p>
+                    ) : null}
                     <div className="table-shell">
                       <table>
                         <thead>
                           <tr>
-                            <th scope="col" aria-label="Drag handle" />
+                            {canManageStatuses ? (
+                              <th scope="col" aria-label="Drag handle" />
+                            ) : null}
                             <th scope="col">Order</th>
                             <th scope="col">Status Name</th>
                             <th scope="col">Description</th>
                             <th scope="col">Active</th>
-                            <th scope="col">Actions</th>
+                            {canManageStatuses ? (
+                              <th scope="col">Actions</th>
+                            ) : null}
                           </tr>
                         </thead>
                         <tbody>
@@ -1095,17 +1148,19 @@ export function SettingsPage() {
                                 void handleStatusDrop(status.id);
                               }}
                             >
-                              <td>
-                                <span
-                                  aria-hidden="true"
-                                  className="status-order-handle"
-                                >
-                                  ⋮⋮
-                                </span>
-                                <span className="visually-hidden">
-                                  Drag to reorder {status.name}
-                                </span>
-                              </td>
+                              {canManageStatuses ? (
+                                <td>
+                                  <span
+                                    aria-hidden="true"
+                                    className="status-order-handle"
+                                  >
+                                    ⋮⋮
+                                  </span>
+                                  <span className="visually-hidden">
+                                    Drag to reorder {status.name}
+                                  </span>
+                                </td>
+                              ) : null}
                               <td>{status.displayOrder}</td>
                               <td>
                                 {status.name}
@@ -1127,44 +1182,46 @@ export function SettingsPage() {
                                     : 'Active'}
                                 </StatusBadge>
                               </td>
-                              <td>
-                                <div className="table-actions">
-                                  {canManageStatuses ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="button button--ghost"
-                                        onClick={() =>
-                                          startEditingStatus(status)
-                                        }
-                                        disabled={
-                                          isUpdatingStatus ||
-                                          isDeactivatingStatus ||
-                                          isReorderingStatuses
-                                        }
-                                      >
-                                        Edit {status.name}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="button button--ghost"
-                                        onClick={() =>
-                                          handleDeactivateStatus(status)
-                                        }
-                                        disabled={
-                                          isDeactivatingStatus ||
-                                          isUpdatingStatus ||
-                                          isReorderingStatuses
-                                        }
-                                      >
-                                        {isDeactivatingStatus
-                                          ? 'Deactivating...'
-                                          : `Deactivate ${status.name}`}
-                                      </button>
-                                    </>
-                                  ) : null}
-                                </div>
-                              </td>
+                              {canManageStatuses ? (
+                                <td>
+                                  <div className="table-actions">
+                                    {canManageStatuses ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="button button--ghost"
+                                          onClick={() =>
+                                            startEditingStatus(status)
+                                          }
+                                          disabled={
+                                            isUpdatingStatus ||
+                                            isDeactivatingStatus ||
+                                            isReorderingStatuses
+                                          }
+                                        >
+                                          Edit {status.name}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="button button--ghost"
+                                          onClick={() =>
+                                            handleDeactivateStatus(status)
+                                          }
+                                          disabled={
+                                            isDeactivatingStatus ||
+                                            isUpdatingStatus ||
+                                            isReorderingStatuses
+                                          }
+                                        >
+                                          {isDeactivatingStatus
+                                            ? 'Deactivating...'
+                                            : `Deactivate ${status.name}`}
+                                        </button>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              ) : null}
                             </tr>
                           ))}
                         </tbody>
@@ -1223,7 +1280,7 @@ export function SettingsPage() {
                   </form>
                 ) : (
                   <p className="feedback">
-                    Only managers and administrators can manage statuses.
+                    Only administrators can manage statuses.
                   </p>
                 )}
 
@@ -1309,7 +1366,8 @@ export function SettingsPage() {
             </div>
           ) : null}
 
-          {activeSection === 'all' || activeSection === 'visibility' ? (
+          {isAdmin &&
+          (activeSection === 'all' || activeSection === 'visibility') ? (
             <div className="workspace-grid workspace-grid--visibility">
               <form
                 onSubmit={handleOrganizationSettingsSubmit}

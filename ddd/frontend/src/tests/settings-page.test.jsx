@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider.jsx';
@@ -124,6 +125,129 @@ afterEach(() => {
 });
 
 describe('settings page', () => {
+  it('limits manager membership controls to reps on a team they belong to', async () => {
+    setStoredUser('manager');
+    const manager = {
+      id: 'user-1',
+      firstName: 'Manager',
+      lastName: 'Actor',
+      email: 'manager@example.com',
+      role: 'manager',
+    };
+    const rep = {
+      id: 'rep-1',
+      firstName: 'Rep',
+      lastName: 'Member',
+      email: 'rep@example.com',
+      role: 'rep',
+    };
+    const newRep = {
+      id: 'rep-2',
+      firstName: 'New',
+      lastName: 'Rep',
+      email: 'new@example.com',
+      role: 'rep',
+    };
+    const otherManager = {
+      id: 'manager-2',
+      firstName: 'Other',
+      lastName: 'Manager',
+      email: 'other@example.com',
+      role: 'manager',
+    };
+    const admin = {
+      id: 'admin-1',
+      firstName: 'Admin',
+      lastName: 'User',
+      email: 'admin@example.com',
+      role: 'admin',
+    };
+    getTeams.mockResolvedValue([
+      { id: 'own', name: 'Own Team' },
+      { id: 'other', name: 'Other Team' },
+    ]);
+    getUsers.mockResolvedValue([manager, rep, newRep, otherManager, admin]);
+    getTeam.mockImplementation(async (id) => ({
+      id,
+      name: id === 'own' ? 'Own Team' : 'Other Team',
+      members: id === 'own' ? [manager, rep, otherManager, admin] : [rep],
+    }));
+
+    renderSettings(['/settings?section=teams']);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Own Team View details' }),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Remove Rep Member' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove Manager Actor' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove Other Manager' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove Admin User' }),
+    ).not.toBeInTheDocument();
+    const select = screen.getByLabelText('Team member');
+    expect(
+      within(select).getByRole('option', { name: /Rep Member/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(select).queryByRole('option', {
+        name: /Manager Actor|Other Manager|Admin User/,
+      }),
+    ).not.toBeInTheDocument();
+
+    addUserToTeam.mockResolvedValue({});
+    fireEvent.change(select, { target: { value: newRep.id } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
+    await waitFor(() => {
+      expect(addUserToTeam).toHaveBeenCalledWith('own', { userId: newRep.id });
+    });
+    await screen.findByText('Team member added successfully.');
+    removeUserFromTeam.mockResolvedValue({});
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Rep Member' }));
+    await waitFor(() => {
+      expect(removeUserFromTeam).toHaveBeenCalledWith('own', rep.id);
+    });
+    await screen.findByText('Team member removed successfully.');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Other Team View details' }),
+    );
+    expect(
+      await screen.findByText(
+        'Only members of this team can manage its representatives.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add member' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove Rep Member' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps status selection readable but hides manager administration controls', async () => {
+    setStoredUser('manager');
+    getStatuses.mockResolvedValue([
+      { id: 'status-1', name: 'Interested', displayOrder: 1, isActive: true },
+    ]);
+    renderSettings(['/settings?section=statuses']);
+    expect(await screen.findByText('Interested')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Create status' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit Interested' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Deactivate Interested' }),
+    ).not.toBeInTheDocument();
+    expect(getOrganizationSettings).not.toHaveBeenCalled();
+  });
+
   it('loads organization info and allows admin update', async () => {
     setStoredUser('admin');
 
@@ -273,8 +397,8 @@ describe('settings page', () => {
     expect(getStatuses).toHaveBeenCalledTimes(1);
   });
 
-  it('allows manager to create a status', async () => {
-    setStoredUser('manager');
+  it('allows admin to create a status', async () => {
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -658,7 +782,7 @@ describe('settings page', () => {
     );
   });
 
-  it('renders non-admin as read-only with no save action', async () => {
+  it('does not request or display organization administration for a manager', async () => {
     setStoredUser('manager');
 
     getOrganization.mockResolvedValue({
@@ -670,14 +794,12 @@ describe('settings page', () => {
 
     renderSettings(['/settings']);
 
-    const input = await screen.findByLabelText('Organization name');
-
-    expect(input).toBeDisabled();
+    await screen.findByRole('button', { name: 'Create team' });
     expect(
-      screen.getByText(
-        'Only administrators can update organization information.',
-      ),
-    ).toBeInTheDocument();
+      screen.queryByLabelText('Organization name'),
+    ).not.toBeInTheDocument();
+    expect(getOrganization).not.toHaveBeenCalled();
+    expect(getOrganizationSettings).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('button', { name: 'Save organization' }),
     ).not.toBeInTheDocument();
@@ -722,7 +844,7 @@ describe('settings page', () => {
   });
 
   it('loads and renders team members when viewing team detail', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -796,7 +918,7 @@ describe('settings page', () => {
   });
 
   it('removes a selected team member and refreshes team detail', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -938,7 +1060,7 @@ describe('settings page', () => {
   });
 
   it('shows loading state while removing a member', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -1006,7 +1128,7 @@ describe('settings page', () => {
   });
 
   it('shows API error when member removal fails', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -1060,7 +1182,7 @@ describe('settings page', () => {
   });
 
   it('adds a selected user to a team and refreshes team detail', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',
@@ -1188,7 +1310,7 @@ describe('settings page', () => {
   });
 
   it('shows API error when add team member fails', async () => {
-    setStoredUser('manager');
+    setStoredUser('admin');
 
     getOrganization.mockResolvedValue({
       id: 'org-1',

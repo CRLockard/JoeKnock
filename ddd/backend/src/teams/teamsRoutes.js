@@ -80,6 +80,7 @@ export function buildTeamsRoutes({ teamsService = createTeamsService() } = {}) {
           organizationId: req.auth.organizationId,
           teamId: req.params.id,
           userId: req.body.userId,
+          actorUserId: req.auth.userId,
         });
 
         return res.status(201).json(membership);
@@ -100,6 +101,7 @@ export function buildTeamsRoutes({ teamsService = createTeamsService() } = {}) {
           organizationId: req.auth.organizationId,
           teamId: req.params.id,
           userId: req.params.userId,
+          actorUserId: req.auth.userId,
         });
 
         return res.status(200).json(membership);

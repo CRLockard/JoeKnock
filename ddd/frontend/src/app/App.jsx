@@ -137,7 +137,13 @@ export function App() {
             Profile
           </NavLink>
           <NavLink
-            to="/settings?section=company"
+            to={
+              auth.user?.role === 'manager'
+                ? '/settings?section=teams'
+                : auth.user?.role === 'admin'
+                  ? '/settings?section=company'
+                  : '/settings?section=statuses'
+            }
             className="app-user-menu__item"
             role="menuitem"
           >

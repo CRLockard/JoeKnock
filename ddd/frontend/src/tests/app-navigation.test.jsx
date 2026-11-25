@@ -101,24 +101,31 @@ describe('app navigation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens the user menu and exposes settings route', async () => {
-    setStoredSession();
+  it.each([
+    ['manager', '/settings?section=teams'],
+    ['admin', '/settings?section=company'],
+    ['rep', '/settings?section=statuses'],
+  ])(
+    'opens the appropriate settings section for %s',
+    async (role, destination) => {
+      setStoredSession(role);
 
-    render(
-      <AuthProvider>
-        <MemoryRouter>
-          <App />
-        </MemoryRouter>
-      </AuthProvider>,
-    );
+      render(
+        <AuthProvider>
+          <MemoryRouter>
+            <App />
+          </MemoryRouter>
+        </AuthProvider>,
+      );
 
-    fireEvent.click(screen.getByRole('button', { name: /Corey Lopez/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Corey Lopez/i }));
 
-    const settingsLink = await screen.findByRole('menuitem', {
-      name: 'Settings',
-    });
-    expect(settingsLink).toHaveAttribute('href', '/settings?section=company');
-  });
+      const settingsLink = await screen.findByRole('menuitem', {
+        name: 'Settings',
+      });
+      expect(settingsLink).toHaveAttribute('href', destination);
+    },
+  );
 
   it('renders Reports link in the drawer for manager users', async () => {
     setStoredSession('manager');

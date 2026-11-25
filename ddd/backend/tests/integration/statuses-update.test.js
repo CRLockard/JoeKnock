@@ -129,9 +129,9 @@ describeDb('PATCH /api/statuses/:id', () => {
     await resetRegistrationTables();
   });
 
-  it('updates permitted fields for manager', async () => {
+  it('updates permitted fields for admin', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
     const status = await createStatusRecord({
       organizationId: actor.organization.id,
       name: 'No Answer',
@@ -237,7 +237,7 @@ describeDb('PATCH /api/statuses/:id', () => {
 
   it('rejects malformed id and invalid values', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
 
     const badId = await request(app)
       .patch('/api/statuses/not-a-uuid')
@@ -303,7 +303,7 @@ describeDb('PATCH /api/statuses/:id', () => {
 
   it('returns not found for nonexistent status', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
 
     const response = await request(app)
       .patch('/api/statuses/8d3be711-07b6-4f76-bb06-ef2f0b5547f7')

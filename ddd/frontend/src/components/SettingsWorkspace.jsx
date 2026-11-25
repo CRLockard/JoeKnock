@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth.js';
 
 const SETTINGS_ITEMS = [
   {
@@ -40,11 +41,20 @@ export function SettingsWorkspace({
   actions = null,
   children,
 }) {
+  const { user } = useAuth();
+  const visibleItems = SETTINGS_ITEMS.filter((item) => {
+    if (user?.role === 'admin') return true;
+    if (user?.role === 'manager') {
+      return ['teams', 'users', 'export'].includes(item.id);
+    }
+    return false;
+  });
+
   return (
     <section className="settings-workspace-page">
       <aside className="settings-sidebar" aria-label="Settings navigation">
         <nav className="settings-sidebar__nav">
-          {SETTINGS_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             // Settings are modeled as one workspace with sections so shared
             // context (org/team/status) stays visible while moving between
             // management tasks.

@@ -18,11 +18,20 @@ const TEAM_BY_ID_AND_ORGANIZATION_SQL = `
   LIMIT 1
 `;
 
+// Hold user roles and the manager's membership stable until the write commits.
 const USER_BY_ID_AND_ORGANIZATION_SQL = `
-  SELECT id, organization_id
+  SELECT id, organization_id, role, is_active
   FROM users
   WHERE id = $1 AND organization_id = $2
   LIMIT 1
+  FOR SHARE
+`;
+
+const ACTOR_MEMBERSHIP_SQL = `
+  SELECT 1
+  FROM team_users
+  WHERE organization_id = $1 AND team_id = $2 AND user_id = $3
+  FOR SHARE
 `;
 
 const TEAM_USER_INSERT_SQL = `
@@ -95,6 +104,15 @@ export const teamsRepository = {
       organizationId,
     ]);
     return result.rows;
+  },
+
+  async hasLockedMembership(client, { organizationId, teamId, userId }) {
+    const result = await client.query(ACTOR_MEMBERSHIP_SQL, [
+      organizationId,
+      teamId,
+      userId,
+    ]);
+    return result.rowCount > 0;
   },
 
   async addUserToTeam(client, { organizationId, teamId, userId }) {

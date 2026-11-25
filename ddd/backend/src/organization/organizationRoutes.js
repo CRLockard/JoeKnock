@@ -33,21 +33,17 @@ export function buildOrganizationRoutes({
 } = {}) {
   const router = Router();
 
-  router.get(
-    '/settings',
-    requireRoles(['manager', 'admin']),
-    async (req, res, next) => {
-      try {
-        const settings = await organizationService.getOrganizationSettings({
-          organizationId: req.auth.organizationId,
-        });
+  router.get('/settings', requireRoles(['admin']), async (req, res, next) => {
+    try {
+      const settings = await organizationService.getOrganizationSettings({
+        organizationId: req.auth.organizationId,
+      });
 
-        return res.status(200).json(settings);
-      } catch (error) {
-        return next(error);
-      }
-    },
-  );
+      return res.status(200).json(settings);
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.patch(
     '/settings',
@@ -71,21 +67,17 @@ export function buildOrganizationRoutes({
     },
   );
 
-  router.get(
-    '/',
-    requireRoles(['manager', 'admin']),
-    async (req, res, next) => {
-      try {
-        const organization = await organizationService.getOrganization({
-          organizationId: req.auth.organizationId,
-        });
+  router.get('/', requireRoles(['admin']), async (req, res, next) => {
+    try {
+      const organization = await organizationService.getOrganization({
+        organizationId: req.auth.organizationId,
+      });
 
-        return res.status(200).json(organization);
-      } catch (error) {
-        return next(error);
-      }
-    },
-  );
+      return res.status(200).json(organization);
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.patch(
     '/',

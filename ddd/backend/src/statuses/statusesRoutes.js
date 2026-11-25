@@ -48,7 +48,7 @@ export function buildStatusesRoutes({
 
   router.post(
     '/',
-    requireRoles(['manager', 'admin']),
+    requireRoles(['admin']),
     createStatusValidators,
     validate,
     async (req, res, next) => {
@@ -69,7 +69,7 @@ export function buildStatusesRoutes({
 
   router.patch(
     '/:id',
-    requireRoles(['manager', 'admin']),
+    requireRoles(['admin']),
     updateStatusValidators,
     validate,
     async (req, res, next) => {
@@ -91,8 +91,7 @@ export function buildStatusesRoutes({
 
   router.patch(
     '/:id/active',
-    // Managers/admins can retire statuses; reps cannot alter workflow catalog.
-    requireRoles(['manager', 'admin']),
+    requireRoles(['admin']),
     updateStatusActiveValidators,
     validate,
     async (req, res, next) => {

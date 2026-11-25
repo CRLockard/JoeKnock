@@ -94,10 +94,10 @@ describeDb('organization settings endpoints', () => {
     await resetRegistrationTables();
   });
 
-  it('GET /api/organization/settings returns authenticated organization settings for manager', async () => {
+  it('GET /api/organization/settings returns authenticated organization settings for admin', async () => {
     const app = createApp();
     const seeded = await seedUser({
-      role: 'manager',
+      role: 'admin',
       repVisibility: 'team',
       timezone: 'America/New_York',
     });
