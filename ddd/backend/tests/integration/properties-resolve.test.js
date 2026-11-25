@@ -4,6 +4,7 @@ import { createApp } from '../../src/app.js';
 import { signAccessToken } from '../../src/auth/jwt.js';
 import { query } from '../../src/db/client.js';
 import { createPropertiesService } from '../../src/properties/propertiesService.js';
+import { createNominatimGeocodingProvider } from '../../src/properties/geocodingProvider.js';
 import {
   ensureTestMigrations,
   hasTestDatabase,
@@ -84,6 +85,7 @@ function appWithGeocoder(geocodingProvider) {
 
 function buildResolvableAddress(overrides = {}) {
   return {
+    precision: 'property',
     addressLine1: '123 Main Street',
     addressLine2: null,
     city: 'Knoxville',
@@ -189,6 +191,48 @@ describeDb('POST /api/properties/resolve', () => {
     expect(count.rows[0].count).toBe(1);
   });
 
+  it('resolves and reuses a complete building address from the provider', async () => {
+    const orgId = await createOrganization('Org A');
+    const user = await createUser({ organizationId: orgId, label: 'actor' });
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        category: 'building',
+        type: 'house',
+        place_rank: 30,
+        lat: '35.9',
+        lon: '-84',
+        address: {
+          house_number: '12A',
+          road: 'Main Street',
+          city: 'Knoxville',
+          state: 'TN',
+          postcode: '37901',
+          country_code: 'us',
+        },
+      }),
+    }));
+    const app = appWithGeocoder(
+      createNominatimGeocodingProvider({ fetchImpl }),
+    );
+    const first = await request(app)
+      .post('/api/properties/resolve')
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({ latitude: 35.9, longitude: -84 });
+    const second = await request(app)
+      .post('/api/properties/resolve')
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({ latitude: 35.9, longitude: -84 });
+    expect(first.status).toBe(200);
+    expect(first.body.created).toBe(true);
+    expect(second.status).toBe(200);
+    expect(second.body.created).toBe(false);
+    expect(second.body.property.propertyId).toBe(
+      first.body.property.propertyId,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('enforces organization isolation for the same normalized address', async () => {
     const orgA = await createOrganization('Org A');
     const orgB = await createOrganization('Org B');
@@ -245,6 +289,56 @@ describeDb('POST /api/properties/resolve', () => {
 
     const count = await query('SELECT COUNT(*)::int AS count FROM properties');
     expect(count.rows[0].count).toBe(0);
+  });
+
+  it('does not create or reuse an existing road-only property for distinct taps', async () => {
+    const orgId = await createOrganization('Org A');
+    const user = await createUser({ organizationId: orgId, label: 'actor' });
+    await query(
+      `INSERT INTO properties (organization_id, address_line_1, city, state, postal_code,
+        country, normalized_address, latitude, longitude)
+       VALUES ($1, 'Main Street', 'Knoxville', 'TN', '37901', 'US',
+         'main st|knoxville|tn|37901|us', 35.9, -84)`,
+      [orgId],
+    );
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        category: 'highway',
+        type: 'residential',
+        place_rank: 26,
+        lat: '35.9',
+        lon: '-84',
+        address: {
+          road: 'Main Street',
+          city: 'Knoxville',
+          state: 'TN',
+          postcode: '37901',
+          country_code: 'us',
+        },
+      }),
+    }));
+    const app = appWithGeocoder(
+      createNominatimGeocodingProvider({ fetchImpl }),
+    );
+    for (const latitude of [35.9, 35.91]) {
+      const response = await request(app)
+        .post('/api/properties/resolve')
+        .set('Authorization', `Bearer ${tokenFor(user)}`)
+        .send({ latitude, longitude: -84 });
+      expect(response.status).toBe(422);
+      expect(response.body.error).toMatchObject({
+        code: 'PROPERTY_LOCATION_UNRESOLVABLE',
+        message:
+          'We couldn’t identify a specific property here. Try tapping closer to the building.',
+      });
+    }
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const count = await query(
+      'SELECT COUNT(*)::int AS count FROM properties WHERE organization_id = $1',
+      [orgId],
+    );
+    expect(count.rows[0].count).toBe(1);
   });
 
   it('contains provider failures behind an actionable unavailable response', async () => {

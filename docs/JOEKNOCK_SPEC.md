@@ -89,8 +89,21 @@ connection strings, hashes, or personal field notes.
 The map is the main workspace. Property resolution is performed by the backend
 through `POST /api/properties/resolve`; the frontend does not call geocoding
 providers directly. Properties are organization-owned and reused by normalized
-address. A property without a visible current interaction need not have a map
-marker. V1 does not provide status/date map filters or marker counts.
+address only after the provider result has passed the property-precision check.
+For this pilot, Nominatim must return a nonempty house-number identifier and
+road, search rank 30, and a building or `place=house` node result, as well as
+the existing locality fields. The identifier need not be numeric. Road-only,
+`place=house` way (including documented interpolation ways), missing-evidence,
+and other less-specific results cannot create or reuse a property. A rejected
+lookup displays “We couldn’t identify a
+specific property here. Try tapping closer to the building.” and leaves the
+existing selection and draft intact; it does not automatically retry.
+This conservative pilot limitation does not mean unnumbered or named properties
+are invalid; support for resolving them is deferred. Nominatim returns the
+nearest suitable mapped object, so passing the check does not guarantee that
+the selected point belongs to that property. A property without a visible
+current interaction need not have a map marker. V1 does not provide status/date
+map filters or marker counts.
 When location permission is denied or GPS is unavailable, manual map use must
 remain possible. Recenter resumes following the current location.
 
@@ -124,8 +137,9 @@ while a browser is closed. Popup/context switching preserves unfinished work
 without a normal confirmation prompt; a confirmed submission clears only its
 own draft.
 
-Map selection claims its identity before asynchronous property lookup. Late
-lookup, detail, save, or error results cannot replace a newer selection.
+Map lookup claims its identity before asynchronous property lookup while the
+existing selection stays active until a lookup succeeds. Late lookup, detail,
+save, or error results cannot replace a newer selection.
 Confirmed writes remain bound to the captured user, organization, property,
 and interaction; a later refresh failure must not resubmit a successful write.
 On mobile, controls and feedback must remain reachable with landscape and the
@@ -229,7 +243,7 @@ endpoint's stated restrictions. Auth means an active authorized user.
 | `PATCH /statuses/:id` | Admin | Update status fields while retaining historical status text. |
 | `PATCH /statuses/:id/active` | Admin | Activate/deactivate a status. |
 | `GET /properties/:id` | Auth | Read a scoped property. |
-| `POST /properties/resolve` | Auth | Resolve coordinates to a normalized organization property. |
+| `POST /properties/resolve` | Auth | Resolve coordinates to a normalized organization property only when provider evidence passes the pilot precision check; otherwise return `PROPERTY_LOCATION_UNRESOLVABLE` without a property write or reuse. |
 | `GET /properties/:propertyId/interactions` | Auth + visibility | Read authorized current interaction summaries, not a timeline. |
 | `POST /properties/:propertyId/interactions` | Auth | Create a visit with a required active status and optional contact/notes, or an explicitly confirmed same-day return. |
 | `GET /interactions/:id` | Auth + visibility | Read current group state; an older snapshot ID resolves to current state. |

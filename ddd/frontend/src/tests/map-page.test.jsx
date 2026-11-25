@@ -1306,6 +1306,50 @@ describe('MapPage selection identity with delayed responses', () => {
     mockGeolocationSuccess();
   });
 
+  it('keeps the selected property and its draft when a location is uncertain', async () => {
+    useTwoProperties();
+    const message =
+      'We couldn’t identify a specific property here. Try tapping closer to the building.';
+    resolvePropertyLocation.mockRejectedValueOnce(new Error(message));
+    render(<MapPage />);
+    await clickMarker(0);
+    fireEvent.change(await screen.findByLabelText('Notes'), {
+      target: { value: 'Keep my draft.' },
+    });
+    await waitFor(() => {
+      expect(loadInteractionDraft(draftScope('property-1'))?.notes).toBe(
+        'Keep my draft.',
+      );
+    });
+    await clickMap(35.52, -84.12);
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Notes')).toHaveValue('Keep my draft.');
+    expect(loadInteractionDraft(draftScope('property-1'))?.notes).toBe(
+      'Keep my draft.',
+    );
+    expect(resolvePropertyLocation).toHaveBeenCalledTimes(1);
+    expect(getPropertyById).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes loading the existing selection when a later location lookup fails', async () => {
+    useTwoProperties();
+    const details = deferred();
+    getPropertyById.mockReturnValueOnce(details.promise);
+    resolvePropertyLocation.mockRejectedValueOnce(
+      new Error('Uncertain location'),
+    );
+    render(<MapPage />);
+    await clickMarker(0);
+    await clickMap(35.52, -84.12);
+    expect(await screen.findByText('Uncertain location')).toBeInTheDocument();
+    await act(async () => {
+      details.resolve(PROPERTY_1);
+    });
+    expect(await screen.findByText(/123 Main St/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Notes')).toBeInTheDocument();
+  });
+
   it('ignores an older map-location lookup that finishes after a newer one', async () => {
     useTwoProperties();
     const lookupOne = deferred();

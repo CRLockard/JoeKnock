@@ -67,7 +67,7 @@ function toUnresolvableError() {
   return new AppError(
     422,
     'PROPERTY_LOCATION_UNRESOLVABLE',
-    'The selected map location could not be resolved to a valid property address.',
+    'We couldn’t identify a specific property here. Try tapping closer to the building.',
   );
 }
 
@@ -188,6 +188,16 @@ export function createPropertiesService({
           operation: 'properties.resolve',
           provider: 'nominatim',
           failureCategory: 'provider_unusable_address',
+        });
+        throw toUnresolvableError();
+      }
+
+      if (resolved.precision !== 'property') {
+        logger.warn('property_resolution_location_unresolvable', {
+          requestId,
+          operation: 'properties.resolve',
+          provider: 'nominatim',
+          failureCategory: 'provider_imprecise_address',
         });
         throw toUnresolvableError();
       }

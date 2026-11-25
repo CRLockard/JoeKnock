@@ -25,6 +25,25 @@ function pickAddressLine1(address) {
   return '';
 }
 
+function hasPropertyPrecision(body, address) {
+  const houseNumber =
+    typeof address.house_number === 'string' && address.house_number.trim();
+  const road = typeof address.road === 'string' && address.road.trim();
+  const isBuilding =
+    body.category === 'building' &&
+    typeof body.type === 'string' &&
+    body.type.trim().length > 0;
+  // Nominatim can represent interpolated numbers as place=house ways.
+  const isHouse =
+    body.category === 'place' &&
+    body.type === 'house' &&
+    body.osm_type === 'node';
+
+  return Boolean(
+    houseNumber && road && body.place_rank === 30 && (isBuilding || isHouse),
+  );
+}
+
 export function createNominatimGeocodingProvider({
   fetchImpl = fetch,
   baseUrl = process.env.GEOCODING_BASE_URL ||
@@ -120,6 +139,9 @@ export function createNominatimGeocodingProvider({
       const resolvedLongitude = toNumber(body?.lon);
 
       return {
+        precision: hasPropertyPrecision(body, address)
+          ? 'property'
+          : 'uncertain',
         addressLine1,
         addressLine2: null,
         city,

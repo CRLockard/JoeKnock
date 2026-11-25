@@ -76,6 +76,24 @@ test('selecting a map marker opens property workflow and interaction entry', asy
     });
   });
 
+  let lookupCount = 0;
+  const uncertainMessage =
+    'We couldn’t identify a specific property here. Try tapping closer to the building.';
+  await page.route('**/api/properties/resolve', async (route) => {
+    lookupCount += 1;
+    await route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: {
+          code: 'PROPERTY_LOCATION_UNRESOLVABLE',
+          message: uncertainMessage,
+        },
+      }),
+    });
+  });
+  await page.route('**/*.tile.openstreetmap.org/**', (route) => route.abort());
+
   await page.goto('/login');
 
   await page.evaluate(() => {
@@ -127,6 +145,15 @@ test('selecting a map marker opens property workflow and interaction entry', asy
   await expect(
     page.getByRole('heading', { name: 'Record Interaction' }),
   ).toBeVisible();
+
+  await page.getByLabel('Notes').fill('Keep this draft.');
+  await page.locator('.map-container').click({ position: { x: 60, y: 240 } });
+  await expect(page.getByText(uncertainMessage)).toBeVisible();
+  await expect(page.locator('.map-property-address')).toContainText(
+    '123 Main St',
+  );
+  await expect(page.getByLabel('Notes')).toHaveValue('Keep this draft.');
+  expect(lookupCount).toBe(1);
 
   await page
     .locator('form.map-interaction-form')

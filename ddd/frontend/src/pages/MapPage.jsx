@@ -310,6 +310,7 @@ export function MapPage() {
   const [refreshRetry, setRefreshRetry] = useState(null);
   const [sameDayConflict, setSameDayConflict] = useState(null);
   const selectionTokenRef = useRef(0);
+  const locationLookupTokenRef = useRef(0);
   const latestRequestRef = useRef(0);
   const latestBoundsRef = useRef(null);
 
@@ -520,11 +521,9 @@ export function MapPage() {
   );
 
   const handleMarkerSelect = useCallback(
-    async (propertyId, existingToken) => {
-      // A map click claims its token before reverse geocoding starts; marker
-      // clicks claim a fresh one here.
-      const selectionToken = existingToken ?? (selectionTokenRef.current += 1);
-      selectionTokenRef.current = selectionToken;
+    async (propertyId) => {
+      locationLookupTokenRef.current += 1;
+      const selectionToken = (selectionTokenRef.current += 1);
       setDraftReadyKey(null);
       setDraftStorageError('');
       setConflictSnapshot(null);
@@ -612,9 +611,8 @@ export function MapPage() {
 
   const handleMapLocationSelect = useCallback(
     async ({ lat, lng }) => {
-      // Identity tracking starts at click time so an older, slower lookup can
-      // never replace a newer selection or reopen a cancelled one.
-      const selectionToken = (selectionTokenRef.current += 1);
+      // Keep the existing selection active until a lookup succeeds.
+      const lookupToken = (locationLookupTokenRef.current += 1);
       setSelectionError('');
 
       try {
@@ -625,7 +623,7 @@ export function MapPage() {
           longitude: lng,
         });
 
-        if (selectionTokenRef.current !== selectionToken) {
+        if (locationLookupTokenRef.current !== lookupToken) {
           return;
         }
 
@@ -638,9 +636,9 @@ export function MapPage() {
           return;
         }
 
-        await handleMarkerSelect(propertyId, selectionToken);
+        await handleMarkerSelect(propertyId);
       } catch (error) {
-        if (selectionTokenRef.current !== selectionToken) {
+        if (locationLookupTokenRef.current !== lookupToken) {
           return;
         }
 
@@ -1206,6 +1204,7 @@ export function MapPage() {
   const handleCancelSelection = useCallback(() => {
     // Invalidate in-flight selection responses; stored drafts are kept.
     selectionTokenRef.current += 1;
+    locationLookupTokenRef.current += 1;
     setRefreshRetry(null);
     setDraftReadyKey(null);
     setDraftStorageError('');
