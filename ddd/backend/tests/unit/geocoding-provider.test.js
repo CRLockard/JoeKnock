@@ -20,6 +20,9 @@ describe('nominatim geocoding provider adapter', () => {
       return makeSuccessResponse({
         lat: '38.8976998',
         lon: '-77.0365532',
+        category: 'building',
+        type: 'yes',
+        place_rank: 30,
         address: {
           house_number: '1600',
           road: 'Pennsylvania Avenue Northwest',
@@ -36,6 +39,7 @@ describe('nominatim geocoding provider adapter', () => {
     await expect(
       provider.reverseGeocode({ latitude: 38.8977, longitude: -77.0365 }),
     ).resolves.toEqual({
+      precision: 'property',
       addressLine1: '1600 Pennsylvania Avenue Northwest',
       addressLine2: null,
       city: 'Washington',
@@ -48,6 +52,82 @@ describe('nominatim geocoding provider adapter', () => {
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    [
+      'building with an alphanumeric number',
+      'building',
+      'residential',
+      30,
+      '12A',
+      'property',
+    ],
+    ['explicit house', 'place', 'house', 30, 'Orchard Cottage', 'property'],
+    ['road only', 'highway', 'residential', 26, '', 'uncertain'],
+    [
+      'road with a house number',
+      'highway',
+      'residential',
+      26,
+      '12',
+      'uncertain',
+    ],
+    [
+      'rank 30 road with a house number',
+      'highway',
+      'residential',
+      30,
+      '12',
+      'uncertain',
+    ],
+    ['lower-rank house', 'place', 'house', 28, '12', 'uncertain'],
+    ['house way', 'place', 'house', 30, '12', 'uncertain', 'way'],
+    [
+      'house with missing OSM type',
+      'place',
+      'house',
+      30,
+      '12',
+      'uncertain',
+      null,
+    ],
+    ['unnumbered building', 'building', 'yes', 30, '', 'uncertain'],
+    ['missing result type', undefined, undefined, 30, '12', 'uncertain'],
+    ['missing rank', 'building', 'yes', undefined, '12', 'uncertain'],
+  ])(
+    'classifies %s using provider evidence',
+    async (
+      _label,
+      category,
+      type,
+      placeRank,
+      houseNumber,
+      precision,
+      osmType = 'node',
+    ) => {
+      const fetchImpl = vi.fn(async () =>
+        makeSuccessResponse({
+          category,
+          type,
+          place_rank: placeRank,
+          osm_type: osmType,
+          address: {
+            house_number: houseNumber,
+            road: 'Main Street',
+            city: 'Knoxville',
+            state: 'TN',
+            postcode: '37901',
+            country_code: 'us',
+          },
+        }),
+      );
+      const provider = createNominatimGeocodingProvider({ fetchImpl });
+      await expect(
+        provider.reverseGeocode({ latitude: 35.9, longitude: -84 }),
+      ).resolves.toMatchObject({ precision });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('throws a deterministic provider error for network failures', async () => {
     const fetchImpl = vi.fn(async () => {
