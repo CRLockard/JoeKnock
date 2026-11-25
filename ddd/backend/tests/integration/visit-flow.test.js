@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
-import { query } from '../../src/db/client.js';
+import { getPool, query } from '../../src/db/client.js';
 import { signAccessToken } from '../../src/auth/jwt.js';
 import { createInteractionsService } from '../../src/interactions/interactionsService.js';
 import {
@@ -184,6 +184,45 @@ describeDb('log a visit across company-local midnight', () => {
     ]);
   });
 
+  it('preserves omitted same-day contact fields and permits explicit clearing', async () => {
+    const f = await fixture();
+    at(DAY2_MORNING);
+    await visit(f, {
+      contactName: 'Existing Name',
+      contactPhone: '555-0100',
+      contactEmail: 'existing@example.com',
+      notes: 'Existing note',
+    });
+
+    const omitted = await visit(f, {
+      sameDayReturn: true,
+      contactName: undefined,
+      contactPhone: undefined,
+      contactEmail: undefined,
+      notes: undefined,
+    });
+    expect(omitted).toMatchObject({
+      contactName: 'Existing Name',
+      contactPhone: '555-0100',
+      contactEmail: 'existing@example.com',
+      notes: 'Existing note',
+    });
+
+    const cleared = await visit(f, {
+      sameDayReturn: true,
+      contactName: null,
+      contactPhone: null,
+      contactEmail: null,
+      notes: null,
+    });
+    expect(cleared).toMatchObject({
+      contactName: null,
+      contactPhone: null,
+      contactEmail: null,
+      notes: null,
+    });
+  });
+
   it('treats sameDayReturn as a normal first visit when none exists today', async () => {
     const f = await fixture();
     at(DAY2_MORNING);
@@ -234,6 +273,83 @@ describeDb('log a visit across company-local midnight', () => {
     expect(new Set(results.map((r) => r.interactionGroupId)).size).toBe(1);
     expect(await state(f)).toEqual([
       { d: '2026-07-02', counted: 1, snapshots: 5, groups: 1, currents: 1 },
+    ]);
+  });
+
+  it('coordinates a same-day return with a competing edit after locking', async () => {
+    const f = await fixture();
+    at(DAY2_FIRST_SECOND);
+    const first = await visit(f);
+
+    let releaseRelationship;
+    const relationshipGate = new Promise((resolve) => {
+      releaseRelationship = resolve;
+    });
+    let signalRelationship;
+    const relationshipAcquired = new Promise((resolve) => {
+      signalRelationship = resolve;
+    });
+
+    const gatedRunInTransaction = async (callback) => {
+      const client = await getPool().connect();
+      try {
+        await client.query('BEGIN');
+        const result = await callback({
+          query: async (sql, values) => {
+            const result = await client.query(sql, values);
+            if (
+              sql.includes('pg_advisory_xact_lock') &&
+              String(sql).includes('hashtextextended')
+            ) {
+              signalRelationship();
+              await relationshipGate;
+            }
+            return result;
+          },
+        });
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    };
+
+    const gatedService = createInteractionsService({
+      now: () => clock,
+      runInTransaction: gatedRunInTransaction,
+    });
+    at(DAY2_MORNING);
+    const sameDayPromise = gatedService.createInteractionForProperty({
+      organizationId: f.org,
+      userId: f.user,
+      propertyId: f.property,
+      statusId: f.status,
+      sameDayReturn: true,
+      notes: 'same-day return wins',
+    });
+
+    await relationshipAcquired;
+    const editPromise = service.reviseInteraction({
+      organizationId: f.org,
+      userId: f.user,
+      role: f.role,
+      interactionId: first.interactionId,
+      notes: 'competing edit',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    releaseRelationship();
+
+    const [sameDay, edit] = await Promise.all([
+      sameDayPromise,
+      editPromise.catch((error) => error),
+    ]);
+    expect(sameDay.notes).toBe('same-day return wins');
+    expect(edit).toMatchObject({ statusCode: 409, code: 'CONFLICT' });
+    expect(await state(f)).toEqual([
+      { d: '2026-07-02', counted: 1, snapshots: 2, groups: 1, currents: 1 },
     ]);
   });
 

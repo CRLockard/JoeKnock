@@ -29,6 +29,7 @@ function fixture() {
       id: 'status-1',
       name: 'No Answer',
     })),
+    lockRelationship: vi.fn(async () => {}),
     clearCurrentForGroup: vi.fn(async () => {
       current.is_current = false;
     }),
@@ -83,6 +84,14 @@ describe('interaction optimistic concurrency', () => {
       sql: expect.stringContaining('pg_advisory_xact_lock'),
       values: ['org-1', 'group-1'],
     });
+    expect(f.repository.lockRelationship).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        organizationId: 'org-1',
+        userId: 'rep-1',
+        propertyId: 'property-1',
+      },
+    );
   });
   it('queues overlapping revisions on stable group identity and yields one winner', async () => {
     const f = fixture();
