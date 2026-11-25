@@ -96,9 +96,9 @@ describeDb('POST /api/statuses', () => {
     await resetRegistrationTables();
   });
 
-  it('creates a status for manager in authenticated organization scope and appends order when omitted', async () => {
+  it('creates a status for admin in authenticated organization scope and appends order when omitted', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
 
     await query(
       `INSERT INTO statuses (organization_id, name, description, display_order, is_active)
@@ -153,7 +153,7 @@ describeDb('POST /api/statuses', () => {
 
   it('ignores client-supplied organization ownership selectors', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
     const other = await seedAuthenticatedUser({ role: 'admin' });
 
     const response = await request(app)

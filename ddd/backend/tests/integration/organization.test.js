@@ -89,9 +89,9 @@ describeDb('organization endpoints', () => {
     await resetRegistrationTables();
   });
 
-  it('GET /api/organization returns authenticated organization for manager', async () => {
+  it('GET /api/organization returns authenticated organization for admin', async () => {
     const app = createApp();
-    const seeded = await seedUser({ role: 'manager' });
+    const seeded = await seedUser({ role: 'admin' });
 
     const token = signAccessToken({
       userId: seeded.user.id,

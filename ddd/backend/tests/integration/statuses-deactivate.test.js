@@ -129,9 +129,9 @@ describeDb('PATCH /api/statuses/:id/active', () => {
     await resetRegistrationTables();
   });
 
-  it('deactivates status for manager and keeps row', async () => {
+  it('deactivates status for admin and keeps row', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
     const status = await createStatusRecord({
       organizationId: actor.organization.id,
       name: 'No Answer',
@@ -212,7 +212,7 @@ describeDb('PATCH /api/statuses/:id/active', () => {
 
   it('supports repeated deactivation idempotently', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
     const status = await createStatusRecord({
       organizationId: actor.organization.id,
       name: 'Already Inactive',
@@ -281,7 +281,7 @@ describeDb('PATCH /api/statuses/:id/active', () => {
 
   it('validates malformed id and invalid body shape', async () => {
     const app = createApp();
-    const actor = await seedAuthenticatedUser({ role: 'manager' });
+    const actor = await seedAuthenticatedUser({ role: 'admin' });
 
     const badId = await request(app)
       .patch('/api/statuses/not-a-uuid/active')

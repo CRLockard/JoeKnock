@@ -170,6 +170,11 @@ describeDb('DELETE /api/teams/:id/users/:userId', () => {
       organizationId: actor.organization.id,
       name: 'North Team',
     });
+    await addUserToTeam({
+      organizationId: actor.organization.id,
+      teamId: team.id,
+      userId: actor.user.id,
+    });
     const member = await createUserRecord({
       organizationId: actor.organization.id,
       email: `member-mgr-remove.${Date.now()}@example.com`,
@@ -235,6 +240,11 @@ describeDb('DELETE /api/teams/:id/users/:userId', () => {
     const team = await createTeamRecord({
       organizationId: actor.organization.id,
       name: 'User Integrity Team',
+    });
+    await addUserToTeam({
+      organizationId: actor.organization.id,
+      teamId: team.id,
+      userId: actor.user.id,
     });
     const member = await createUserRecord({
       organizationId: actor.organization.id,
@@ -316,6 +326,11 @@ describeDb('DELETE /api/teams/:id/users/:userId', () => {
       organizationId: actor.organization.id,
       name: 'Shared Team',
     });
+    await addUserToTeam({
+      organizationId: actor.organization.id,
+      teamId: team.id,
+      userId: actor.user.id,
+    });
     const memberA = await createUserRecord({
       organizationId: actor.organization.id,
       email: `member-a-remove.${Date.now()}@example.com`,
@@ -351,8 +366,9 @@ describeDb('DELETE /api/teams/:id/users/:userId', () => {
       [team.id],
     );
 
-    expect(membershipRows.rows).toHaveLength(1);
-    expect(membershipRows.rows[0].user_id).toBe(memberB.id);
+    expect(membershipRows.rows.map((row) => row.user_id)).toEqual(
+      [memberB.id, actor.user.id].sort(),
+    );
   });
 
   it('does not change interaction history row counts', async () => {

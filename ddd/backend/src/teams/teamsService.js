@@ -37,6 +37,34 @@ function isUniqueViolation(error) {
   return error && error.code === '23505';
 }
 
+async function authorizeMembershipChange(
+  client,
+  repository,
+  { organizationId, teamId, actor, target },
+) {
+  if (actor.is_active && actor.role === 'admin') {
+    return;
+  }
+
+  if (
+    !actor.is_active ||
+    actor.role !== 'manager' ||
+    target.role !== 'rep' ||
+    target.id === actor.id ||
+    !(await repository.hasLockedMembership(client, {
+      organizationId,
+      teamId,
+      userId: actor.id,
+    }))
+  ) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'You do not have permission to perform this action.',
+    );
+  }
+}
+
 export function createTeamsService({
   repository = defaultRepository,
   runInTransaction = withTransaction,
@@ -105,7 +133,7 @@ export function createTeamsService({
       return toTeamResponse(team);
     },
 
-    async addUserToTeam({ organizationId, teamId, userId }) {
+    async addUserToTeam({ organizationId, teamId, userId, actorUserId }) {
       try {
         const membership = await runInTransaction(async (client) => {
           // Guard parent/child references within org boundary before insert.
@@ -118,6 +146,18 @@ export function createTeamsService({
             throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Team not found.');
           }
 
+          const actor = await repository.findUserByIdAndOrganization(client, {
+            userId: actorUserId,
+            organizationId,
+          });
+          if (!actor) {
+            throw new AppError(
+              403,
+              'FORBIDDEN',
+              'You do not have permission to perform this action.',
+            );
+          }
+
           const user = await repository.findUserByIdAndOrganization(client, {
             userId,
             organizationId,
@@ -126,6 +166,13 @@ export function createTeamsService({
           if (!user) {
             throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
           }
+
+          await authorizeMembershipChange(client, repository, {
+            organizationId,
+            teamId,
+            actor,
+            target: user,
+          });
 
           return repository.addUserToTeam(client, {
             organizationId,
@@ -156,7 +203,7 @@ export function createTeamsService({
       }
     },
 
-    async removeUserFromTeam({ organizationId, teamId, userId }) {
+    async removeUserFromTeam({ organizationId, teamId, userId, actorUserId }) {
       const removedMembership = await runInTransaction(async (client) => {
         const team = await repository.findTeamByIdAndOrganization(client, {
           teamId,
@@ -167,6 +214,18 @@ export function createTeamsService({
           throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Team not found.');
         }
 
+        const actor = await repository.findUserByIdAndOrganization(client, {
+          userId: actorUserId,
+          organizationId,
+        });
+        if (!actor) {
+          throw new AppError(
+            403,
+            'FORBIDDEN',
+            'You do not have permission to perform this action.',
+          );
+        }
+
         const user = await repository.findUserByIdAndOrganization(client, {
           userId,
           organizationId,
@@ -175,6 +234,13 @@ export function createTeamsService({
         if (!user) {
           throw new AppError(404, 'RESOURCE_NOT_FOUND', 'User not found.');
         }
+
+        await authorizeMembershipChange(client, repository, {
+          organizationId,
+          teamId,
+          actor,
+          target: user,
+        });
 
         return repository.removeUserFromTeam(client, {
           organizationId,

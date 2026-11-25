@@ -5,9 +5,9 @@ requirements, architecture constraints, data/API semantics, and engineering
 workflow. The README and Copilot instructions are entry points only. Code and
 tests are evidence of implementation, not authority to change a requirement.
 
-**Baseline reviewed:** `main` at `998502b` (PR #52 merge; includes PR #50).
-This is a documentation consolidation, not a new code or test result. Current
-open-PR status and validation are recorded in
+**Baseline reviewed:** `main` at `8f86482` (PR #54 merge). This specification
+also includes the manager-access changes beyond that baseline. Current
+release history and follow-up are recorded in
 [Release status](#release-status-and-follow-up).
 
 ## Status labels and change control
@@ -58,10 +58,17 @@ users. Representative visibility is governed by the organization's `own`,
 `team`, or `organization` setting; organization admins retain organization
 scope. Representatives edit their own interactions, managers edit their own
 and permitted shared-team interactions, and admins may edit any interaction
-in their organization. Managers can currently read organization/settings,
-manage teams and statuses, and create representatives; that current V1 surface
-is broader than the approved V2 policy below. The last active admin cannot be
-demoted or deactivated.
+in their organization. Managers can create representatives and teams and can
+add or remove only representatives on teams they already belong to. They
+cannot add or remove themselves, managers, or admins. Team creation does not
+automatically add the creator; an admin must assign a manager before that
+manager can manage its membership. Membership mutations check and lock the
+actor's current role, target role, and (for managers) current team membership
+within the transaction. Only admins manage statuses and access
+organization information or settings administration. All authenticated roles
+retain active-status reads, and reports use the organization timezone on the
+backend without exposing settings administration. The last active admin cannot
+be demoted or deactivated.
 
 The current visibility setting affects reads: `own` limits representatives to
 their own records; `team` adds records shared through team membership; and
@@ -195,9 +202,9 @@ Historical immutability is enforced by
 application behavior; do not claim a universal database immutability trigger.
 No migration or destructive data change is authorized by this specification.
 
-The following inventory describes V1 as implemented on main. M/A means current
-manager/admin access; approved V2 restrictions above take precedence as a
-future target. Auth means an active authorized user.
+The following inventory describes the current V1 contract including the
+manager-access changes. M/A means manager/admin access subject to the
+endpoint's stated restrictions. Auth means an active authorized user.
 
 | Method and path | Access | Contract summary |
 |---|---|---|
@@ -205,9 +212,9 @@ future target. Auth means an active authorized user.
 | `POST /auth/login` | Public | Verify email/password and active user; return token and public user. |
 | `POST /auth/logout` | Valid token claims | Confirm logout; client clears its session. Copied tokens are not globally revoked. |
 | `GET /me` | Auth | Return current user's public profile and organization context. |
-| `GET /organization` | M/A | Read current organization. |
+| `GET /organization` | Admin | Read current organization for administration. |
 | `PATCH /organization` | Admin | Update organization name. |
-| `GET /organization/settings` | M/A | Read current visibility/timezone settings. |
+| `GET /organization/settings` | Admin | Read current visibility/timezone settings. |
 | `PATCH /organization/settings` | Admin | Update permitted visibility/timezone fields. |
 | `GET /users` | M/A | List scoped users, with supported active/role filters. |
 | `POST /users` | M/A | Create a user; manager creation is limited to representatives. |
@@ -215,12 +222,12 @@ future target. Auth means an active authorized user.
 | `PATCH /users/:id/active` | Admin | Activate/deactivate while preserving history and last-admin protection. |
 | `GET /teams`, `GET /teams/:id` | M/A | Read organization teams and membership. |
 | `POST /teams` | M/A | Create an organization team. |
-| `POST /teams/:id/users` | M/A | Add a same-organization team member. |
-| `DELETE /teams/:id/users/:userId` | M/A | Remove only the membership relationship. |
+| `POST /teams/:id/users` | M/A | Admins add same-organization users; managers add reps only to teams they currently belong to. |
+| `DELETE /teams/:id/users/:userId` | M/A | Admins remove same-organization users; managers remove reps only from teams they currently belong to. |
 | `GET /statuses` | Auth | Read active selectable organization statuses. |
-| `POST /statuses` | M/A | Create a status (V2 target restricts catalog management to admins). |
-| `PATCH /statuses/:id` | M/A | Update status fields while retaining historical status text. |
-| `PATCH /statuses/:id/active` | M/A | Activate/deactivate a status. |
+| `POST /statuses` | Admin | Create a status. |
+| `PATCH /statuses/:id` | Admin | Update status fields while retaining historical status text. |
+| `PATCH /statuses/:id/active` | Admin | Activate/deactivate a status. |
 | `GET /properties/:id` | Auth | Read a scoped property. |
 | `POST /properties/resolve` | Auth | Resolve coordinates to a normalized organization property. |
 | `GET /properties/:propertyId/interactions` | Auth + visibility | Read authorized current interaction summaries, not a timeline. |
@@ -293,18 +300,15 @@ and migration/rollback mechanics remain undecided.
 
 ### Manager, team, status, and administrator boundaries
 
-The approved V2 manager policy is narrower than V1 and is not implemented:
+The membership, status, and settings restrictions above are implemented. The
+remaining approved V2 directions below are not implemented:
 
-- Managers may add/remove representatives only on teams they currently belong
-  to; they may not manage other managers or admins in teams.
 - Managers may create teams for themselves and may delete only teams they
   created. Leaving a self-created team deletes that team and its memberships,
   after a clear warning. User records and fieldwork remain intact.
 - Managers may invite representatives, but not managers or admins. They may
   not assign roles, view/edit organization settings or permissions, or
   deactivate users.
-- Only admins manage the status catalog. Managers and representatives may
-  still read and select active statuses for permitted field interactions.
 - Before an admin deactivates a manager, the confirmation separately lists
   the manager by display name, their owned teams, and teams they only assist
   on. Keep the two categories separate and show an explicit `None` for an
@@ -432,7 +436,7 @@ defects.
 |---|---|
 | One knock per representative/property forever; edits or future activity could be counted differently | One count per organization + representative + property + stored organization-local date. Same-day returns and all edits add no count. |
 | Export date could reflect edit time or latest interaction time | CSV `interactionDate` is the original knock date; row details are the latest saved details for that counted history. One row per counted history. |
-| Managers may broadly manage teams/settings/statuses, or status editing is already admin-only | Current V1 access is broader; approved V2 manager restrictions and admin-only catalog management are targets, not shipped behavior. |
+| Managers may broadly manage memberships/settings/statuses | Managers manage reps only on teams they belong to; organization administration and status catalog writes are admin-only. |
 | MVP prohibits all deletion | Approved V2 exception allows deletion of manager-owned teams and memberships only; user/work records remain. No endpoint is implemented. |
 | Last active admin and a designated main admin are the same control | V1 blocks removal of the last active admin. A designated main admin with accepted transfer is an approved V2 direction. |
 | Old mockups or story tickets imply functionality is approved | Only requirements labeled implemented or approved here are standing requirements. Mockup-only items are deferred; old ticket-specific plans are retired. |
