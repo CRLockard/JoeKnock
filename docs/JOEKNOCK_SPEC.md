@@ -135,8 +135,11 @@ PR #49 implemented the approved daily-knock model:
   `knock_date` and `knock_timezone`; changing the setting later does not move
   existing knocks.
 - A confirmed same-day return appends information to that day's history but
-  adds no count. A new local day can create a new counted history. Edits,
-  including edits to older histories, never add counts.
+  adds no count. Same-day return snapshots preserve current contact fields and
+  notes when those fields are omitted; explicit `null` or normalized empty text
+  clears a field. A submitted `notes` value replaces the current notes value;
+  note appending is not implemented. A new local day can create a new counted
+  history. Edits, including edits to older histories, never add counts.
 - `SAME_DAY_VISIT_EXISTS` requires explicit confirmation. A request-ID retry
   returns the original result even if the retry occurs after midnight.
 - Legacy rows without the new knock fields are not backfilled and are excluded
@@ -184,8 +187,11 @@ history, and idempotent request identity. The submission path serializes
 concurrent work for the organization/representative/property key and the
 database uniqueness constraint prevents duplicate daily counts. Reusing a
 request ID for a different actor/property is a conflict; matching retries
-return the original result. Transactional behavior must preserve a current
-snapshot and reject stale edits. Historical immutability is enforced by
+return the original result. Same-day returns and edits acquire the relationship
+lock before the stable interaction-group lock, re-read the current snapshot
+after locking, preserve database uniqueness safeguards, and reject stale edits.
+Transactional behavior must preserve a current snapshot and reject stale edits.
+Historical immutability is enforced by
 application behavior; do not claim a universal database immutability trigger.
 No migration or destructive data change is authorized by this specification.
 

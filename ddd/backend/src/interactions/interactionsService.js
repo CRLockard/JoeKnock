@@ -206,25 +206,65 @@ export function createInteractionsService({
               interactionId: todaysVisitId.id,
             });
 
+            if (!todaysCurrent) {
+              throw new AppError(
+                409,
+                'CONFLICT',
+                'Current interaction snapshot could not be resolved.',
+              );
+            }
+
+            await client.query(
+              'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+              [organizationId, todaysCurrent.interaction_group_id],
+            );
+            const latestCurrent = await repository.findCurrentSnapshotByGroup(
+              client,
+              {
+                organizationId,
+                interactionGroupId: todaysCurrent.interaction_group_id,
+              },
+            );
+
+            if (!latestCurrent) {
+              throw new AppError(
+                409,
+                'CONFLICT',
+                'Current interaction snapshot could not be resolved.',
+              );
+            }
+
             await repository.clearCurrentForGroup(client, {
               organizationId,
-              interactionGroupId: todaysCurrent.interaction_group_id,
+              interactionGroupId: latestCurrent.interaction_group_id,
             });
 
             const added = await repository.createSnapshot(client, {
-              interactionGroupId: todaysCurrent.interaction_group_id,
+              interactionGroupId: latestCurrent.interaction_group_id,
               propertyId,
               organizationId,
               ownerUserId: userId,
               statusId: status.id,
               statusName: status.name,
-              initialInteractionAt: todaysCurrent.initial_interaction_at,
-              timingSourceSnapshotId: todaysCurrent.id,
+              initialInteractionAt: latestCurrent.initial_interaction_at,
+              timingSourceSnapshotId: latestCurrent.id,
               changedBy: userId,
-              contactName: normalizedPayload.contactName,
-              contactPhone: normalizedPayload.contactPhone,
-              contactEmail: normalizedPayload.contactEmail,
-              notes: normalizedPayload.notes,
+              contactName:
+                normalizedPayload.contactName !== undefined
+                  ? normalizedPayload.contactName
+                  : latestCurrent.contact_name,
+              contactPhone:
+                normalizedPayload.contactPhone !== undefined
+                  ? normalizedPayload.contactPhone
+                  : latestCurrent.contact_phone,
+              contactEmail:
+                normalizedPayload.contactEmail !== undefined
+                  ? normalizedPayload.contactEmail
+                  : latestCurrent.contact_email,
+              notes:
+                normalizedPayload.notes !== undefined
+                  ? normalizedPayload.notes
+                  : latestCurrent.notes,
               clientRequestId: normalizedPayload.clientRequestId,
             });
 
@@ -420,6 +460,12 @@ export function createInteractionsService({
             'You do not have permission to perform this action.',
           );
         }
+
+        await repository.lockRelationship(client, {
+          organizationId,
+          userId: baseSnapshot.user_id,
+          propertyId: baseSnapshot.property_id,
+        });
 
         // Lock the stable group identity, not the replaceable current row.
         // After waiting, READ COMMITTED sees the latest committed snapshot.
