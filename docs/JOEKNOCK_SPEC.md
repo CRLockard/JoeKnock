@@ -143,7 +143,10 @@ save, or error results cannot replace a newer selection.
 Confirmed writes remain bound to the captured user, organization, property,
 and interaction; a later refresh failure must not resubmit a successful write.
 On mobile, controls and feedback must remain reachable with landscape and the
-keyboard open; real-device validation remains a launch check.
+keyboard open. The property panel must remain within the map container and
+visible viewport, with scrollable content and usable map controls and
+attribution. Browser emulation does not replace real-device validation, which
+remains a launch check.
 
 ### Daily knocks, dates, reports, and CSV
 
