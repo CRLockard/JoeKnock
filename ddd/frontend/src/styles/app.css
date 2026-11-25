@@ -889,7 +889,7 @@ td {
 
 .map-stage {
   position: relative;
-  min-height: calc(100vh - 72px);
+  height: calc(100vh - 72px);
   background: #cfe8d2;
   isolation: isolate;
 }
@@ -918,12 +918,13 @@ td {
 
 .map-stage__controls {
   position: absolute;
-  right: 1rem;
-  bottom: 7rem;
+  left: 1rem;
+  bottom: 1.5rem;
   z-index: 10;
-  display: grid;
-  justify-items: end;
+  display: flex;
+  align-items: center;
   gap: 0.65rem;
+  max-width: calc(100% - 6rem);
 }
 
 .map-follow-status {
@@ -1001,7 +1002,7 @@ td {
   position: relative;
   z-index: 0;
   width: 100%;
-  height: calc(100vh - 72px);
+  height: 100%;
   overflow: hidden;
 }
 
@@ -1031,22 +1032,20 @@ td {
   left: 50%;
   bottom: 5.4rem;
   z-index: 16;
-  width: min(860px, calc(100vw - 2rem));
+  width: min(860px, calc(100% - 2rem));
   padding: 1.25rem 1.4rem;
   transform: translateX(-50%);
-  max-height: calc(100vh - 72px - 6.4rem);
-  max-height: calc(100dvh - 72px - 6.4rem);
+  max-height: calc(100% - 6.4rem);
   overflow-y: auto;
   overscroll-behavior: contain;
   background: #272c3f;
 }
 
 @supports (height: 100dvh) {
-  .map-page,
-  .map-stage {
+  .map-page {
     min-height: calc(100dvh - 72px);
   }
-  .map-canvas {
+  .map-stage {
     height: calc(100dvh - 72px);
   }
 }
@@ -1157,7 +1156,7 @@ td {
 
 .leaflet-top.leaflet-left {
   top: auto;
-  bottom: 7rem;
+  bottom: 0.875rem;
   left: auto;
   right: 1rem;
 }
@@ -1193,6 +1192,10 @@ td {
     padding: 1rem;
   }
 
+  .app-main--map {
+    padding: 0;
+  }
+
   .app-brand {
     font-size: 1.55rem;
   }
@@ -1212,22 +1215,16 @@ td {
     grid-template-columns: 1fr;
   }
 
-  .map-stage {
-    min-height: calc(100vh - 72px);
-  }
-
   .map-stage__controls {
-    right: 0.75rem;
-    bottom: 6.2rem;
+    left: 0.75rem;
   }
 
   .leaflet-top.leaflet-left {
     right: 0.75rem;
-    bottom: 6.2rem;
   }
 
   .map-property-panel--overlay {
-    width: calc(100vw - 1rem);
+    width: calc(100% - 1rem);
     left: 0.5rem;
     right: 0.5rem;
     bottom: 5.2rem;
