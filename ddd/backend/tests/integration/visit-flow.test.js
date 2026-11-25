@@ -276,6 +276,93 @@ describeDb('log a visit across company-local midnight', () => {
     ]);
   });
 
+  it('preserves an edit winning before a waiting same-day return', async () => {
+    const f = await fixture();
+    at(DAY2_FIRST_SECOND);
+    const first = await visit(f);
+
+    let releaseEdit;
+    const editGate = new Promise((resolve) => {
+      releaseEdit = resolve;
+    });
+    let signalEditLock;
+    const editLockAcquired = new Promise((resolve) => {
+      signalEditLock = resolve;
+    });
+
+    const gatedRunInTransaction = async (callback) => {
+      const client = await getPool().connect();
+      try {
+        await client.query('BEGIN');
+        const result = await callback({
+          query: async (sql, values) => {
+            const result = await client.query(sql, values);
+            if (
+              sql.includes('pg_advisory_xact_lock') &&
+              String(sql).includes('hashtext')
+            ) {
+              signalEditLock();
+              await editGate;
+            }
+            return result;
+          },
+        });
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    };
+
+    const gatedEditService = createInteractionsService({
+      now: () => clock,
+      runInTransaction: gatedRunInTransaction,
+    });
+    at(DAY2_MORNING);
+    const editPromise = gatedEditService.reviseInteraction({
+      organizationId: f.org,
+      userId: f.user,
+      role: f.role,
+      interactionId: first.interactionId,
+      contactName: 'Edited Name',
+      contactPhone: '555-0199',
+      contactEmail: 'edited@example.com',
+      notes: 'Edit wins',
+    });
+
+    await editLockAcquired;
+    const returnPromise = service.createInteractionForProperty({
+      organizationId: f.org,
+      userId: f.user,
+      propertyId: f.property,
+      statusId: f.status,
+      sameDayReturn: true,
+      notes: undefined,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    releaseEdit();
+
+    const [edited, sameDay] = await Promise.all([editPromise, returnPromise]);
+    expect(edited).toMatchObject({
+      contactName: 'Edited Name',
+      contactPhone: '555-0199',
+      contactEmail: 'edited@example.com',
+      notes: 'Edit wins',
+    });
+    expect(sameDay).toMatchObject({
+      contactName: 'Edited Name',
+      contactPhone: '555-0199',
+      contactEmail: 'edited@example.com',
+      notes: 'Edit wins',
+    });
+    expect(await state(f)).toEqual([
+      { d: '2026-07-02', counted: 1, snapshots: 3, groups: 1, currents: 1 },
+    ]);
+  });
+
   it('coordinates a same-day return with a competing edit after locking', async () => {
     const f = await fixture();
     at(DAY2_FIRST_SECOND);
