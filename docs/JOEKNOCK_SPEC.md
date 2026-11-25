@@ -109,9 +109,19 @@ remain possible. Recenter resumes following the current location.
 
 V1 uses OpenStreetMap tiles and public Nominatim reverse geocoding. PR #49 added
 a configurable provider identity and timeout, bounded in-process caching,
-sharing of identical in-flight requests, and database advisory-gate pacing
-with cooldown. The gate coordinates processes sharing its database and may hold
-a connection while waiting; deployment capacity/policy checks remain open.
+sharing of identical in-flight requests, and database-coordinated pacing.
+A metadata-only singleton lease and an advisory lock coordinate all API
+processes and organizations using the same database. A provider call holds
+one connection while active, but its result returns after recording the
+cooldown; no connection or background timer is held for the cooldown itself.
+Unavailable coordination fails closed. A conservative 32-second reservation
+protects the maximum 30-second provider timeout and cooldown after an
+unexpected worker exit; a live stalled worker retains the advisory lock.
+The additive pacing-table migration must be applied before the new code is
+started. Old and new gate implementations must not run together: older
+processes do not honor the persisted cooldown. Coordinate the rollout and
+stop old processes before starting new ones. Separate databases do not share
+this gate; deployment-wide provider capacity/policy checks remain open.
 Provide appropriate OpenStreetMap attribution. There is no general
 property-edit endpoint or user-editable coordinate flow.
 

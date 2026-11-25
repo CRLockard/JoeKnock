@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createManagedGeocodingProvider } from '../../src/properties/managedGeocodingProvider.js';
+import { EventEmitter } from 'node:events';
+import {
+  createManagedGeocodingProvider,
+  createProviderGate,
+} from '../../src/properties/managedGeocodingProvider.js';
 import { createNominatimGeocodingProvider } from '../../src/properties/geocodingProvider.js';
 
 const address = {
@@ -10,6 +14,58 @@ const address = {
   country: 'US',
 };
 describe('managed geocoding', () => {
+  it('fails closed without calling the provider if database coordination is unavailable', async () => {
+    const operation = vi.fn();
+    const gate = createProviderGate({
+      pool: () => ({
+        connect: async () => {
+          throw new Error('database unavailable');
+        },
+      }),
+    });
+    await expect(gate(operation)).rejects.toMatchObject({
+      category: 'provider_coordination_unavailable',
+    });
+    expect(operation).not.toHaveBeenCalled();
+  });
+
+  it('aborts an active provider call and destroys a failed coordination connection', async () => {
+    const client = new EventEmitter();
+    client.query = vi.fn(async (sql) => {
+      if (sql.includes('pg_try_advisory_lock'))
+        return { rows: [{ acquired: true }] };
+      return { rows: [{ singleton: true }], rowCount: 1 };
+    });
+    client.release = vi.fn();
+    const gate = createProviderGate({
+      pool: () => ({ connect: async () => client }),
+    });
+    const pending = gate(async (signal) => {
+      await new Promise((resolve) => {
+        signal.addEventListener('abort', resolve, { once: true });
+        client.emit('error', new Error('connection lost'));
+      });
+    });
+    await expect(pending).rejects.toMatchObject({
+      category: 'provider_coordination_unavailable',
+    });
+    expect(client.release).toHaveBeenCalledWith(true);
+    expect(client.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts old cache entries at the configured bound', async () => {
+    const provider = { reverseGeocode: vi.fn(async () => address) };
+    const managed = createManagedGeocodingProvider({
+      provider,
+      gate: (fn) => fn(),
+      maxEntries: 1,
+    });
+    await managed.reverseGeocode({ latitude: 1, longitude: 2 });
+    await managed.reverseGeocode({ latitude: 2, longitude: 2 });
+    await managed.reverseGeocode({ latitude: 1, longitude: 2 });
+    expect(provider.reverseGeocode).toHaveBeenCalledTimes(3);
+  });
+
   it('coalesces concurrent identical coordinates and caches before a provider call', async () => {
     const provider = { reverseGeocode: vi.fn(async () => address) };
     const gate = vi.fn((fn) => fn());
